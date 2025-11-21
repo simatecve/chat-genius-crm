@@ -177,9 +177,9 @@ export const dashboardService = {
 
       const { data, error } = await supabase
         .from('conversations')
-        .select('id, pushname, whatsapp_number, last_message, last_message_at, unread_count')
+        .select('id, pushname, whatsapp_number, last_message, last_message_time, unread_count')
         .in('instance_name', instanceNames)
-        .order('last_message_at', { ascending: false })
+        .order('last_message_time', { ascending: false })
         .limit(limit);
 
       if (error) throw error;

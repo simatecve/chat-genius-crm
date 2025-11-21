@@ -288,6 +288,7 @@ const CreateCampaign = () => {
       const campaignData = {
         name: formData.name.trim(),
         description: formData.description.trim(),
+        message: formData.campaign_message.trim(),
         whatsapp_connection_name: formData.whatsapp_connection_name,
         campaign_message: formData.campaign_message.trim(),
         edit_with_ai: formData.edit_with_ai,

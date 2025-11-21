@@ -174,16 +174,13 @@ const AIAgents = () => {
     if (!editingAgent) return;
 
     try {
-      const whatsappConnection = whatsappConnections.find(conn => conn.id === formData.whatsapp_connection_id);
-      
       const { data, error } = await supabase
         .from('ai_agents')
         .update({
           name: formData.name.trim(),
-          whatsapp_connection_id: formData.whatsapp_connection_id === 'none' ? null : formData.whatsapp_connection_id || null,
-          whatsapp_connection_name: whatsappConnection?.name || null,
-          instructions: formData.instructions.trim(),
-          message_delay: formData.message_delay * 1000,
+          system_prompt: formData.system_prompt.trim(),
+          temperature: formData.temperature,
+          max_tokens: formData.max_tokens,
           is_active: formData.is_active,
           updated_at: new Date().toISOString()
         })

@@ -182,7 +182,7 @@ const AdminConversations = () => {
             <div className="text-2xl font-bold">
               {conversations.filter(c => {
                 const today = new Date();
-                const conversationDate = new Date(c.last_message_at || c.created_at);
+                const conversationDate = new Date(c.last_message_time || c.created_at);
                 return conversationDate.toDateString() === today.toDateString();
               }).length}
             </div>
@@ -315,7 +315,7 @@ const AdminConversations = () => {
                       <div className="flex items-center space-x-2">
                         <Clock className="h-4 w-4 text-gray-400" />
                         <span className="text-sm text-gray-500">
-                          {new Date(conversation.last_message_at || conversation.created_at).toLocaleDateString()}
+                          {new Date(conversation.last_message_time || conversation.created_at).toLocaleDateString()}
                         </span>
                       </div>
                     </td>
