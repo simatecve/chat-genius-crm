@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/hooks/use-toast';
-import logo2 from '@/assets/logo2.png';
+import logo from '@/assets/supercrm-logo.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -70,8 +70,8 @@ const Login = () => {
         <CardHeader className="text-center space-y-6">
           <div className="flex justify-center">
             <img 
-              src={logo2} 
-              alt="KanbanPRO" 
+              src={logo} 
+              alt="SUPERCRM" 
               className="h-16 w-auto"
             />
           </div>

@@ -16,7 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
-import logo2 from '@/assets/logo2.png';
+import logo from '@/assets/supercrm-logo.png';
 
 interface SidebarItem {
   label: string;

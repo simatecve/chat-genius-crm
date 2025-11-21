@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import logo2 from '@/assets/logo2.png';
+import logo from '@/assets/supercrm-logo.png';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface AdminLayoutProps {
@@ -106,8 +106,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         {/* Logo section */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
           <div className="flex items-center space-x-2">
-            <img src={logo2} alt="Logo" className="h-8 w-8" />
-            <span className="text-xl font-bold text-sidebar-foreground">Admin Panel</span>
+            <img src={logo} alt="SUPERCRM" className="h-10 w-auto" />
           </div>
           <Button
             variant="ghost"
