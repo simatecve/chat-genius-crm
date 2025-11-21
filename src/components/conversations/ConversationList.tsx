@@ -146,7 +146,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.pushname || conversation.whatsapp_number}
             </h3>
             <span className="text-xs text-muted-foreground">
-              {conversation.last_message_at && formatTime(conversation.last_message_at)}
+              {conversation.last_message_time && formatTime(conversation.last_message_time)}
             </span>
           </div>
           

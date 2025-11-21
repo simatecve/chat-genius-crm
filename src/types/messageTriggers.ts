@@ -1,9 +1,9 @@
 import { Tables, TablesInsert, TablesUpdate } from '../integrations/supabase/types';
 
-// Tipos base de la tabla column_message_triggers
-export type MessageTrigger = Tables<'column_message_triggers'>;
-export type MessageTriggerInsert = TablesInsert<'column_message_triggers'>;
-export type MessageTriggerUpdate = TablesUpdate<'column_message_triggers'>;
+// Tipos base de la tabla message_triggers (también conocida como column_message_triggers)
+export type MessageTrigger = Tables<'message_triggers'>;
+export type MessageTriggerInsert = TablesInsert<'message_triggers'>;
+export type MessageTriggerUpdate = TablesUpdate<'message_triggers'>;
 
 // Tipos específicos para la UI
 export interface MessageTriggerFormData {

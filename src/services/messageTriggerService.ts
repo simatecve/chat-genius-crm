@@ -5,7 +5,7 @@ export class MessageTriggerService {
   // Obtener todos los disparadores de un usuario
   static async getMessageTriggers(userId: string): Promise<MessageTrigger[]> {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -20,7 +20,7 @@ export class MessageTriggerService {
   // Obtener disparadores por columna
   static async getMessageTriggersByColumn(columnId: string): Promise<MessageTrigger[]> {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .select('*')
       .eq('column_id', columnId)
       .order('created_at', { ascending: false });
@@ -35,7 +35,7 @@ export class MessageTriggerService {
   // Obtener un disparador por ID
   static async getMessageTriggerById(id: string): Promise<MessageTrigger | null> {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .select('*')
       .eq('id', id)
       .single();
@@ -53,7 +53,7 @@ export class MessageTriggerService {
   // Crear un nuevo disparador
   static async createMessageTrigger(trigger: MessageTriggerInsert): Promise<MessageTrigger> {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .insert(trigger)
       .select()
       .single();
@@ -68,7 +68,7 @@ export class MessageTriggerService {
   // Actualizar un disparador
   static async updateMessageTrigger(id: string, updates: MessageTriggerUpdate): Promise<MessageTrigger> {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .update({
         ...updates,
         updated_at: new Date().toISOString()
@@ -87,7 +87,7 @@ export class MessageTriggerService {
   // Eliminar un disparador
   static async deleteMessageTrigger(id: string): Promise<void> {
     const { error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .delete()
       .eq('id', id);
 
@@ -104,7 +104,7 @@ export class MessageTriggerService {
   // Obtener disparadores por condición
   static async getTriggersByCondition(condition: string): Promise<MessageTrigger[]> {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .select('*')
       .eq('trigger_condition', condition)
       .order('created_at', { ascending: false });
@@ -118,11 +118,11 @@ export class MessageTriggerService {
 
   // Obtener disparadores activos por columna y condición
   static async getActiveTriggersByColumnAndCondition(
-    columnId: string,
+    columnId: string, 
     condition: string
   ): Promise<MessageTrigger[]> {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .select('*')
       .eq('column_id', columnId)
       .eq('is_active', true)
@@ -139,7 +139,7 @@ export class MessageTriggerService {
   // Obtener disparadores con información de la columna
   static async getMessageTriggersWithColumnInfo(userId: string) {
     const { data, error } = await supabase
-      .from('column_message_triggers')
+      .from('message_triggers')
       .select(`
         *,
         lead_columns!inner(

@@ -173,6 +173,7 @@ Deno.serve(async (req) => {
       } catch (messageError) {
         console.error(`❌ Error processing message ${message.id}:`, messageError);
         
+        const errorMsg = messageError instanceof Error ? messageError.message : 'Unknown error';
         const currentRetryCount = message.retry_count || 0;
         
         if (currentRetryCount < 3) {
@@ -184,7 +185,7 @@ Deno.serve(async (req) => {
               retry_count: currentRetryCount + 1,
               last_retry_at: new Date().toISOString(),
               scheduled_for: nextRetry,
-              error_message: `Exception: ${messageError.message}`,
+              error_message: `Exception: ${errorMsg}`,
             })
             .eq('id', message.id);
         } else {
@@ -192,7 +193,7 @@ Deno.serve(async (req) => {
             .from('automated_message_logs')
             .update({ 
               status: 'failed',
-              error_message: `Failed after 3 retries. Last error: ${messageError.message}`,
+              error_message: `Failed after 3 retries. Last error: ${errorMsg}`,
             })
             .eq('id', message.id);
           
@@ -217,8 +218,9 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error('❌ Fatal error in process-scheduled-messages:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
