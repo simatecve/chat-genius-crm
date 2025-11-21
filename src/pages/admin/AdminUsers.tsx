@@ -49,7 +49,7 @@ const AdminUsers = () => {
     last_name: '',
     phone: '',
     company_name: '',
-    profile_type: 'cliente' as ProfileType
+    profile_type: 'client' as ProfileType
   });
   const [newPassword, setNewPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
@@ -200,7 +200,7 @@ const AdminUsers = () => {
           last_name: '',
           phone: '',
           company_name: '',
-          profile_type: 'cliente'
+          profile_type: 'client'
         });
         
         // Refresh users list separately to avoid affecting success message
@@ -507,7 +507,7 @@ const AdminUsers = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cliente">Cliente</SelectItem>
+                      <SelectItem value="client">Cliente</SelectItem>
                       <SelectItem value="superadmin">Super Admin</SelectItem>
                     </SelectContent>
                   </Select>
@@ -613,7 +613,7 @@ const AdminUsers = () => {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-2">
-                          {user.profile_type === 'cliente' && (
+                          {user.profile_type === 'client' && (
                             <Button
                               variant="default"
                               size="sm"
@@ -777,7 +777,7 @@ const AdminUsers = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cliente">Cliente</SelectItem>
+                        <SelectItem value="client">Cliente</SelectItem>
                         <SelectItem value="superadmin">Super Admin</SelectItem>
                       </SelectContent>
                     </Select>

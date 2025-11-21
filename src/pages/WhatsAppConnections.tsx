@@ -19,7 +19,6 @@ interface WhatsAppConnection {
   id: string;
   name: string;
   phone_number: string;
-  color: string;
   status: string;
   created_at: string;
 }
@@ -46,8 +45,7 @@ const WhatsAppConnections = () => {
   const [verifying, setVerifying] = useState<string | null>(null); // Agregar esta línea
   const [formData, setFormData] = useState({
     name: '',
-    phone_number: '',
-    color: '#3b82f6'
+    phone_number: ''
   });
   const { toast } = useToast();
   const { user } = useAuth();
@@ -285,7 +283,6 @@ const WhatsAppConnections = () => {
         // Datos de la conexión WhatsApp
         nombre_instancia: formData.name,
         telefono: formData.phone_number,
-        color: formData.color,
         
         // Metadatos adicionales
         created_at: new Date().toISOString(),
@@ -310,13 +307,12 @@ const WhatsAppConnections = () => {
       console.log('Webhook response:', webhookData);
 
       // Si el webhook fue exitoso, guardar en la base de datos
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('whatsapp_connections')
         .insert({
           user_id: effectiveUserId,
           name: formData.name,
           phone_number: formData.phone_number,
-          color: formData.color,
           status: 'desconectado'
         })
         .select()
@@ -333,7 +329,7 @@ const WhatsAppConnections = () => {
       });
 
       setDialogOpen(false);
-      setFormData({ name: '', phone_number: '', color: '#3b82f6' });
+      setFormData({ name: '', phone_number: '' });
       fetchConnections();
     } catch (error: any) {
       console.error('Error creating connection:', error);
@@ -485,10 +481,6 @@ const WhatsAppConnections = () => {
     }
   };
 
-  const getColorOption = (colorValue: string) => {
-    return colorOptions.find(opt => opt.value === colorValue) || colorOptions[0];
-  };
-
   if (loading || userIdLoading) {
     return (
         <div className="space-y-6">
@@ -549,29 +541,8 @@ const WhatsAppConnections = () => {
                   disabled={creating}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Color de identificación</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {colorOptions.map((color) => (
-                    <button
-                      key={color.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, color: color.value })}
-                      className={`flex items-center space-x-2 p-3 rounded-lg border-2 transition-all ${
-                        formData.color === color.value 
-                          ? 'border-primary bg-primary/10' 
-                          : 'border-border hover:border-primary/50'
-                      }`}
-                      disabled={creating}
-                    >
-                      <div className={`w-4 h-4 rounded-full ${color.bg}`}></div>
-                      <span className="text-sm">{color.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
               <Button 
-                type="submit" 
+                type="submit"
                 className="w-full bg-emerald-500 hover:bg-emerald-600"
                 disabled={creating}
               >
@@ -675,15 +646,11 @@ const WhatsAppConnections = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {connections.map((connection) => {
-            const colorOption = getColorOption(connection.color);
             return (
               <Card key={connection.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
-                      <div 
-                        className={`w-4 h-4 rounded-full ${colorOption.bg}`}
-                      ></div>
                       <h3 className="font-semibold">{connection.name}</h3>
                     </div>
                     <div className="flex items-center space-x-2">

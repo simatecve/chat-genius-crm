@@ -26,12 +26,9 @@ import NotFound from "./pages/NotFound";
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
-import AdminPaymentPlans from "./pages/admin/AdminPaymentPlans";
-import AdminPaymentMethods from "./pages/admin/AdminPaymentMethods";
 import AdminStatistics from "./pages/admin/AdminStatistics";
 import AdminMessages from "./pages/admin/AdminMessages";
 import AdminConversations from "./pages/admin/AdminConversations";
-import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
 
 const queryClient = new QueryClient();
 
@@ -140,16 +137,6 @@ const App = () => (
                 <AdminUsers />
               </ProtectedRoute>
             } />
-            <Route path="/admin/planes" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminPaymentPlans />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/metodos-pago" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminPaymentMethods />
-              </ProtectedRoute>
-            } />
             <Route path="/admin/estadisticas" element={
               <ProtectedRoute requireSuperAdmin>
                 <AdminStatistics />
@@ -163,11 +150,6 @@ const App = () => (
             <Route path="/admin/conversaciones" element={
               <ProtectedRoute requireSuperAdmin>
                 <AdminConversations />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/gestion-suscripciones" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminSubscriptions />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
