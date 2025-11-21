@@ -91,6 +91,7 @@ export type Database = {
           created_at: string | null
           error_message: string | null
           id: string
+          last_retry_at: string | null
           lead_id: string | null
           message_content: string
           phone_number: string
@@ -105,6 +106,7 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          last_retry_at?: string | null
           lead_id?: string | null
           message_content: string
           phone_number: string
@@ -119,6 +121,7 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          last_retry_at?: string | null
           lead_id?: string | null
           message_content?: string
           phone_number?: string
@@ -195,18 +198,21 @@ export type Database = {
       }
       contact_list_members: {
         Row: {
+          added_at: string | null
           contact_id: string
           contact_list_id: string
           created_at: string | null
           id: string
         }
         Insert: {
+          added_at?: string | null
           contact_id: string
           contact_list_id: string
           created_at?: string | null
           id?: string
         }
         Update: {
+          added_at?: string | null
           contact_id?: string
           contact_list_id?: string
           created_at?: string | null
@@ -694,6 +700,8 @@ export type Database = {
           id: string
           last_name: string | null
           phone: string | null
+          plan_id: string | null
+          plan_type: string | null
           profile_type: Database["public"]["Enums"]["profile_type"] | null
           updated_at: string | null
         }
@@ -705,6 +713,8 @@ export type Database = {
           id: string
           last_name?: string | null
           phone?: string | null
+          plan_id?: string | null
+          plan_type?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
           updated_at?: string | null
         }
@@ -716,10 +726,20 @@ export type Database = {
           id?: string
           last_name?: string | null
           phone?: string | null
+          plan_id?: string | null
+          plan_type?: string | null
           profile_type?: Database["public"]["Enums"]["profile_type"] | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scheduled_messages: {
         Row: {
@@ -992,6 +1012,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_usage: {
+        Args: { p_amount?: number; p_resource_type: string; p_user_id: string }
+        Returns: undefined
       }
     }
     Enums: {

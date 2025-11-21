@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/integrations/supabase/types';
 
-type PaymentPlan = Database['public']['Tables']['subscription_plans']['Row'];
+type PaymentPlan = Database['public']['Tables']['payment_plans']['Row'];
 type UserSubscription = Database['public']['Tables']['user_subscriptions']['Row'];
 
 const PaymentPlans = () => {
@@ -43,7 +43,7 @@ const PaymentPlans = () => {
       
       // Obtener planes activos
       const { data: plansData, error: plansError } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .select('*')
         .eq('is_active', true)
         .order('price', { ascending: true });
@@ -84,7 +84,7 @@ const PaymentPlans = () => {
 
       // Obtener el plan
       const { data: plan, error: planError } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .select('*')
         .eq('id', planId)
         .single();

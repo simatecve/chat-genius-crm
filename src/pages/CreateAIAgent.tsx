@@ -100,7 +100,7 @@ const CreateAIAgent = () => {
       const whatsappConnection = whatsappConnections.find(conn => conn.id === formData.whatsapp_connection_id);
       
       const { data, error } = await supabase
-        .from('ai_bots')
+        .from('ai_agents')
         .insert({
           user_id: user?.id!,
           name: formData.name.trim(),
