@@ -16,49 +16,16 @@ export class ConversationService {
    */
   static async getConversations(userId: string): Promise<ConversationWithLastMessage[]> {
     try {
-      // Primero obtenemos las instancias de WhatsApp del usuario
-      const { data: userInstances, error: instancesError } = await supabase
-        .from('whatsapp_connections')
-        .select('name')
-        .eq('user_id', userId);
-
-      if (instancesError) {
-        console.error('Error fetching user instances:', instancesError);
-        throw instancesError;
-      }
-      
-      // Si el usuario no tiene instancias, retornamos array vacío
-      if (!userInstances || userInstances.length === 0) {
-        return [];
-      }
-
-      // Extraemos los nombres de las instancias
-      const instanceNames = userInstances.map(instance => instance.name);
-
-      // Filtramos conversaciones por las instancias del usuario
       const { data, error } = await supabase
         .from('conversations')
         .select(`
           *,
-          messages!inner(
-            id,
-            message,
-            created_at,
-            direction,
-            message_type,
-            is_bot,
-            attachment_url,
-            conversation_id,
-            file_url,
-            instance_name,
-            pushname,
-            updated_at,
-            user_id,
-            whatsapp_number
+          messages(
+            *
           )
         `)
-        .in('instance_name', instanceNames)
-        .order('last_message_at', { ascending: false });
+        .eq('user_id', userId)
+        .order('last_message_time', { ascending: false });
 
       if (error) {
         console.error('Error fetching conversations:', error);
@@ -100,50 +67,17 @@ export class ConversationService {
    */
   static async searchConversations(userId: string, searchTerm: string): Promise<ConversationWithLastMessage[]> {
     try {
-      // Primero obtenemos las instancias de WhatsApp del usuario
-      const { data: userInstances, error: instancesError } = await supabase
-        .from('whatsapp_connections')
-        .select('name')
-        .eq('user_id', userId);
-
-      if (instancesError) {
-        console.error('Error fetching user instances:', instancesError);
-        throw instancesError;
-      }
-      
-      // Si el usuario no tiene instancias, retornamos array vacío
-      if (!userInstances || userInstances.length === 0) {
-        return [];
-      }
-
-      // Extraemos los nombres de las instancias
-      const instanceNames = userInstances.map(instance => instance.name);
-
-      // Filtramos conversaciones por las instancias del usuario y la búsqueda
       const { data, error } = await supabase
         .from('conversations')
         .select(`
           *,
-          messages!inner(
-            id,
-            message,
-            created_at,
-            direction,
-            message_type,
-            is_bot,
-            attachment_url,
-            conversation_id,
-            file_url,
-            instance_name,
-            pushname,
-            updated_at,
-            user_id,
-            whatsapp_number
+          messages(
+            *
           )
         `)
-        .in('instance_name', instanceNames)
-        .or(`pushname.ilike.%${searchTerm}%,whatsapp_number.ilike.%${searchTerm}%`)
-        .order('last_message_at', { ascending: false });
+        .eq('user_id', userId)
+        .or(`pushname.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`)
+        .order('last_message_time', { ascending: false });
 
       if (error) {
         console.error('Error searching conversations:', error);
@@ -162,31 +96,11 @@ export class ConversationService {
    */
   static async getMessages(conversationId: string, userId: string, limit: number = 50, offset: number = 0): Promise<Message[]> {
     try {
-      // Primero obtenemos las instancias de WhatsApp del usuario
-      const { data: userInstances, error: instancesError } = await supabase
-        .from('whatsapp_connections')
-        .select('name')
-        .eq('user_id', userId);
-
-      if (instancesError) {
-        console.error('Error fetching user instances:', instancesError);
-        throw instancesError;
-      }
-      
-      // Si el usuario no tiene instancias, retornamos array vacío
-      if (!userInstances || userInstances.length === 0) {
-        return [];
-      }
-
-      // Extraemos los nombres de las instancias
-      const instanceNames = userInstances.map(instance => instance.name);
-
-      // Filtramos mensajes por conversación y las instancias del usuario
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .in('instance_name', instanceNames)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -306,13 +220,19 @@ export class ConversationService {
     try {
       const webhookUrl = 'https://n8n.kanbanpro.com.ar/webhook/enviar-mensaje';
       
+      // Obtener información de la conversación para los campos faltantes
+      const { data: conversation } = await supabase
+        .from('conversations')
+        .select('whatsapp_number, pushname')
+        .eq('id', messageData.conversation_id)
+        .single();
+      
       const payload = {
         id: messageData.id,
         user_id: messageData.user_id,
         conversation_id: messageData.conversation_id,
-        whatsapp_number: messageData.whatsapp_number,
-        instance_name: messageData.instance_name,
-        pushname: messageData.pushname,
+        whatsapp_number: conversation?.whatsapp_number || '',
+        pushname: conversation?.pushname || '',
         message: messageData.message,
         message_type: messageData.message_type,
         direction: messageData.direction,
@@ -320,7 +240,6 @@ export class ConversationService {
         file_url: messageData.file_url,
         is_bot: messageData.is_bot,
         created_at: messageData.created_at,
-        updated_at: messageData.updated_at,
       };
 
       await fetch(webhookUrl, {
@@ -351,7 +270,7 @@ export class ConversationService {
         .from('conversations')
         .update({
           last_message: lastMessage,
-          last_message_at: lastMessageAt,
+          last_message_time: lastMessageAt,
           updated_at: new Date().toISOString()
         })
         .eq('id', conversationId);

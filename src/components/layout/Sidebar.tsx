@@ -45,7 +45,6 @@ export const Sidebar = () => {
     {
       label: 'Comunicaciones',
       items: [
-        { label: 'Conexiones WhatsApp', icon: Phone, href: '/conexiones' },
         { 
           label: 'Conversaciones', 
           icon: MessageSquare, 
