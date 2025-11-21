@@ -80,7 +80,7 @@ const AIAgents = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('ai_bots')
+        .from('ai_agents')
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -149,7 +149,7 @@ const AIAgents = () => {
       const whatsappConnection = whatsappConnections.find(conn => conn.id === formData.whatsapp_connection_id);
       
       const { data, error } = await supabase
-        .from('ai_bots')
+        .from('ai_agents')
         .insert({
           user_id: user?.id!,
           name: formData.name.trim(),
@@ -191,7 +191,7 @@ const AIAgents = () => {
       const whatsappConnection = whatsappConnections.find(conn => conn.id === formData.whatsapp_connection_id);
       
       const { data, error } = await supabase
-        .from('ai_bots')
+        .from('ai_agents')
         .update({
           name: formData.name.trim(),
           whatsapp_connection_id: formData.whatsapp_connection_id === 'none' ? null : formData.whatsapp_connection_id || null,
@@ -236,7 +236,7 @@ const AIAgents = () => {
       setDeleting(agentId);
       
       const { error } = await supabase
-        .from('ai_bots')
+        .from('ai_agents')
         .delete()
         .eq('id', agentId)
         .eq('user_id', user?.id);
@@ -264,8 +264,8 @@ const AIAgents = () => {
   const toggleAgentStatus = async (agent: AIAgent) => {
     try {
       const { error } = await supabase
-        .from('ai_bots')
-        .update({ 
+        .from('ai_agents')
+        .update({
           is_active: !agent.is_active,
           updated_at: new Date().toISOString()
         })

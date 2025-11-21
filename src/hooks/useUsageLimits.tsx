@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
-type SubscriptionPlan = Database['public']['Tables']['subscription_plans']['Row'];
+type SubscriptionPlan = Database['public']['Tables']['payment_plans']['Row'];
 type UserUsage = Database['public']['Tables']['user_usage']['Row'];
 type UserSubscription = Database['public']['Tables']['user_subscriptions']['Row'];
 
@@ -52,7 +52,7 @@ export const useUsageLimits = () => {
         .from('user_subscriptions')
         .select(`
           *,
-          subscription_plans(*)
+          payment_plans(*)
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
@@ -74,7 +74,7 @@ export const useUsageLimits = () => {
       }
 
       setLimitsData({
-        plan: subscription?.subscription_plans || null,
+        plan: subscription?.payment_plans || null,
         usage: usage || null,
         subscription: subscription || null,
         loading: false,
