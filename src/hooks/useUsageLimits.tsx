@@ -91,100 +91,19 @@ export const useUsageLimits = () => {
   };
 
   const checkLimit = (resourceType: keyof UserUsage, requestedAmount: number = 1): LimitCheck => {
-    if (!limitsData.plan || !limitsData.usage) {
-      return {
-        allowed: false,
-        usage: 0,
-        limit: 0,
-        percentage: 0,
-        message: 'No se pudo verificar el límite'
-      };
-    }
-
-    const { plan, usage } = limitsData;
-    let currentUsage = 0;
-    let limit = 0;
-    let resourceName = '';
-
-    switch (resourceType) {
-      case 'whatsapp_connections_used':
-        currentUsage = usage.whatsapp_connections_used;
-        limit = plan.max_whatsapp_connections;
-        resourceName = 'conexiones WhatsApp';
-        break;
-      case 'contacts_used':
-        currentUsage = usage.contacts_used;
-        limit = plan.max_contacts;
-        resourceName = 'contactos';
-        break;
-      case 'campaigns_this_month':
-        currentUsage = usage.campaigns_this_month;
-        limit = plan.max_monthly_campaigns;
-        resourceName = 'campañas este mes';
-        break;
-      case 'bot_responses_this_month':
-        currentUsage = usage.bot_responses_this_month;
-        limit = plan.max_bot_responses;
-        resourceName = 'respuestas del bot este mes';
-        break;
-      case 'storage_used_mb':
-        currentUsage = usage.storage_used_mb;
-        limit = plan.max_storage_mb;
-        resourceName = 'almacenamiento (MB)';
-        break;
-      case 'device_sessions_used':
-        currentUsage = usage.device_sessions_used;
-        limit = plan.max_device_sessions || 1;
-        resourceName = 'sesiones de dispositivo';
-        break;
-      case 'conversations_used':
-        currentUsage = usage.conversations_used;
-        limit = plan.max_conversations || 100;
-        resourceName = 'conversaciones';
-        break;
-      default:
-        return {
-          allowed: false,
-          usage: 0,
-          limit: 0,
-          percentage: 0,
-          message: 'Recurso no reconocido'
-        };
-    }
-
-    const wouldExceed = (currentUsage + requestedAmount) > limit;
-    const percentage = Math.round((currentUsage / limit) * 100);
-
+    // LÍMITES DESACTIVADOS - Siempre permitir acceso
     return {
-      allowed: !wouldExceed,
-      usage: currentUsage,
-      limit,
-      percentage,
-      message: wouldExceed 
-        ? `Has alcanzado el límite de ${resourceName} (${currentUsage}/${limit}). Actualiza tu plan para continuar.`
-        : percentage >= 80 
-          ? `Te estás acercando al límite de ${resourceName} (${currentUsage}/${limit} - ${percentage}%).`
-          : undefined
+      allowed: true,
+      usage: 0,
+      limit: 999999,
+      percentage: 0,
+      message: undefined
     };
   };
 
   const checkUsageLimit = async (resourceType: string, requestedAmount: number = 1): Promise<boolean> => {
-    if (!user) return false;
-
-    try {
-      const { data, error } = await supabase
-        .rpc('check_usage_limit', {
-          p_user_id: user.id,
-          p_resource_type: resourceType,
-          p_requested_amount: requestedAmount
-        });
-
-      if (error) throw error;
-      return data;
-    } catch (error: any) {
-      console.error('Error checking usage limit:', error);
-      return false;
-    }
+    // LÍMITES DESACTIVADOS - Siempre permitir
+    return true;
   };
 
   const incrementUsage = async (resourceType: string, amount: number = 1): Promise<boolean> => {
@@ -220,17 +139,7 @@ export const useUsageLimits = () => {
   };
 
   const enforceLimit = async (resourceType: string, requestedAmount: number = 1): Promise<boolean> => {
-    const allowed = await checkUsageLimit(resourceType, requestedAmount);
-    
-    if (!allowed) {
-      toast({
-        title: "Límite alcanzado",
-        description: "Has alcanzado el límite de tu plan actual. Actualiza tu plan para continuar.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
+    // LÍMITES DESACTIVADOS - Siempre permitir
     return true;
   };
 
@@ -245,7 +154,8 @@ export const useUsageLimits = () => {
   };
 
   const hasActivePlan = (): boolean => {
-    return limitsData.subscription?.status === 'active' && limitsData.plan !== null;
+    // LÍMITES DESACTIVADOS - Siempre retornar true
+    return true;
   };
 
   return {
