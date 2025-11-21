@@ -388,6 +388,7 @@ export type Database = {
           position: number
           updated_at: string | null
           user_id: string
+          workspace_id: string | null
         }
         Insert: {
           color?: string | null
@@ -398,6 +399,7 @@ export type Database = {
           position: number
           updated_at?: string | null
           user_id: string
+          workspace_id?: string | null
         }
         Update: {
           color?: string | null
@@ -408,8 +410,17 @@ export type Database = {
           position?: number
           updated_at?: string | null
           user_id?: string
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lead_columns_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {
@@ -996,6 +1007,33 @@ export type Database = {
           qr_code?: string | null
           session_data?: Json | null
           status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workspaces: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          position: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          position?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          position?: number
           updated_at?: string | null
           user_id?: string
         }

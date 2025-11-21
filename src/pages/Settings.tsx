@@ -12,7 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 
 import Integrations from '@/components/Integrations';
-import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot } from 'lucide-react';
+import WorkspaceManagement from '@/components/WorkspaceManagement';
+import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 
@@ -186,8 +187,12 @@ const Settings = () => {
         <h1 className="text-3xl font-bold">Configuración</h1>
       </div>
       
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="workspaces" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="workspaces" className="flex items-center space-x-2">
+              <Briefcase className="h-4 w-4" />
+              <span>Espacios</span>
+            </TabsTrigger>
             <TabsTrigger value="profile" className="flex items-center space-x-2">
               <User className="h-4 w-4" />
               <span>Perfil</span>
@@ -201,6 +206,10 @@ const Settings = () => {
               <span>Integraciones</span>
             </TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="workspaces" className="mt-6">
+            <WorkspaceManagement />
+          </TabsContent>
           
           <TabsContent value="profile" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
