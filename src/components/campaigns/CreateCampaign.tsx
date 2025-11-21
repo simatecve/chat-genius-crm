@@ -49,11 +49,11 @@ export function CreateCampaign({ campaign, contactLists, onClose, onSuccess }: C
       setFormData({
         name: campaign.name,
         description: campaign.description || '',
-        whatsapp_connection_name: campaign.whatsapp_connection_name,
-        campaign_message: campaign.campaign_message,
-        edit_with_ai: campaign.edit_with_ai,
-        min_delay: campaign.min_delay,
-        max_delay: campaign.max_delay,
+        whatsapp_connection_name: campaign.whatsapp_connection_name || '',
+        campaign_message: campaign.message, // map 'message' to 'campaign_message'
+        edit_with_ai: campaign.edit_with_ai || false,
+        min_delay: campaign.min_delay || 1000,
+        max_delay: campaign.max_delay || 5000,
         status: campaign.status,
         contact_list_id: campaign.contact_list_id || '',
         attachment_urls: campaign.attachment_urls || [],
@@ -115,7 +115,7 @@ export function CreateCampaign({ campaign, contactLists, onClose, onSuccess }: C
         name: formData.name.trim(),
         description: formData.description.trim() || null,
         whatsapp_connection_name: formData.whatsapp_connection_name,
-        campaign_message: formData.campaign_message.trim(),
+        message: formData.campaign_message.trim(), // map 'campaign_message' to 'message'
         edit_with_ai: formData.edit_with_ai,
         min_delay: formData.min_delay,
         max_delay: formData.max_delay,

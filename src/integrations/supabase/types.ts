@@ -86,6 +86,113 @@ export type Database = {
         }
         Relationships: []
       }
+      automated_message_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          lead_id: string | null
+          message_content: string
+          phone_number: string
+          retry_count: number | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string | null
+          trigger_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          message_content: string
+          phone_number: string
+          retry_count?: number | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string | null
+          trigger_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          message_content?: string
+          phone_number?: string
+          retry_count?: number | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string | null
+          trigger_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automated_message_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automated_message_logs_trigger_id_fkey"
+            columns: ["trigger_id"]
+            isOneToOne: false
+            referencedRelation: "column_message_triggers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      column_message_triggers: {
+        Row: {
+          column_id: string
+          created_at: string | null
+          delay_hours: number | null
+          id: string
+          is_active: boolean | null
+          message_content: string
+          message_title: string
+          trigger_condition: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          column_id: string
+          created_at?: string | null
+          delay_hours?: number | null
+          id?: string
+          is_active?: boolean | null
+          message_content: string
+          message_title: string
+          trigger_condition: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          column_id?: string
+          created_at?: string | null
+          delay_hours?: number | null
+          id?: string
+          is_active?: boolean | null
+          message_content?: string
+          message_title?: string
+          trigger_condition?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_triggers_column_id_fkey"
+            columns: ["column_id"]
+            isOneToOne: false
+            referencedRelation: "lead_columns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_list_members: {
         Row: {
           contact_id: string
@@ -145,6 +252,30 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contacto_bloqueado_bot: {
+        Row: {
+          created_at: string | null
+          id: string
+          numero: string
+          pushname: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          numero: string
+          pushname?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          numero?: string
+          pushname?: string | null
           user_id?: string
         }
         Relationships: []
@@ -332,10 +463,17 @@ export type Database = {
       }
       mass_campaigns: {
         Row: {
+          attachment_names: string[] | null
+          attachment_urls: string[] | null
+          campaign_message: string | null
           contact_list_id: string | null
           created_at: string | null
+          description: string | null
+          edit_with_ai: boolean | null
           id: string
+          max_delay: number | null
           message: string
+          min_delay: number | null
           name: string
           scheduled_at: string | null
           sent_count: number | null
@@ -344,12 +482,20 @@ export type Database = {
           updated_at: string | null
           user_id: string
           whatsapp_connection_id: string | null
+          whatsapp_connection_name: string | null
         }
         Insert: {
+          attachment_names?: string[] | null
+          attachment_urls?: string[] | null
+          campaign_message?: string | null
           contact_list_id?: string | null
           created_at?: string | null
+          description?: string | null
+          edit_with_ai?: boolean | null
           id?: string
+          max_delay?: number | null
           message: string
+          min_delay?: number | null
           name: string
           scheduled_at?: string | null
           sent_count?: number | null
@@ -358,12 +504,20 @@ export type Database = {
           updated_at?: string | null
           user_id: string
           whatsapp_connection_id?: string | null
+          whatsapp_connection_name?: string | null
         }
         Update: {
+          attachment_names?: string[] | null
+          attachment_urls?: string[] | null
+          campaign_message?: string | null
           contact_list_id?: string | null
           created_at?: string | null
+          description?: string | null
+          edit_with_ai?: boolean | null
           id?: string
+          max_delay?: number | null
           message?: string
+          min_delay?: number | null
           name?: string
           scheduled_at?: string | null
           sent_count?: number | null
@@ -372,6 +526,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           whatsapp_connection_id?: string | null
+          whatsapp_connection_name?: string | null
         }
         Relationships: [
           {
@@ -390,53 +545,6 @@ export type Database = {
           },
         ]
       }
-      message_triggers: {
-        Row: {
-          column_id: string
-          created_at: string | null
-          delay_hours: number | null
-          id: string
-          is_active: boolean | null
-          message_content: string
-          message_title: string
-          trigger_condition: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          column_id: string
-          created_at?: string | null
-          delay_hours?: number | null
-          id?: string
-          is_active?: boolean | null
-          message_content: string
-          message_title: string
-          trigger_condition: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          column_id?: string
-          created_at?: string | null
-          delay_hours?: number | null
-          id?: string
-          is_active?: boolean | null
-          message_content?: string
-          message_title?: string
-          trigger_condition?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "message_triggers_column_id_fkey"
-            columns: ["column_id"]
-            isOneToOne: false
-            referencedRelation: "lead_columns"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       messages: {
         Row: {
           attachment_url: string | null
@@ -446,6 +554,8 @@ export type Database = {
           direction: string
           file_url: string | null
           id: string
+          is_bot: boolean | null
+          message: string | null
           message_type: string | null
           metadata: Json | null
           status: string | null
@@ -459,6 +569,8 @@ export type Database = {
           direction: string
           file_url?: string | null
           id?: string
+          is_bot?: boolean | null
+          message?: string | null
           message_type?: string | null
           metadata?: Json | null
           status?: string | null
@@ -472,6 +584,8 @@ export type Database = {
           direction?: string
           file_url?: string | null
           id?: string
+          is_bot?: boolean | null
+          message?: string | null
           message_type?: string | null
           metadata?: Json | null
           status?: string | null
@@ -662,7 +776,7 @@ export type Database = {
             foreignKeyName: "scheduled_messages_trigger_id_fkey"
             columns: ["trigger_id"]
             isOneToOne: false
-            referencedRelation: "message_triggers"
+            referencedRelation: "column_message_triggers"
             referencedColumns: ["id"]
           },
         ]
@@ -693,6 +807,30 @@ export type Database = {
           period_end?: string
           period_start?: string
           resource_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_bot_settings: {
+        Row: {
+          auto_stop_on_human_reply: boolean | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_stop_on_human_reply?: boolean | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_stop_on_human_reply?: boolean | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -811,6 +949,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          name: string | null
           phone_number: string
           qr_code: string | null
           session_data: Json | null
@@ -821,6 +960,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          name?: string | null
           phone_number: string
           qr_code?: string | null
           session_data?: Json | null
@@ -831,6 +971,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          name?: string | null
           phone_number?: string
           qr_code?: string | null
           session_data?: Json | null
