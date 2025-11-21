@@ -127,7 +127,7 @@ const Login = () => {
       </div>
 
       {/* Columna derecha - Logo */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-muted/30">
+      <div className="hidden lg:flex flex-1 items-center justify-center bg-gray-100">
         <div className="max-w-md p-8 text-center">
           <img 
             src={logo} 
