@@ -65,24 +65,24 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md shadow-elegant">
-        <CardHeader className="text-center space-y-6">
-          <div className="flex justify-center">
-            <img 
-              src={logo} 
-              alt="SUPERCRM" 
-              className="h-16 w-auto"
-            />
+    <div className="min-h-screen flex">
+      {/* Columna izquierda - Formulario */}
+      <div className="flex-1 flex items-center justify-center p-8 bg-background">
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Iniciar Sesión
+            </h1>
+            <p className="text-muted-foreground">
+              Accede a tu cuenta de SUPERCRM
+            </p>
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">
-            Iniciar Sesión
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -93,8 +93,11 @@ const Login = () => {
                 disabled={isLoading}
               />
             </div>
+            
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password" className="text-sm font-medium">
+                Contraseña
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -105,6 +108,7 @@ const Login = () => {
                 disabled={isLoading}
               />
             </div>
+
             <Button 
               type="submit" 
               className="w-full bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow"
@@ -113,13 +117,32 @@ const Login = () => {
               {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
-          <div className="text-center mt-6 pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground">
-              Versión 1.6.0 (3 noviembre 2025)
+
+          <div className="mt-8 pt-6 border-t border-border">
+            <p className="text-xs text-muted-foreground text-center">
+              Versión 2.0 (21 noviembre 2025)
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Columna derecha - Logo */}
+      <div className="hidden lg:flex flex-1 items-center justify-center bg-muted/30">
+        <div className="max-w-md p-8 text-center">
+          <img 
+            src={logo} 
+            alt="SUPERCRM" 
+            className="w-full max-w-sm mx-auto mb-8"
+          />
+          <h2 className="text-2xl font-semibold text-foreground mb-4">
+            Gestión de clientes y conversaciones
+          </h2>
+          <p className="text-muted-foreground">
+            La plataforma CRM más completa para gestionar tus leads, 
+            conversaciones de WhatsApp y campañas de marketing.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
