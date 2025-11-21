@@ -190,7 +190,7 @@ export const Dashboard = () => {
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-foreground truncate">{conv.pushname || conv.whatsapp_number || 'Contacto desconocido'}</h4>
                         <span className="text-xs text-muted-foreground">
-                          {conv.last_message_at ? formatTimeAgo(conv.last_message_at) : 'Sin fecha'}
+                          {conv.last_message_time ? formatTimeAgo(conv.last_message_time) : 'Sin fecha'}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground truncate">

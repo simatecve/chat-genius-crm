@@ -24,7 +24,7 @@ export interface ActiveConversation {
   pushname: string | null;
   whatsapp_number: string;
   last_message: string | null;
-  last_message_at: string | null;
+  last_message_time: string | null;
   unread_count: number;
 }
 
@@ -72,22 +72,18 @@ export const dashboardService = {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId),
         
-        // Conversaciones activas (basadas en instancias del usuario)
-        instanceNames.length > 0 
-          ? supabase
-              .from('conversations')
-              .select('id', { count: 'exact', head: true })
-              .in('instance_name', instanceNames)
-          : { count: 0 },
+        // Conversaciones activas del usuario
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId),
         
-        // Mensajes enviados
-        instanceNames.length > 0
-          ? supabase
-              .from('messages')
-              .select('id', { count: 'exact', head: true })
-              .in('instance_name', instanceNames)
-              .eq('direction', 'outgoing')
-          : { count: 0 }
+        // Mensajes enviados del usuario
+        supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('direction', 'outgoing')
       ]);
 
       // Calcular tasa de conversión (leads calificados vs total)
@@ -178,7 +174,7 @@ export const dashboardService = {
       const { data, error } = await supabase
         .from('conversations')
         .select('id, pushname, whatsapp_number, last_message, last_message_time, unread_count')
-        .in('instance_name', instanceNames)
+        .eq('user_id', userId)
         .order('last_message_time', { ascending: false })
         .limit(limit);
 

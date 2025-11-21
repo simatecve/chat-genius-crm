@@ -32,7 +32,7 @@ type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
 type ProfileType = Database['public']['Enums']['profile_type'];
 
 interface UserWithAuth extends Profile {
-  email?: string;
+  email: string;
 }
 
 const AdminUsers = () => {
@@ -161,18 +161,15 @@ const AdminUsers = () => {
         // Create profile using supabaseAdmin to bypass RLS with UPSERT to handle duplicates
         const { error: profileError } = await supabaseAdmin
           .from('profiles')
-          .upsert({
+          .upsert([{
             id: authData.user.id,
+            email: authData.user.email || '',
             first_name: formData.first_name || null,
             last_name: formData.last_name || null,
             phone: formData.phone || null,
             company_name: formData.company_name || null,
             profile_type: formData.profile_type,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'id'
-          });
+          }]);
 
         if (profileError) {
           console.error('Profile creation error:', profileError);

@@ -286,6 +286,7 @@ const CreateCampaign = () => {
       const { urls, names } = await uploadFiles();
       
       const campaignData = {
+        user_id: user?.id || '',
         name: formData.name.trim(),
         description: formData.description.trim(),
         message: formData.campaign_message.trim(),
@@ -326,7 +327,7 @@ const CreateCampaign = () => {
         // Crear nueva campaña
         const { error } = await supabase
           .from('mass_campaigns')
-          .insert(campaignData);
+          .insert([campaignData]);
 
         if (error) {
           console.error('Error creating campaign:', error);

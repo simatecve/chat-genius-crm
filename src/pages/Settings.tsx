@@ -13,7 +13,8 @@ import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 
 import Integrations from '@/components/Integrations';
 import WorkspaceManagement from '@/components/WorkspaceManagement';
-import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase } from 'lucide-react';
+import WhatsAppConnections from '@/pages/WhatsAppConnections';
+import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 
@@ -191,10 +192,14 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="workspaces" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="workspaces" className="flex items-center space-x-2">
               <Briefcase className="h-4 w-4" />
               <span>Espacios</span>
+            </TabsTrigger>
+            <TabsTrigger value="sessions" className="flex items-center space-x-2">
+              <Smartphone className="h-4 w-4" />
+              <span>Sesiones</span>
             </TabsTrigger>
             <TabsTrigger value="profile" className="flex items-center space-x-2">
               <User className="h-4 w-4" />
@@ -212,6 +217,10 @@ const Settings = () => {
           
           <TabsContent value="workspaces" className="mt-6">
             <WorkspaceManagement />
+          </TabsContent>
+          
+          <TabsContent value="sessions" className="mt-6">
+            <WhatsAppConnections />
           </TabsContent>
           
           <TabsContent value="profile" className="mt-6">
