@@ -1,0 +1,515 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Plus, Edit, Trash2, Briefcase } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import type { Tables } from '@/integrations/supabase/types';
+
+type Workspace = Tables<'workspaces'>;
+type LeadColumn = Tables<'lead_columns'>;
+
+const WorkspaceManagement = () => {
+  const { user } = useAuth();
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [columns, setColumns] = useState<LeadColumn[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showWorkspaceDialog, setShowWorkspaceDialog] = useState(false);
+  const [showColumnDialog, setShowColumnDialog] = useState(false);
+  const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
+  const [editingColumn, setEditingColumn] = useState<LeadColumn | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [workspaceName, setWorkspaceName] = useState('');
+  const [columnName, setColumnName] = useState('');
+  const [columnColor, setColumnColor] = useState('#3b82f6');
+
+  useEffect(() => {
+    if (user) {
+      loadData();
+    }
+  }, [user]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([loadWorkspaces(), loadColumns()]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: "Error al cargar los datos",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadWorkspaces = async () => {
+    const { data, error } = await supabase
+      .from('workspaces')
+      .select('*')
+      .eq('user_id', user?.id)
+      .order('position');
+
+    if (error) {
+      console.error('Error loading workspaces:', error);
+      return;
+    }
+
+    setWorkspaces(data || []);
+  };
+
+  const loadColumns = async () => {
+    const { data, error } = await supabase
+      .from('lead_columns')
+      .select('*')
+      .eq('user_id', user?.id)
+      .order('position');
+
+    if (error) {
+      console.error('Error loading columns:', error);
+      return;
+    }
+
+    setColumns(data || []);
+  };
+
+  const handleCreateWorkspace = async () => {
+    if (!workspaceName.trim()) return;
+
+    const { data, error } = await supabase
+      .from('workspaces')
+      .insert({
+        name: workspaceName,
+        position: workspaces.length,
+        user_id: user?.id
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating workspace:', error);
+      toast({
+        title: "Error",
+        description: "Error al crear el espacio de trabajo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setWorkspaces([...workspaces, data]);
+    setWorkspaceName('');
+    setShowWorkspaceDialog(false);
+    toast({
+      title: "Éxito",
+      description: "Espacio de trabajo creado correctamente"
+    });
+  };
+
+  const handleUpdateWorkspace = async () => {
+    if (!editingWorkspace || !workspaceName.trim()) return;
+
+    const { error } = await supabase
+      .from('workspaces')
+      .update({ name: workspaceName })
+      .eq('id', editingWorkspace.id);
+
+    if (error) {
+      console.error('Error updating workspace:', error);
+      toast({
+        title: "Error",
+        description: "Error al actualizar el espacio de trabajo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setWorkspaces(workspaces.map(ws => 
+      ws.id === editingWorkspace.id ? { ...ws, name: workspaceName } : ws
+    ));
+    setEditingWorkspace(null);
+    setWorkspaceName('');
+    setShowWorkspaceDialog(false);
+    toast({
+      title: "Éxito",
+      description: "Espacio de trabajo actualizado correctamente"
+    });
+  };
+
+  const handleDeleteWorkspace = async (workspaceId: string) => {
+    const { error } = await supabase
+      .from('workspaces')
+      .delete()
+      .eq('id', workspaceId);
+
+    if (error) {
+      console.error('Error deleting workspace:', error);
+      toast({
+        title: "Error",
+        description: "Error al eliminar el espacio de trabajo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setWorkspaces(workspaces.filter(ws => ws.id !== workspaceId));
+    toast({
+      title: "Éxito",
+      description: "Espacio de trabajo eliminado correctamente"
+    });
+  };
+
+  const handleCreateColumn = async () => {
+    if (!columnName.trim() || !selectedWorkspace) return;
+
+    const workspaceColumns = columns.filter(col => col.workspace_id === selectedWorkspace);
+
+    const { data, error } = await supabase
+      .from('lead_columns')
+      .insert({
+        name: columnName,
+        color: columnColor,
+        position: workspaceColumns.length,
+        workspace_id: selectedWorkspace,
+        user_id: user?.id
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating column:', error);
+      toast({
+        title: "Error",
+        description: "Error al crear el embudo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setColumns([...columns, data]);
+    setColumnName('');
+    setColumnColor('#3b82f6');
+    setShowColumnDialog(false);
+    toast({
+      title: "Éxito",
+      description: "Embudo creado correctamente"
+    });
+  };
+
+  const handleUpdateColumn = async () => {
+    if (!editingColumn || !columnName.trim()) return;
+
+    const { error } = await supabase
+      .from('lead_columns')
+      .update({
+        name: columnName,
+        color: columnColor
+      })
+      .eq('id', editingColumn.id);
+
+    if (error) {
+      console.error('Error updating column:', error);
+      toast({
+        title: "Error",
+        description: "Error al actualizar el embudo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setColumns(columns.map(col => 
+      col.id === editingColumn.id 
+        ? { ...col, name: columnName, color: columnColor }
+        : col
+    ));
+    setEditingColumn(null);
+    setColumnName('');
+    setColumnColor('#3b82f6');
+    setShowColumnDialog(false);
+    toast({
+      title: "Éxito",
+      description: "Embudo actualizado correctamente"
+    });
+  };
+
+  const handleDeleteColumn = async (columnId: string) => {
+    const { error } = await supabase
+      .from('lead_columns')
+      .delete()
+      .eq('id', columnId);
+
+    if (error) {
+      console.error('Error deleting column:', error);
+      toast({
+        title: "Error",
+        description: "Error al eliminar el embudo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setColumns(columns.filter(col => col.id !== columnId));
+    toast({
+      title: "Éxito",
+      description: "Embudo eliminado correctamente"
+    });
+  };
+
+  const openCreateWorkspaceDialog = () => {
+    setEditingWorkspace(null);
+    setWorkspaceName('');
+    setShowWorkspaceDialog(true);
+  };
+
+  const openEditWorkspaceDialog = (workspace: Workspace) => {
+    setEditingWorkspace(workspace);
+    setWorkspaceName(workspace.name);
+    setShowWorkspaceDialog(true);
+  };
+
+  const openCreateColumnDialog = (workspaceId: string) => {
+    setSelectedWorkspace(workspaceId);
+    setEditingColumn(null);
+    setColumnName('');
+    setColumnColor('#3b82f6');
+    setShowColumnDialog(true);
+  };
+
+  const openEditColumnDialog = (column: LeadColumn) => {
+    setEditingColumn(column);
+    setColumnName(column.name);
+    setColumnColor(column.color || '#3b82f6');
+    setShowColumnDialog(true);
+  };
+
+  const getWorkspaceColumns = (workspaceId: string) => {
+    return columns.filter(col => col.workspace_id === workspaceId);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando espacios de trabajo...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Briefcase className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-bold">Espacios de trabajo</h2>
+        </div>
+        <Button onClick={openCreateWorkspaceDialog} className="bg-orange-500 hover:bg-orange-600">
+          <Plus className="h-4 w-4 mr-2" />
+          Nuevo Espacio
+        </Button>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        Crear, editar y eliminar tus espacios de trabajo y embudos
+      </p>
+
+      {workspaces.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground text-center mb-4">
+              No hay espacios de trabajo creados aún
+            </p>
+            <Button onClick={openCreateWorkspaceDialog} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Crear primer espacio
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6">
+          {workspaces.map((workspace) => (
+            <Card key={workspace.id} className="border-border/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Briefcase className="h-5 w-5" />
+                    <h3 className="text-lg font-semibold uppercase">{workspace.name}</h3>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditWorkspaceDialog(workspace)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteWorkspace(workspace.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getWorkspaceColumns(workspace.id).map((column, index) => (
+                    <Card 
+                      key={column.id} 
+                      className="border-2 cursor-pointer hover:border-primary transition-colors"
+                      style={{ borderColor: column.color || '#3b82f6' }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <div className="flex flex-col">
+                              <span className="text-muted-foreground text-xs">●</span>
+                              <span className="text-muted-foreground text-xs">●</span>
+                              <span className="text-muted-foreground text-xs">●</span>
+                            </div>
+                            <div>
+                              <p className="text-lg font-bold">{index + 1}</p>
+                              <p className="text-sm font-medium">{column.name}</p>
+                            </div>
+                          </div>
+                          <div className="flex space-x-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => openEditColumnDialog(column)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleDeleteColumn(column.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  <Card 
+                    className="border-2 border-dashed border-border/50 cursor-pointer hover:border-primary transition-colors"
+                    onClick={() => openCreateColumnDialog(workspace.id)}
+                  >
+                    <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[100px]">
+                      <Plus className="h-8 w-8 text-orange-500 mb-2" />
+                      <p className="text-sm font-medium text-muted-foreground">Agregar Embudo</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Workspace Dialog */}
+      <Dialog open={showWorkspaceDialog} onOpenChange={setShowWorkspaceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingWorkspace ? 'Editar Espacio de Trabajo' : 'Nuevo Espacio de Trabajo'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingWorkspace 
+                ? 'Modifica el nombre del espacio de trabajo'
+                : 'Crea un nuevo espacio de trabajo para organizar tus embudos'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="workspace-name">Nombre del Espacio</Label>
+              <Input
+                id="workspace-name"
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
+                placeholder="Ej: Ventas, Marketing, Soporte"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWorkspaceDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={editingWorkspace ? handleUpdateWorkspace : handleCreateWorkspace}>
+              {editingWorkspace ? 'Actualizar' : 'Crear'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Column Dialog */}
+      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingColumn ? 'Editar Embudo' : 'Nuevo Embudo'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingColumn 
+                ? 'Modifica el nombre y color del embudo'
+                : 'Crea un nuevo embudo en el espacio de trabajo'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="column-name">Nombre del Embudo</Label>
+              <Input
+                id="column-name"
+                value={columnName}
+                onChange={(e) => setColumnName(e.target.value)}
+                placeholder="Ej: Primer Contacto, Calificación"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="column-color">Color</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="column-color"
+                  type="color"
+                  value={columnColor}
+                  onChange={(e) => setColumnColor(e.target.value)}
+                  className="w-20 h-10"
+                />
+                <Input
+                  type="text"
+                  value={columnColor}
+                  onChange={(e) => setColumnColor(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowColumnDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={editingColumn ? handleUpdateColumn : handleCreateColumn}>
+              {editingColumn ? 'Actualizar' : 'Crear'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default WorkspaceManagement;
