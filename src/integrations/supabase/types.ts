@@ -86,74 +86,24 @@ export type Database = {
         }
         Relationships: []
       }
-      campaigns: {
-        Row: {
-          contact_list_id: string | null
-          created_at: string | null
-          id: string
-          message: string
-          name: string
-          scheduled_at: string | null
-          sent_count: number | null
-          status: string | null
-          total_count: number | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          contact_list_id?: string | null
-          created_at?: string | null
-          id?: string
-          message: string
-          name: string
-          scheduled_at?: string | null
-          sent_count?: number | null
-          status?: string | null
-          total_count?: number | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          contact_list_id?: string | null
-          created_at?: string | null
-          id?: string
-          message?: string
-          name?: string
-          scheduled_at?: string | null
-          sent_count?: number | null
-          status?: string | null
-          total_count?: number | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaigns_contact_list_id_fkey"
-            columns: ["contact_list_id"]
-            isOneToOne: false
-            referencedRelation: "contact_lists"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       contact_list_members: {
         Row: {
           contact_id: string
+          contact_list_id: string
           created_at: string | null
           id: string
-          list_id: string
         }
         Insert: {
           contact_id: string
+          contact_list_id: string
           created_at?: string | null
           id?: string
-          list_id: string
         }
         Update: {
           contact_id?: string
+          contact_list_id?: string
           created_at?: string | null
           id?: string
-          list_id?: string
         }
         Relationships: [
           {
@@ -164,8 +114,8 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "contact_list_members_list_id_fkey"
-            columns: ["list_id"]
+            foreignKeyName: "contact_list_members_contact_list_id_fkey"
+            columns: ["contact_list_id"]
             isOneToOne: false
             referencedRelation: "contact_lists"
             referencedColumns: ["id"]
@@ -207,7 +157,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
-          phone: string
+          phone_number: string
           updated_at: string | null
           user_id: string
         }
@@ -218,7 +168,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
-          phone: string
+          phone_number: string
           updated_at?: string | null
           user_id: string
         }
@@ -229,7 +179,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
-          phone?: string
+          phone_number?: string
           updated_at?: string | null
           user_id?: string
         }
@@ -244,10 +194,12 @@ export type Database = {
           last_message_time: string | null
           lead_id: string | null
           phone_number: string
+          pushname: string | null
           status: string | null
           unread_count: number | null
           updated_at: string | null
           user_id: string
+          whatsapp_number: string | null
         }
         Insert: {
           contact_name?: string | null
@@ -257,10 +209,12 @@ export type Database = {
           last_message_time?: string | null
           lead_id?: string | null
           phone_number: string
+          pushname?: string | null
           status?: string | null
           unread_count?: number | null
           updated_at?: string | null
           user_id: string
+          whatsapp_number?: string | null
         }
         Update: {
           contact_name?: string | null
@@ -270,10 +224,12 @@ export type Database = {
           last_message_time?: string | null
           lead_id?: string | null
           phone_number?: string
+          pushname?: string | null
           status?: string | null
           unread_count?: number | null
           updated_at?: string | null
           user_id?: string
+          whatsapp_number?: string | null
         }
         Relationships: [
           {
@@ -285,7 +241,7 @@ export type Database = {
           },
         ]
       }
-      kanban_columns: {
+      lead_columns: {
         Row: {
           color: string | null
           created_at: string | null
@@ -320,6 +276,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          bot_active: boolean | null
           column_id: string
           company: string | null
           created_at: string | null
@@ -334,6 +291,7 @@ export type Database = {
           value: number | null
         }
         Insert: {
+          bot_active?: boolean | null
           column_id: string
           company?: string | null
           created_at?: string | null
@@ -348,6 +306,7 @@ export type Database = {
           value?: number | null
         }
         Update: {
+          bot_active?: boolean | null
           column_id?: string
           company?: string | null
           created_at?: string | null
@@ -366,7 +325,67 @@ export type Database = {
             foreignKeyName: "leads_column_id_fkey"
             columns: ["column_id"]
             isOneToOne: false
-            referencedRelation: "kanban_columns"
+            referencedRelation: "lead_columns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mass_campaigns: {
+        Row: {
+          contact_list_id: string | null
+          created_at: string | null
+          id: string
+          message: string
+          name: string
+          scheduled_at: string | null
+          sent_count: number | null
+          status: string | null
+          total_count: number | null
+          updated_at: string | null
+          user_id: string
+          whatsapp_connection_id: string | null
+        }
+        Insert: {
+          contact_list_id?: string | null
+          created_at?: string | null
+          id?: string
+          message: string
+          name: string
+          scheduled_at?: string | null
+          sent_count?: number | null
+          status?: string | null
+          total_count?: number | null
+          updated_at?: string | null
+          user_id: string
+          whatsapp_connection_id?: string | null
+        }
+        Update: {
+          contact_list_id?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          name?: string
+          scheduled_at?: string | null
+          sent_count?: number | null
+          status?: string | null
+          total_count?: number | null
+          updated_at?: string | null
+          user_id?: string
+          whatsapp_connection_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mass_campaigns_contact_list_id_fkey"
+            columns: ["contact_list_id"]
+            isOneToOne: false
+            referencedRelation: "contact_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mass_campaigns_whatsapp_connection_id_fkey"
+            columns: ["whatsapp_connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
             referencedColumns: ["id"]
           },
         ]
@@ -413,17 +432,19 @@ export type Database = {
             foreignKeyName: "message_triggers_column_id_fkey"
             columns: ["column_id"]
             isOneToOne: false
-            referencedRelation: "kanban_columns"
+            referencedRelation: "lead_columns"
             referencedColumns: ["id"]
           },
         ]
       }
       messages: {
         Row: {
+          attachment_url: string | null
           content: string
           conversation_id: string
           created_at: string | null
           direction: string
+          file_url: string | null
           id: string
           message_type: string | null
           metadata: Json | null
@@ -431,10 +452,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attachment_url?: string | null
           content: string
           conversation_id: string
           created_at?: string | null
           direction: string
+          file_url?: string | null
           id?: string
           message_type?: string | null
           metadata?: Json | null
@@ -442,10 +465,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attachment_url?: string | null
           content?: string
           conversation_id?: string
           created_at?: string | null
           direction?: string
+          file_url?: string | null
           id?: string
           message_type?: string | null
           metadata?: Json | null
@@ -590,6 +615,7 @@ export type Database = {
           lead_id: string
           message_content: string
           phone_number: string
+          retry_count: number | null
           scheduled_for: string
           sent_at: string | null
           status: string | null
@@ -603,6 +629,7 @@ export type Database = {
           lead_id: string
           message_content: string
           phone_number: string
+          retry_count?: number | null
           scheduled_for: string
           sent_at?: string | null
           status?: string | null
@@ -616,6 +643,7 @@ export type Database = {
           lead_id?: string
           message_content?: string
           phone_number?: string
+          retry_count?: number | null
           scheduled_for?: string
           sent_at?: string | null
           status?: string | null
@@ -733,6 +761,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_usage: {
+        Row: {
+          bot_responses_this_month: number | null
+          campaigns_this_month: number | null
+          contacts_used: number | null
+          conversations_used: number | null
+          created_at: string | null
+          device_sessions_used: number | null
+          id: string
+          storage_used_mb: number | null
+          updated_at: string | null
+          usage_month: string
+          user_id: string
+          whatsapp_connections_used: number | null
+        }
+        Insert: {
+          bot_responses_this_month?: number | null
+          campaigns_this_month?: number | null
+          contacts_used?: number | null
+          conversations_used?: number | null
+          created_at?: string | null
+          device_sessions_used?: number | null
+          id?: string
+          storage_used_mb?: number | null
+          updated_at?: string | null
+          usage_month: string
+          user_id: string
+          whatsapp_connections_used?: number | null
+        }
+        Update: {
+          bot_responses_this_month?: number | null
+          campaigns_this_month?: number | null
+          contacts_used?: number | null
+          conversations_used?: number | null
+          created_at?: string | null
+          device_sessions_used?: number | null
+          id?: string
+          storage_used_mb?: number | null
+          updated_at?: string | null
+          usage_month?: string
+          user_id?: string
+          whatsapp_connections_used?: number | null
+        }
+        Relationships: []
       }
       whatsapp_connections: {
         Row: {
