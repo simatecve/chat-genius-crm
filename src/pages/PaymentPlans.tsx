@@ -193,38 +193,41 @@ const PaymentPlans = () => {
     }
   };
 
-  const getPlanFeatures = (plan: PaymentPlan) => [
-    {
-      icon: Phone,
-      label: 'Conexiones WhatsApp',
-      value: plan.max_whatsapp_connections
-    },
-    {
-      icon: Users,
-      label: 'Contactos',
-      value: plan.max_contacts.toLocaleString()
-    },
-    {
-      icon: MessageSquare,
-      label: 'Conversaciones',
-      value: plan.max_conversations?.toLocaleString() || 'Ilimitadas'
-    },
-    {
-      icon: Calendar,
-      label: 'Campañas por mes',
-      value: plan.max_monthly_campaigns
-    },
-    {
-      icon: Bot,
-      label: 'Respuestas Bot',
-      value: plan.max_bot_responses.toLocaleString()
-    },
-    {
-      icon: HardDrive,
-      label: 'Almacenamiento',
-      value: `${(plan.max_storage_mb / 1024).toFixed(1)} GB`
-    }
-  ];
+  const getPlanFeatures = (plan: PaymentPlan) => {
+    const limits = plan.limits as any || {};
+    return [
+      {
+        icon: Phone,
+        label: 'Conexiones WhatsApp',
+        value: limits.max_whatsapp_connections || 0
+      },
+      {
+        icon: Users,
+        label: 'Contactos',
+        value: (limits.max_contacts || 0).toLocaleString()
+      },
+      {
+        icon: MessageSquare,
+        label: 'Conversaciones',
+        value: limits.max_conversations?.toLocaleString() || 'Ilimitadas'
+      },
+      {
+        icon: Calendar,
+        label: 'Campañas por mes',
+        value: limits.max_monthly_campaigns || 0
+      },
+      {
+        icon: Bot,
+        label: 'Respuestas Bot',
+        value: (limits.max_bot_responses || 0).toLocaleString()
+      },
+      {
+        icon: HardDrive,
+        label: 'Almacenamiento',
+        value: `${((limits.max_storage_mb || 0) / 1024).toFixed(1)} GB`
+      }
+    ];
+  };
 
   const isCurrentPlan = (planId: string) => {
     return currentSubscription?.plan_id === planId;

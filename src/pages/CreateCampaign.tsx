@@ -325,10 +325,7 @@ const CreateCampaign = () => {
         // Crear nueva campaña
         const { error } = await supabase
           .from('mass_campaigns')
-          .insert({
-            user_id: user?.id,
-            ...campaignData
-          });
+          .insert(campaignData);
 
         if (error) {
           console.error('Error creating campaign:', error);

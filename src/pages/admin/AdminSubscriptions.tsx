@@ -15,8 +15,8 @@ import { Plus, Search, Edit, Trash2, User, Calendar, CreditCard } from 'lucide-r
 import type { Tables } from '@/integrations/supabase/types';
 
 type Profile = Tables<'profiles'>;
-type SubscriptionPlan = Tables<'subscription_plans'>;
-type AdminSubscription = Tables<'admin_subscriptions'>;
+type SubscriptionPlan = Tables<'payment_plans'>;
+type AdminSubscription = Tables<'user_subscriptions'>;
 
 interface SubscriptionFormData {
   user_id: string;
@@ -77,7 +77,7 @@ const AdminSubscriptions = () => {
   const loadPlans = async () => {
     try {
       const { data, error } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .select('*')
         .eq('is_active', true)
         .order('name');
@@ -93,11 +93,10 @@ const AdminSubscriptions = () => {
   const loadSubscriptions = async () => {
     try {
       const { data, error } = await supabase
-        .from('admin_subscriptions')
+        .from('user_subscriptions')
         .select(`
           *,
-          profiles!admin_subscriptions_user_id_fkey(id, first_name, last_name, company_name),
-          subscription_plans!admin_subscriptions_plan_id_fkey(id, name, price)
+          profiles(id, first_name, last_name, company_name)
         `)
         .order('created_at', { ascending: false });
       
@@ -121,7 +120,7 @@ const AdminSubscriptions = () => {
 
       if (editingSubscription) {
         const { error } = await supabase
-          .from('admin_subscriptions')
+          .from('user_subscriptions')
           .update(subscriptionData)
           .eq('id', editingSubscription.id);
         
@@ -129,7 +128,7 @@ const AdminSubscriptions = () => {
         toast.success('Suscripción actualizada exitosamente');
       } else {
         const { error } = await supabase
-          .from('admin_subscriptions')
+          .from('user_subscriptions')
           .insert([subscriptionData]);
         
         if (error) throw error;
@@ -169,7 +168,7 @@ const AdminSubscriptions = () => {
 
     try {
       const { error } = await supabase
-        .from('admin_subscriptions')
+        .from('user_subscriptions')
         .delete()
         .eq('id', id);
       

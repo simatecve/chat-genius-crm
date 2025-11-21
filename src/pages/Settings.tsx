@@ -90,11 +90,14 @@ const Settings = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          id: effectiveUserId,
-          ...profile,
+        .update({
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone,
+          company_name: profile.company_name,
           updated_at: new Date().toISOString()
-        });
+        })
+        .eq('id', effectiveUserId);
 
       if (error) throw error;
 

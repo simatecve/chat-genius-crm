@@ -56,7 +56,7 @@ export const useProfile = () => {
   }, [effectiveUserId, userIdLoading]);
 
   const isSuperAdmin = profile?.profile_type === 'superadmin';
-  const isClient = profile?.profile_type === 'cliente';
+  const isClient = profile?.profile_type === 'client';
 
   return {
     profile,

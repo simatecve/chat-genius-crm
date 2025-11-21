@@ -24,9 +24,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
-type PaymentPlan = Database['public']['Tables']['subscription_plans']['Row'];
-type PaymentPlanInsert = Database['public']['Tables']['subscription_plans']['Insert'];
-type PaymentPlanUpdate = Database['public']['Tables']['subscription_plans']['Update'];
+type PaymentPlan = Database['public']['Tables']['payment_plans']['Row'];
+type PaymentPlanInsert = Database['public']['Tables']['payment_plans']['Insert'];
+type PaymentPlanUpdate = Database['public']['Tables']['payment_plans']['Update'];
 
 const AdminPaymentPlans = () => {
   const [plans, setPlans] = useState<PaymentPlan[]>([]);
@@ -61,7 +61,7 @@ const AdminPaymentPlans = () => {
       setLoading(true);
       
       const { data, error } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -107,7 +107,7 @@ const AdminPaymentPlans = () => {
       };
 
       const { error } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .insert(planData);
 
       if (error) throw error;
@@ -153,7 +153,7 @@ const AdminPaymentPlans = () => {
       };
 
       const { error } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .update(planData)
         .eq('id', selectedPlan.id);
 
@@ -182,7 +182,7 @@ const AdminPaymentPlans = () => {
   const handleDeletePlan = async (planId: string) => {
     try {
       const { error } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .delete()
         .eq('id', planId);
 
@@ -207,7 +207,7 @@ const AdminPaymentPlans = () => {
   const handleTogglePlanStatus = async (planId: string, newStatus: boolean) => {
     try {
       const { error } = await supabase
-        .from('subscription_plans')
+        .from('payment_plans')
         .update({ is_active: newStatus })
         .eq('id', planId);
 

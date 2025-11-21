@@ -72,7 +72,7 @@ const Conversations = () => {
       message: messageText.trim() || '',
       direction: 'outgoing',
       whatsapp_number: selectedConversation.whatsapp_number,
-      instance_name: selectedConversation.instance_name || '',
+      instance_name: selectedConversation.whatsapp_number || '',
       user_id: effectiveUserId,
       message_type: attachment ? 'file' : 'text',
       is_bot: false,

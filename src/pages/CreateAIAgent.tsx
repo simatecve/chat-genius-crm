@@ -104,10 +104,7 @@ const CreateAIAgent = () => {
         .insert({
           user_id: user?.id!,
           name: formData.name.trim(),
-          whatsapp_connection_id: formData.whatsapp_connection_id === 'none' ? null : formData.whatsapp_connection_id || null,
-          whatsapp_connection_name: whatsappConnection?.name || null,
-          instructions: formData.instructions.trim(),
-          message_delay: formData.message_delay * 1000,
+          system_prompt: formData.instructions.trim(),
           is_active: formData.is_active
         })
         .select()
