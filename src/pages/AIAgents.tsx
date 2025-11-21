@@ -17,32 +17,21 @@ import { useAuth } from '@/hooks/useAuth';
 
 import { Tables } from '@/integrations/supabase/types';
 
-// Interfaces TypeScript basadas en la estructura de la BD
-interface AIAgent {
-  id: string;
-  user_id: string;
-  name: string;
-  whatsapp_connection_id: string | null;
-  instructions: string;
-  message_delay: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  whatsapp_connection_name: string | null;
-}
+// Usar tipos de Supabase
+type AIAgent = Tables<'ai_agents'>;
 
 interface WhatsAppConnection {
   id: string;
-  name: string;
+  name: string | null;
   phone_number: string;
   status: string | null;
 }
 
 interface FormData {
   name: string;
-  whatsapp_connection_id: string;
-  instructions: string;
-  message_delay: number;
+  system_prompt: string;
+  temperature: number;
+  max_tokens: number;
   is_active: boolean;
 }
 
@@ -58,9 +47,9 @@ const AIAgents = () => {
   const [editingAgent, setEditingAgent] = useState<AIAgent | null>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
-    whatsapp_connection_id: 'none',
-    instructions: '',
-    message_delay: 1,
+    system_prompt: '',
+    temperature: 0.7,
+    max_tokens: 500,
     is_active: false
   });
   const { toast } = useToast();
@@ -122,7 +111,7 @@ const AIAgents = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.instructions.trim()) {
+    if (!formData.name.trim() || !formData.system_prompt.trim()) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos requeridos",
@@ -146,17 +135,14 @@ const AIAgents = () => {
 
   const createAgent = async () => {
     try {
-      const whatsappConnection = whatsappConnections.find(conn => conn.id === formData.whatsapp_connection_id);
-      
       const { data, error } = await supabase
         .from('ai_agents')
         .insert({
           user_id: user?.id!,
           name: formData.name.trim(),
-          whatsapp_connection_id: formData.whatsapp_connection_id === 'none' ? null : formData.whatsapp_connection_id || null,
-          whatsapp_connection_name: whatsappConnection?.name || null,
-          instructions: formData.instructions.trim(),
-          message_delay: formData.message_delay * 1000,
+          system_prompt: formData.system_prompt.trim(),
+          temperature: formData.temperature,
+          max_tokens: formData.max_tokens,
           is_active: formData.is_active
         })
         .select()
@@ -295,21 +281,21 @@ const AIAgents = () => {
   const openEditDialog = (agent: AIAgent) => {
     setEditingAgent(agent);
     setFormData({
-        name: agent.name,
-        whatsapp_connection_id: agent.whatsapp_connection_id || 'none',
-        instructions: agent.instructions,
-        message_delay: Math.round(agent.message_delay / 1000),
-        is_active: agent.is_active
-      });
+      name: agent.name,
+      system_prompt: agent.system_prompt,
+      temperature: agent.temperature || 0.7,
+      max_tokens: agent.max_tokens || 500,
+      is_active: agent.is_active || false
+    });
     setDialogOpen(true);
   };
 
   const resetForm = () => {
     setFormData({
       name: '',
-      whatsapp_connection_id: 'none',
-      instructions: '',
-      message_delay: 1,
+      system_prompt: '',
+      temperature: 0.7,
+      max_tokens: 500,
       is_active: false
     });
     setEditingAgent(null);
@@ -374,59 +360,43 @@ const AIAgents = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="whatsapp_connection">Conexión WhatsApp</Label>
-                    <Select
-                      value={formData.whatsapp_connection_id}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, whatsapp_connection_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar conexión" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin conexión</SelectItem>
-                        {whatsappConnections.map((connection) => (
-                          <SelectItem key={connection.id} value={connection.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{connection.name} ({connection.phone_number})</span>
-                              <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                                connection.status === 'conectado' 
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
-                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                              }`}>
-                                {connection.status || 'desconectado'}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="instructions">Instrucciones del Agente *</Label>
-                  <Textarea
-                    id="instructions"
-                    value={formData.instructions}
-                    onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
-                    placeholder="Describe cómo debe comportarse el agente, qué respuestas debe dar, etc."
-                    rows={6}
-                    required
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="message_delay">Retraso de Mensaje (segundos)</Label>
-                    <Input
-                      id="message_delay"
-                      type="number"
-                      min="1"
-                      max="60"
-                      step="1"
-                      value={formData.message_delay}
-                      onChange={(e) => setFormData(prev => ({ ...prev, message_delay: parseInt(e.target.value) || 1 }))}
+                    <Label htmlFor="system_prompt">Prompt del Sistema *</Label>
+                    <Textarea
+                      id="system_prompt"
+                      value={formData.system_prompt}
+                      onChange={(e) => setFormData(prev => ({ ...prev, system_prompt: e.target.value }))}
+                      placeholder="Describe cómo debe comportarse el agente de IA..."
+                      rows={6}
+                      required
                     />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="temperature">Temperatura</Label>
+                      <Input
+                        id="temperature"
+                        type="number"
+                        min="0"
+                        max="2"
+                        step="0.1"
+                        value={formData.temperature}
+                        onChange={(e) => setFormData(prev => ({ ...prev, temperature: parseFloat(e.target.value) || 0.7 }))}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="max_tokens">Max Tokens</Label>
+                      <Input
+                        id="max_tokens"
+                        type="number"
+                        min="100"
+                        max="4000"
+                        step="100"
+                        value={formData.max_tokens}
+                        onChange={(e) => setFormData(prev => ({ ...prev, max_tokens: parseInt(e.target.value) || 500 }))}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
@@ -494,7 +464,7 @@ const AIAgents = () => {
                       <div>
                         <CardTitle className="text-lg">{agent.name}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          {agent.whatsapp_connection_name || 'Sin conexión'}
+                          {agent.model || 'gpt-3.5-turbo'}
                         </p>
                       </div>
                     </div>
@@ -540,14 +510,14 @@ const AIAgents = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground line-clamp-3">
-                      {agent.instructions}
+                      {agent.system_prompt}
                     </p>
                   </div>
                   
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center space-x-1 text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{Math.round(agent.message_delay / 1000)}s</span>
+                      <Settings className="h-4 w-4" />
+                      <span>Temp: {agent.temperature || 0.7}</span>
                     </div>
                     
                     <div className="flex items-center space-x-2">

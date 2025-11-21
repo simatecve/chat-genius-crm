@@ -75,47 +75,49 @@ const UsageDashboard = () => {
     );
   }
 
+  const planLimits = plan.limits as any || {};
+
   const usageItems = [
     {
       title: 'Conexiones WhatsApp',
       icon: Phone,
       current: usage.whatsapp_connections_used,
-      limit: plan.max_whatsapp_connections,
+      limit: planLimits.max_whatsapp_connections || 0,
       color: 'blue'
     },
     {
       title: 'Contactos',
       icon: Users,
       current: usage.contacts_used,
-      limit: plan.max_contacts,
+      limit: planLimits.max_contacts || 0,
       color: 'green'
     },
     {
       title: 'Conversaciones',
       icon: MessageSquare,
       current: usage.conversations_used,
-      limit: plan.max_conversations || 100,
+      limit: planLimits.max_conversations || 100,
       color: 'purple'
     },
     {
       title: 'Campañas (Este Mes)',
       icon: Calendar,
       current: usage.campaigns_this_month,
-      limit: plan.max_monthly_campaigns,
+      limit: planLimits.max_monthly_campaigns || 0,
       color: 'orange'
     },
     {
       title: 'Respuestas Bot (Este Mes)',
       icon: Bot,
       current: usage.bot_responses_this_month,
-      limit: plan.max_bot_responses,
+      limit: planLimits.max_bot_responses || 0,
       color: 'indigo'
     },
     {
       title: 'Almacenamiento',
       icon: HardDrive,
       current: usage.storage_used_mb,
-      limit: plan.max_storage_mb,
+      limit: planLimits.max_storage_mb || 0,
       color: 'red',
       formatter: (value: number) => `${(value / 1024).toFixed(1)} GB`
     }
