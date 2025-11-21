@@ -111,9 +111,9 @@ export const Sidebar = () => {
             {!isCollapsed && (
               <div className="flex items-center space-x-3">
                 <img 
-                  src={logo2} 
-                  alt="KanbanPRO" 
-                  className="h-8 w-auto"
+                  src={logo} 
+                  alt="SUPERCRM" 
+                  className="h-12 w-auto"
                 />
               </div>
             )}
