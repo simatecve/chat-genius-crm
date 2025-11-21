@@ -5,13 +5,11 @@ import {
   Users, 
   UserPlus, 
   Send, 
-  BarChart3, 
   Settings, 
   Menu, 
   X,
   Bot,
-  Phone,
-  CreditCard
+  Phone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -66,15 +64,8 @@ export const Sidebar = () => {
       ]
     },
     {
-      label: 'Análisis',
-      items: [
-        { label: 'Uso del Plan', icon: BarChart3, href: '/uso-plan' },
-      ]
-    },
-    {
       label: 'Sistema',
       items: [
-        { label: 'Planes de Pago', icon: CreditCard, href: '/planes-pago' },
         { label: 'Configuración', icon: Settings, href: '/configuracion' },
       ]
     }
