@@ -132,189 +132,80 @@ const WhatsAppConnections = () => {
     }
 
     try {
-      // Obtener los datos de la conexión
-      const { data: connectionData, error: connectionError } = await supabase
-        .from('whatsapp_connections')
-        .select('*')
-        .eq('name', sessionName)
-        .eq('user_id', effectiveUserId)
-        .single();
-
-      if (connectionError) {
-        console.error('Error fetching connection:', connectionError);
-      }
-
-      // Obtener los datos del perfil del usuario
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, phone, company_name, plan_type, profile_type, email')
-        .eq('id', effectiveUserId)
-        .single();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Error fetching profile:', profileError);
-      }
-
-      // Obtener el nombre del workspace si existe
-      let workspaceName = '';
-      if (connectionData?.workspace_id) {
-        const workspace = workspaces.find(w => w.id === connectionData.workspace_id);
-        workspaceName = workspace?.name || '';
-      }
-
-      // Preparar todos los datos para enviar al webhook
-      const webhookData = {
-        // Datos de autenticación
-        user_id: effectiveUserId,
-        email: profileData?.email || user.email,
-        
-        // Datos del perfil
-        first_name: profileData?.first_name || null,
-        last_name: profileData?.last_name || null,
-        phone: profileData?.phone || null,
-        company_name: profileData?.company_name || null,
-        plan_type: profileData?.plan_type || null,
-        profile_type: profileData?.profile_type || null,
-        
-        // Datos de la conexión WhatsApp (sesión)
-        nombre: sessionName,
-        numero: connectionData?.phone_number || '',
-        workspace_id: connectionData?.workspace_id || null,
-        workspace_name: workspaceName,
-        
-        // Metadatos adicionales
-        created_at: new Date().toISOString(),
-        user_agent: navigator.userAgent,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      };
-
-      const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/crear_qr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(webhookData)
+      const { data, error } = await supabase.functions.invoke('waha-get-qr', {
+        body: {
+          session_name: sessionName,
+          user_id: effectiveUserId
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Error en webhook QR: ${response.status} ${response.statusText}`);
-      }
+      if (error) throw error;
 
-      const qrData = await response.text();
-      
-      // Convertir la respuesta en una imagen base64
-      const qrImageUrl = `data:image/png;base64,${qrData}`;
-      setQrImage(qrImageUrl);
-      
-    } catch (error: any) {
-      console.error('Error getting QR code:', error);
+      if (data?.qr) {
+        setQrImage(data.qr);
+        toast({
+          title: "Código QR generado",
+          description: "Escanea el código QR con WhatsApp para conectar",
+        });
+      } else {
+        throw new Error('No se recibió el código QR');
+      }
+    } catch (error) {
+      console.error('Error al obtener QR:', error);
       toast({
         title: "Error",
-        description: "No se pudo obtener el código QR. Inténtalo de nuevo.",
+        description: "No se pudo obtener el código QR. Verifica que la sesión esté iniciada.",
         variant: "destructive",
       });
+      setQrModalOpen(false);
     } finally {
       setQrLoading(false);
     }
   };
 
   const handleQRConnected = async () => {
-    if (!currentSession) {
-      toast({
-        title: "Error",
-        description: "No hay sesión activa para verificar.",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!currentSession || !effectiveUserId) return;
 
-    if (!effectiveUserId) {
-      toast({
-        title: "Error",
-        description: "Usuario no autenticado",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    setVerifying(currentSession);
     try {
-      console.log('Verificando estatus para:', currentSession);
+      const connection = connections.find(c => c.name === currentSession);
       
-      // Usar el mismo webhook que handleVerifyStatus
-      const response = await fetch('https://n8n.kanbanpro.com.ar/webhook/estatus', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_name: currentSession
-        })
+      const { data, error } = await supabase.functions.invoke('waha-session-status', {
+        body: {
+          session_name: currentSession,
+          connection_id: connection?.id,
+          user_id: effectiveUserId
+        }
       });
-  
-      if (!response.ok) {
-        throw new Error(`Error del webhook: ${response.status}`);
-      }
-  
-      // Obtener respuesta como texto primero
-      const responseText = await response.text();
-      console.log('Respuesta del webhook (texto):', responseText);
+
+      if (error) throw error;
       
-      let newStatus = 'desconectado';
-      
-      try {
-        // Intentar parsear como JSON
-        const webhookData = JSON.parse(responseText);
-        console.log('Datos parseados como JSON:', webhookData);
+      if (data?.status === 'WORKING') {
+        setQrModalOpen(false);
+        setQrImage(null);
+        setCurrentSession('');
+        await fetchConnections();
         
-        // Si es un array con objetos
-        if (Array.isArray(webhookData) && webhookData.length > 0) {
-          const connectionData = webhookData[0];
-          if (connectionData.status === 'WORKING') {
-            newStatus = 'conectado';
-          }
-        }
-      } catch (jsonError) {
-        // Si no es JSON válido, verificar si el texto contiene WORKING
-        console.log('No es JSON, verificando texto plano:', responseText);
-        if (responseText.trim().toUpperCase() === 'WORKING') {
-          newStatus = 'conectado';
-        }
+        toast({
+          title: "¡Conectado!",
+          description: "WhatsApp conectado exitosamente",
+        });
+      } else {
+        toast({
+          title: "Aún no conectado",
+          description: "Por favor, escanea el código QR con WhatsApp",
+          variant: "destructive",
+        });
       }
-      
-      console.log('Actualizando estatus a:', newStatus);
-      
-      // Actualizar en la base de datos
-      const { error: updateError } = await supabase
-        .from('whatsapp_connections')
-        .update({ status: newStatus })
-        .eq('name', currentSession)
-        .eq('user_id', effectiveUserId);
-  
-      if (updateError) {
-        console.error('Error actualizando BD:', updateError);
-        throw new Error('Error actualizando base de datos');
-      }
-      
+    } catch (error) {
+      console.error('Error al verificar conexión:', error);
       toast({
-        title: "¡Conexión verificada!",
-        description: `Conexión ${newStatus}`,
-      });
-      
-    } catch (error: any) {
-      console.error('Error verificando conexión:', error);
-      toast({
-        title: "Error de verificación",
-        description: "No se pudo verificar el estado de la conexión. Inténtalo de nuevo.",
+        title: "Error",
+        description: "No se pudo verificar la conexión",
         variant: "destructive",
       });
     } finally {
-      // Cerrar modal y limpiar estado
-      setQrModalOpen(false);
-      setQrImage(null);
-      setCurrentSession('');
-      
-      // Actualizar la lista de conexiones para reflejar cualquier cambio de estado
-      fetchConnections();
+      setVerifying(null);
     }
   };
 
@@ -338,7 +229,6 @@ const WhatsAppConnections = () => {
       return;
     }
 
-    // Verificar límites antes de crear la conexión
     const canCreate = await enforceLimit('whatsapp_connections', 1);
     if (!canCreate) {
       return;
@@ -346,7 +236,6 @@ const WhatsAppConnections = () => {
 
     setCreating(true);
     try {
-      // Primero obtener los datos completos del perfil del usuario
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('first_name, last_name, phone, company_name, plan_type, profile_type, email')
@@ -357,76 +246,34 @@ const WhatsAppConnections = () => {
         console.error('Error fetching profile:', profileError);
       }
 
-      // Obtener el nombre del workspace si se seleccionó uno
       let workspaceName = '';
       if (formData.workspace_id) {
         const workspace = workspaces.find(w => w.id === formData.workspace_id);
         workspaceName = workspace?.name || '';
       }
 
-      // Preparar todos los datos del usuario para enviar al webhook
-      const userData = {
-        // Datos de autenticación
-        user_id: effectiveUserId,
-        email: profileData?.email || user.email,
-        
-        // Datos del perfil
-        first_name: profileData?.first_name || null,
-        last_name: profileData?.last_name || null,
-        phone: profileData?.phone || null,
-        company_name: profileData?.company_name || null,
-        plan_type: profileData?.plan_type || null,
-        profile_type: profileData?.profile_type || null,
-        
-        // Datos de la conexión WhatsApp (sesión)
-        nombre: formData.name,
-        numero: formData.phone_number,
-        workspace_id: formData.workspace_id || null,
-        workspace_name: workspaceName,
-        
-        // Metadatos adicionales
-        created_at: new Date().toISOString(),
-        user_agent: navigator.userAgent,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-      };
-
-      // Ejecutar el webhook de n8n con todos los datos del usuario
-      const webhookResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/crear_sesion', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData)
-      });
-
-      if (!webhookResponse.ok) {
-        throw new Error(`Error en webhook: ${webhookResponse.status} ${webhookResponse.statusText}`);
-      }
-
-      const webhookData = await webhookResponse.json();
-      console.log('Webhook response:', webhookData);
-
-      // Si el webhook fue exitoso, guardar en la base de datos
-      const { data, error} = await supabase
-        .from('whatsapp_connections')
-        .insert({
+      const { data, error } = await supabase.functions.invoke('waha-create-session', {
+        body: {
           user_id: effectiveUserId,
-          name: formData.name,
+          session_name: formData.name,
           phone_number: formData.phone_number,
-          status: 'desconectado',
-          workspace_id: formData.workspace_id || null
-        })
-        .select()
-        .single();
+          workspace_id: formData.workspace_id || null,
+          workspace_name: workspaceName,
+          email: profileData?.email || user.email,
+          first_name: profileData?.first_name,
+          last_name: profileData?.last_name,
+          company_name: profileData?.company_name,
+          plan_type: profileData?.plan_type,
+        }
+      });
 
       if (error) throw error;
 
-      // Incrementar uso después de crear exitosamente
       await incrementUsage('whatsapp_connections', 1);
 
       toast({
         title: "Conexión creada",
-        description: "La conexión de WhatsApp se creó correctamente y la instancia fue configurada con todos tus datos",
+        description: "La conexión de WhatsApp se creó correctamente. Ahora puedes conectarla mediante código QR.",
       });
 
       setDialogOpen(false);
@@ -435,13 +282,8 @@ const WhatsAppConnections = () => {
     } catch (error: any) {
       console.error('Error creating connection:', error);
       
-      // Mostrar mensaje de error más específico
       let errorMessage = "No se pudo crear la conexión";
-      if (error.message.includes('webhook')) {
-        errorMessage = "Error al configurar la instancia de WhatsApp. Verifica la conexión con el servidor.";
-      } else if (error.message.includes('profiles')) {
-        errorMessage = "Error al obtener los datos del perfil. Verifica tu información de usuario.";
-      } else if (error.message) {
+      if (error.message) {
         errorMessage = error.message;
       }
       
@@ -506,75 +348,34 @@ const WhatsAppConnections = () => {
     setVerifying(connectionId);
     
     try {
-      console.log('Verificando estatus para:', sessionName);
-      
-      const response = await fetch('https://n8n.kanbanpro.com.ar/webhook/estatus', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_name: sessionName
-        })
+      const { data, error } = await supabase.functions.invoke('waha-session-status', {
+        body: {
+          session_name: sessionName,
+          connection_id: connectionId,
+          user_id: effectiveUserId
+        }
       });
-  
-      if (!response.ok) {
-        throw new Error(`Error del webhook: ${response.status}`);
+
+      if (error) throw error;
+
+      await fetchConnections();
+
+      let displayStatus = 'disconnected';
+      if (data.status === 'WORKING') {
+        displayStatus = 'connected';
+      } else if (data.status === 'SCAN_QR_CODE' || data.status === 'STARTING') {
+        displayStatus = 'pending';
       }
-  
-      // Obtener respuesta como texto primero
-      const responseText = await response.text();
-      console.log('Respuesta del webhook (texto):', responseText);
-      
-      let newStatus = 'desconectado';
-      
-      try {
-        // Intentar parsear como JSON
-        const webhookData = JSON.parse(responseText);
-        console.log('Datos parseados como JSON:', webhookData);
-        
-        // Si es un array con objetos
-        if (Array.isArray(webhookData) && webhookData.length > 0) {
-          const connectionData = webhookData[0];
-          if (connectionData.status === 'WORKING') {
-            newStatus = 'conectado';
-          }
-        }
-      } catch (jsonError) {
-        // Si no es JSON válido, verificar si el texto contiene WORKING
-        console.log('No es JSON, verificando texto plano:', responseText);
-        if (responseText.trim().toUpperCase() === 'WORKING') {
-          newStatus = 'conectado';
-        }
-      }
-      
-      console.log('Actualizando estatus a:', newStatus);
-      
-      // Actualizar en la base de datos
-      const { error: updateError } = await supabase
-        .from('whatsapp_connections')
-        .update({ status: newStatus })
-        .eq('id', connectionId)
-        .eq('user_id', effectiveUserId);
-  
-      if (updateError) {
-        console.error('Error actualizando BD:', updateError);
-        throw new Error('Error actualizando base de datos');
-      }
-      
+
       toast({
-        title: "Estatus verificado",
-        description: `Conexión ${newStatus}`,
+        title: "Estado actualizado",
+        description: `Estado de la conexión: ${displayStatus}`,
       });
-      
-      // Refrescar la lista
-      fetchConnections();
-      
-    } catch (error: any) {
-      console.error('Error:', error);
+    } catch (error) {
+      console.error('Error al verificar estado:', error);
       toast({
         title: "Error",
-        description: "No se pudo verificar el estatus",
+        description: "No se pudo verificar el estado de la conexión",
         variant: "destructive",
       });
     } finally {
