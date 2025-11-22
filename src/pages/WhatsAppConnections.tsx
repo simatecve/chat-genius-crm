@@ -141,8 +141,12 @@ const WhatsAppConnections = () => {
 
       if (error) throw error;
 
+      console.log('QR Response:', data);
+
+      // WAHA devuelve el QR en formato: { base64: "data:image/png;base64,..." } o directamente la imagen base64
       if (data?.qr) {
-        setQrImage(data.qr);
+        const qrImageData = data.qr.base64 || data.qr;
+        setQrImage(qrImageData);
         toast({
           title: "Código QR generado",
           description: "Escanea el código QR con WhatsApp para conectar",
