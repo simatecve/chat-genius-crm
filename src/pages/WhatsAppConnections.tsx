@@ -141,17 +141,38 @@ const WhatsAppConnections = () => {
 
       if (error) throw error;
 
-      console.log('QR Response:', data);
+      console.log('QR Response completa:', data);
+      console.log('Estructura de data.qr:', data?.qr);
 
-      // WAHA devuelve el QR en formato: { base64: "data:image/png;base64,..." } o directamente la imagen base64
+      // WAHA devuelve el QR en diferentes formatos según el Accept header
+      // Con Accept: application/json devuelve { base64: "data:image/png;base64,..." }
+      // O puede devolver directamente el string base64
       if (data?.qr) {
-        const qrImageData = data.qr.base64 || data.qr;
+        let qrImageData;
+        
+        if (typeof data.qr === 'string') {
+          // Si es un string directamente
+          qrImageData = data.qr;
+        } else if (data.qr.base64) {
+          // Si viene en formato { base64: "..." }
+          qrImageData = data.qr.base64;
+        } else if (data.qr.image) {
+          // Alternativa por si viene como { image: "..." }
+          qrImageData = data.qr.image;
+        } else {
+          // Intentar serializar el objeto completo por si es otra estructura
+          console.error('Formato de QR no reconocido:', data.qr);
+          throw new Error('Formato de código QR no reconocido');
+        }
+        
+        console.log('QR Image Data:', qrImageData?.substring(0, 100) + '...');
         setQrImage(qrImageData);
         toast({
           title: "Código QR generado",
           description: "Escanea el código QR con WhatsApp para conectar",
         });
       } else {
+        console.error('No se encontró data.qr en la respuesta:', data);
         throw new Error('No se recibió el código QR');
       }
     } catch (error) {

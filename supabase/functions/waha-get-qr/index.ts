@@ -43,6 +43,7 @@ serve(async (req) => {
 
     const qrData = await wahaResponse.json();
     console.log('QR code obtained successfully');
+    console.log('QR Data structure:', JSON.stringify(qrData).substring(0, 200)); // Log primeros 200 caracteres
 
     return new Response(
       JSON.stringify({
