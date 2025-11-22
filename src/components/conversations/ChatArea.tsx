@@ -408,7 +408,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
         
         <div className="whitespace-pre-wrap break-words">
-          {message.message}
+          {message.content}
         </div>
         
         {/* Información del mensaje */}
