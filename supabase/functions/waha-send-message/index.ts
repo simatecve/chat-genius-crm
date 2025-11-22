@@ -45,9 +45,10 @@ serve(async (req) => {
 
     console.log('Formatted chatId:', chatId);
 
-    // Enviar mensaje a WAHA usando el endpoint correcto según documentación
-    const wahaUrl = `${WAHA_BASE_URL}/api/${sessionName}/sendText`;
+    // Enviar mensaje a WAHA
+    const wahaUrl = `${WAHA_BASE_URL}/api/sendText`;
     const wahaPayload = {
+      session: sessionName,
       chatId: chatId,
       text: message
     };
