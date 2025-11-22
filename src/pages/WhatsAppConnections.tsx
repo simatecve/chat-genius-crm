@@ -285,7 +285,7 @@ const WhatsAppConnections = () => {
       // Primero obtener los datos completos del perfil del usuario
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('first_name, last_name, phone, company_name, plan_type, profile_type')
+        .select('first_name, last_name, phone, company_name, plan_type, profile_type, email')
         .eq('id', effectiveUserId)
         .single();
 
@@ -293,11 +293,18 @@ const WhatsAppConnections = () => {
         console.error('Error fetching profile:', profileError);
       }
 
+      // Obtener el nombre del workspace si se seleccionó uno
+      let workspaceName = '';
+      if (formData.workspace_id) {
+        const workspace = workspaces.find(w => w.id === formData.workspace_id);
+        workspaceName = workspace?.name || '';
+      }
+
       // Preparar todos los datos del usuario para enviar al webhook
       const userData = {
         // Datos de autenticación
         user_id: effectiveUserId,
-        email: user.email,
+        email: profileData?.email || user.email,
         
         // Datos del perfil
         first_name: profileData?.first_name || null,
@@ -307,9 +314,11 @@ const WhatsAppConnections = () => {
         plan_type: profileData?.plan_type || null,
         profile_type: profileData?.profile_type || null,
         
-        // Datos de la conexión WhatsApp
-        nombre_instancia: formData.name,
-        telefono: formData.phone_number,
+        // Datos de la conexión WhatsApp (sesión)
+        nombre: formData.name,
+        numero: formData.phone_number,
+        workspace_id: formData.workspace_id || null,
+        workspace_name: workspaceName,
         
         // Metadatos adicionales
         created_at: new Date().toISOString(),
@@ -318,7 +327,7 @@ const WhatsAppConnections = () => {
       };
 
       // Ejecutar el webhook de n8n con todos los datos del usuario
-      const webhookResponse = await fetch('https://n8n.kanbanpro.com.ar/webhook/crear_instancia', {
+      const webhookResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/crear_sesion', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
