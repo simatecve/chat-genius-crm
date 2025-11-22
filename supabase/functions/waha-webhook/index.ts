@@ -7,6 +7,336 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Normalizar número de teléfono removiendo sufijos de WhatsApp
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+  return phone
+    .replace(/@lid$/, '')
+    .replace(/@c\.us$/, '')
+    .replace(/@s\.whatsapp\.net$/, '')
+    .trim();
+}
+
+// Obtener user_id desde el nombre de la sesión
+async function getUserIdFromSession(supabase: any, sessionName: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('whatsapp_connections')
+    .select('user_id')
+    .eq('name', sessionName)
+    .single();
+
+  if (error) {
+    console.error('Error getting user_id from session:', error);
+    return null;
+  }
+
+  return data?.user_id || null;
+}
+
+// Obtener columna por defecto del usuario
+async function getDefaultColumn(supabase: any, userId: string): Promise<string | null> {
+  // Intentar obtener la columna marcada como default
+  let { data, error } = await supabase
+    .from('lead_columns')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_default', true)
+    .order('position', { ascending: true })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    // Si no hay columna default, obtener la primera columna del usuario
+    const result = await supabase
+      .from('lead_columns')
+      .select('id')
+      .eq('user_id', userId)
+      .order('position', { ascending: true })
+      .limit(1)
+      .single();
+
+    data = result.data;
+    error = result.error;
+  }
+
+  if (error) {
+    console.error('Error getting default column:', error);
+    return null;
+  }
+
+  return data?.id || null;
+}
+
+// Obtener siguiente posición en una columna
+async function getNextPosition(supabase: any, columnId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('leads')
+    .select('position')
+    .eq('column_id', columnId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    return 0;
+  }
+
+  return (data.position || 0) + 1;
+}
+
+// Buscar o crear conversación
+async function getOrCreateConversation(
+  supabase: any,
+  userId: string,
+  phoneNumber: string,
+  pushName: string | null,
+  messageContent: string,
+  messageTimestamp: number
+) {
+  // Buscar conversación existente
+  let { data: conversation, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('phone_number', phoneNumber)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    console.error('Error searching conversation:', error);
+    return null;
+  }
+
+  if (!conversation) {
+    // Crear nueva conversación
+    const newConversation = {
+      user_id: userId,
+      phone_number: phoneNumber,
+      pushname: pushName,
+      last_message: messageContent,
+      last_message_time: new Date(messageTimestamp * 1000).toISOString(),
+      unread_count: 1,
+      status: 'active',
+    };
+
+    const { data: created, error: createError } = await supabase
+      .from('conversations')
+      .insert(newConversation)
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Error creating conversation:', createError);
+      return null;
+    }
+
+    console.log('New conversation created:', created.id);
+    return created;
+  } else {
+    // Actualizar conversación existente
+    const { data: updated, error: updateError } = await supabase
+      .from('conversations')
+      .update({
+        last_message: messageContent,
+        last_message_time: new Date(messageTimestamp * 1000).toISOString(),
+        unread_count: conversation.unread_count + 1,
+        pushname: pushName || conversation.pushname,
+      })
+      .eq('id', conversation.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating conversation:', updateError);
+    }
+
+    return updated || conversation;
+  }
+}
+
+// Guardar mensaje en la base de datos
+async function saveMessage(
+  supabase: any,
+  conversationId: string,
+  userId: string,
+  messageData: any
+) {
+  const message = {
+    conversation_id: conversationId,
+    user_id: userId,
+    content: messageData.body || '',
+    direction: messageData.fromMe ? 'outbound' : 'inbound',
+    status: 'delivered',
+    message_type: messageData.hasMedia ? 'media' : 'text',
+    is_bot: false,
+    created_at: new Date(messageData.timestamp * 1000).toISOString(),
+    metadata: {
+      waha_id: messageData.id,
+      ack: messageData.ack,
+      ackName: messageData.ackName,
+    },
+  };
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert(message)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error saving message:', error);
+    return null;
+  }
+
+  console.log('Message saved:', data.id);
+  return data;
+}
+
+// Buscar o crear lead
+async function getOrCreateLead(
+  supabase: any,
+  userId: string,
+  phoneNumber: string,
+  pushName: string | null
+) {
+  // Buscar lead existente por teléfono
+  let { data: lead, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('phone', phoneNumber)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error searching lead:', error);
+    return null;
+  }
+
+  if (!lead) {
+    // Obtener columna por defecto
+    const defaultColumnId = await getDefaultColumn(supabase, userId);
+    if (!defaultColumnId) {
+      console.error('No default column found for user');
+      return null;
+    }
+
+    // Obtener siguiente posición
+    const position = await getNextPosition(supabase, defaultColumnId);
+
+    // Crear nuevo lead
+    const newLead = {
+      user_id: userId,
+      column_id: defaultColumnId,
+      name: pushName || phoneNumber,
+      phone: phoneNumber,
+      position: position,
+      notes: 'Lead creado automáticamente desde WhatsApp',
+      bot_active: true,
+    };
+
+    const { data: created, error: createError } = await supabase
+      .from('leads')
+      .insert(newLead)
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Error creating lead:', createError);
+      return null;
+    }
+
+    console.log('New lead created:', created.id);
+    return created;
+  }
+
+  console.log('Lead already exists:', lead.id);
+  return lead;
+}
+
+// Vincular conversación con lead
+async function linkConversationToLead(
+  supabase: any,
+  conversationId: string,
+  leadId: string
+) {
+  const { error } = await supabase
+    .from('conversations')
+    .update({ lead_id: leadId })
+    .eq('id', conversationId);
+
+  if (error) {
+    console.error('Error linking conversation to lead:', error);
+    return false;
+  }
+
+  console.log('Conversation linked to lead');
+  return true;
+}
+
+// Procesar evento de mensaje
+async function processMessageEvent(supabase: any, payload: any, session: string) {
+  try {
+    console.log('Processing message event...');
+
+    // Extraer datos del mensaje
+    const messageData = payload;
+    const phoneNumber = normalizePhoneNumber(messageData.from);
+    const pushName = messageData._data?.pushName || null;
+    const messageContent = messageData.body;
+    const timestamp = messageData.timestamp;
+    const fromMe = messageData.fromMe;
+
+    // Ignorar mensajes de sistema (sin body)
+    if (!messageContent) {
+      console.log('Ignoring system message');
+      return;
+    }
+
+    console.log(`Message from: ${phoneNumber} (${pushName}), fromMe: ${fromMe}`);
+    console.log(`Content: ${messageContent.substring(0, 50)}...`);
+
+    // Obtener user_id de la sesión
+    const userId = await getUserIdFromSession(supabase, session);
+    if (!userId) {
+      console.error('Could not get user_id from session');
+      return;
+    }
+
+    console.log(`User ID: ${userId}`);
+
+    // Buscar o crear conversación
+    const conversation = await getOrCreateConversation(
+      supabase,
+      userId,
+      phoneNumber,
+      pushName,
+      messageContent,
+      timestamp
+    );
+
+    if (!conversation) {
+      console.error('Failed to create/get conversation');
+      return;
+    }
+
+    // Guardar mensaje
+    await saveMessage(supabase, conversation.id, userId, messageData);
+
+    // Solo crear lead para mensajes entrantes (!fromMe)
+    if (!fromMe) {
+      const lead = await getOrCreateLead(supabase, userId, phoneNumber, pushName);
+      
+      if (lead && !conversation.lead_id) {
+        // Vincular conversación con lead si aún no está vinculada
+        await linkConversationToLead(supabase, conversation.id, lead.id);
+      }
+    }
+
+    console.log('Message processing completed successfully');
+  } catch (error) {
+    console.error('Error processing message event:', error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -53,11 +383,10 @@ serve(async (req) => {
       }
     }
 
-    // Procesar mensajes recibidos (opcional, para funcionalidad futura)
+    // Procesar mensajes recibidos
     if (event === 'message') {
-      console.log('Message event received:', eventPayload);
-      // Aquí se puede agregar lógica para procesar mensajes entrantes
-      // y guardarlos en la tabla de conversaciones/mensajes
+      console.log('Message event detected');
+      await processMessageEvent(supabase, eventPayload, session);
     }
 
     return new Response(
