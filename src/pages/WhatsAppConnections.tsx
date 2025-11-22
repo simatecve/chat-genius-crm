@@ -121,15 +121,79 @@ const WhatsAppConnections = () => {
     setQrLoading(true);
     setQrImage(null);
 
+    if (!effectiveUserId || !user) {
+      toast({
+        title: "Error",
+        description: "Usuario no autenticado",
+        variant: "destructive",
+      });
+      setQrLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch('https://n8n.kanbanpro.com.ar/webhook/qr_instancia', {
+      // Obtener los datos de la conexión
+      const { data: connectionData, error: connectionError } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('name', sessionName)
+        .eq('user_id', effectiveUserId)
+        .single();
+
+      if (connectionError) {
+        console.error('Error fetching connection:', connectionError);
+      }
+
+      // Obtener los datos del perfil del usuario
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, phone, company_name, plan_type, profile_type, email')
+        .eq('id', effectiveUserId)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error fetching profile:', profileError);
+      }
+
+      // Obtener el nombre del workspace si existe
+      let workspaceName = '';
+      if (connectionData?.workspace_id) {
+        const workspace = workspaces.find(w => w.id === connectionData.workspace_id);
+        workspaceName = workspace?.name || '';
+      }
+
+      // Preparar todos los datos para enviar al webhook
+      const webhookData = {
+        // Datos de autenticación
+        user_id: effectiveUserId,
+        email: profileData?.email || user.email,
+        
+        // Datos del perfil
+        first_name: profileData?.first_name || null,
+        last_name: profileData?.last_name || null,
+        phone: profileData?.phone || null,
+        company_name: profileData?.company_name || null,
+        plan_type: profileData?.plan_type || null,
+        profile_type: profileData?.profile_type || null,
+        
+        // Datos de la conexión WhatsApp (sesión)
+        nombre: sessionName,
+        numero: connectionData?.phone_number || '',
+        workspace_id: connectionData?.workspace_id || null,
+        workspace_name: workspaceName,
+        
+        // Metadatos adicionales
+        created_at: new Date().toISOString(),
+        user_agent: navigator.userAgent,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+
+      const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/crear_qr', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          session_name: sessionName
-        })
+        body: JSON.stringify(webhookData)
       });
 
       if (!response.ok) {
