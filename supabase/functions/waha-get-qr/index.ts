@@ -43,12 +43,20 @@ serve(async (req) => {
 
     const qrData = await wahaResponse.json();
     console.log('QR code obtained successfully');
-    console.log('QR Data structure:', JSON.stringify(qrData).substring(0, 200)); // Log primeros 200 caracteres
+    console.log('QR Data structure:', JSON.stringify(qrData).substring(0, 200));
+
+    // WAHA devuelve { data: "base64...", mimetype: "image/png" }
+    // Construir el data URL completo
+    let qrImageUrl = qrData;
+    if (qrData.data && qrData.mimetype) {
+      qrImageUrl = `data:${qrData.mimetype};base64,${qrData.data}`;
+      console.log('Constructed QR URL:', qrImageUrl.substring(0, 100) + '...');
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        qr: qrData
+        qr: qrImageUrl
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
