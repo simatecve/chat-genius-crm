@@ -118,7 +118,7 @@ export class ConversationService {
   }
 
   /**
-   * Envía un nuevo mensaje directamente a WAHA
+   * Envía un nuevo mensaje usando el edge function de Supabase
    */
   static async sendMessage(
     conversationId: string,
@@ -128,84 +128,30 @@ export class ConversationService {
     phoneNumber: string
   ): Promise<Message | null> {
     try {
-      console.log('Sending message directly to WAHA API...');
+      console.log('Sending message via edge function...');
       
-      // Obtener configuración de variables de entorno
-      const WAHA_BASE_URL = import.meta.env.VITE_WAHA_BASE_URL;
-      const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY;
-      
-      if (!WAHA_BASE_URL || !WAHA_API_KEY) {
-        throw new Error('WAHA configuration missing in environment variables');
-      }
-      
-      // Formatear número de teléfono para WAHA
-      const formattedPhone = phoneNumber.replace(/[^0-9]/g, '');
-      const chatId = `${formattedPhone}@c.us`;
-      
-      console.log('Sending to WAHA:', { url: `${WAHA_BASE_URL}/api/sendText`, session: sessionName, chatId });
-      
-      // Enviar mensaje a WAHA
-      const wahaResponse = await fetch(`${WAHA_BASE_URL}/api/sendText`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': WAHA_API_KEY,
-        },
-        body: JSON.stringify({
-          session: sessionName,
-          chatId: chatId,
-          text: message,
-          linkPreview: false
-        })
+      // Llamar al edge function waha-send-message
+      const { data, error } = await supabase.functions.invoke('waha-send-message', {
+        body: {
+          sessionName,
+          phoneNumber,
+          message,
+          userId,
+          conversationId
+        }
       });
 
-      if (!wahaResponse.ok) {
-        const errorText = await wahaResponse.text();
-        throw new Error(`WAHA API error: ${wahaResponse.status} - ${errorText}`);
+      if (error) {
+        console.error('Error calling edge function:', error);
+        throw error;
       }
 
-      const wahaResult = await wahaResponse.json();
-      console.log('Message sent via WAHA:', wahaResult);
-
-      // Guardar mensaje en la base de datos
-      const messageData = {
-        conversation_id: conversationId,
-        user_id: userId,
-        content: message,
-        direction: 'outbound',
-        status: 'sent',
-        message_type: 'text',
-        is_bot: false,
-        created_at: new Date().toISOString(),
-        metadata: {
-          waha_id: wahaResult.id || null,
-          waha_status: wahaResult.status || null,
-          sent_via: 'direct_api'
-        }
-      };
-
-      const { data: savedMessage, error: dbError } = await supabase
-        .from('messages')
-        .insert(messageData)
-        .select()
-        .single();
-
-      if (dbError) {
-        console.error('Error saving message to database:', dbError);
-        throw dbError;
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to send message');
       }
 
-      // Actualizar última fecha de mensaje en la conversación
-      await supabase
-        .from('conversations')
-        .update({
-          last_message: message,
-          last_message_time: new Date().toISOString(),
-        })
-        .eq('id', conversationId);
-
-      console.log('Message sent successfully:', savedMessage);
-      return savedMessage;
+      console.log('Message sent successfully via edge function:', data.savedMessage);
+      return data.savedMessage;
     } catch (error) {
       console.error('Error in sendMessage:', error);
       throw error;
