@@ -76,6 +76,8 @@ serve(async (req) => {
 
     const wahaResult = await wahaResponse.json();
     console.log('Message sent via WAHA:', wahaResult);
+    console.log('WAHA response status:', wahaResult.status);
+    console.log('WAHA message ID:', wahaResult.id);
 
     // Guardar mensaje en la base de datos
     const messageData = {
@@ -83,12 +85,14 @@ serve(async (req) => {
       user_id: userId,
       content: message,
       direction: 'outbound',
-      status: 'sent',
+      status: wahaResult.status === 'PENDING' ? 'sent' : 'delivered',
       message_type: 'text',
       is_bot: false,
       created_at: new Date().toISOString(),
       metadata: {
         waha_id: wahaResult.id || null,
+        waha_status: wahaResult.status || null,
+        waha_timestamp: wahaResult.messageTimestamp || null,
         sent_via: 'api'
       }
     };
