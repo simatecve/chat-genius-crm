@@ -165,7 +165,9 @@ async function saveMessage(
   supabase: any,
   conversationId: string,
   userId: string,
-  messageData: any
+  messageData: any,
+  mediaUrl: string | null = null,
+  mediaType: string = 'text'
 ) {
   const message = {
     conversation_id: conversationId,
@@ -173,13 +175,17 @@ async function saveMessage(
     content: messageData.body || '',
     direction: messageData.fromMe ? 'outbound' : 'inbound',
     status: 'delivered',
-    message_type: messageData.hasMedia ? 'media' : 'text',
+    message_type: mediaType,
     is_bot: false,
     created_at: new Date(messageData.timestamp * 1000).toISOString(),
+    file_url: mediaUrl,
+    attachment_url: mediaUrl,
     metadata: {
       waha_id: messageData.id,
       ack: messageData.ack,
       ackName: messageData.ackName,
+      hasMedia: messageData.hasMedia || false,
+      mimetype: messageData.media?.mimetype || null
     },
   };
 
@@ -288,13 +294,38 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
     const messageData = payload;
     const phoneNumber = normalizePhoneNumber(messageData.from);
     const pushName = messageData._data?.pushName || null;
-    const messageContent = messageData.body;
+    let messageContent = messageData.body || '';
     const timestamp = messageData.timestamp;
     const fromMe = messageData.fromMe;
+    const hasMedia = messageData.hasMedia;
+    let mediaUrl = null;
+    let mediaType = 'text';
 
-    // Ignorar mensajes de sistema (sin body)
-    if (!messageContent) {
-      console.log('Ignoring system message');
+    // Manejar mensajes con archivos multimedia
+    if (hasMedia && messageData.media) {
+      mediaUrl = messageData.media.url;
+      const mimetype = messageData.media.mimetype || '';
+      
+      if (mimetype.startsWith('image/')) {
+        mediaType = 'image';
+        messageContent = messageContent || '[Imagen]';
+      } else if (mimetype.startsWith('video/')) {
+        mediaType = 'video';
+        messageContent = messageContent || '[Video]';
+      } else if (mimetype.startsWith('audio/')) {
+        mediaType = 'audio';
+        messageContent = messageContent || '[Audio]';
+      } else {
+        mediaType = 'file';
+        messageContent = messageContent || '[Archivo]';
+      }
+      
+      console.log(`Media message detected: ${mediaType} at ${mediaUrl}`);
+    }
+
+    // Ignorar mensajes de sistema sin contenido ni media
+    if (!messageContent && !hasMedia) {
+      console.log('Ignoring system message without content or media');
       return;
     }
 
@@ -327,7 +358,7 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
     }
 
     // Guardar mensaje
-    await saveMessage(supabase, conversation.id, userId, messageData);
+    await saveMessage(supabase, conversation.id, userId, messageData, mediaUrl, mediaType);
 
     // Solo crear lead para mensajes entrantes (!fromMe)
     if (!fromMe) {

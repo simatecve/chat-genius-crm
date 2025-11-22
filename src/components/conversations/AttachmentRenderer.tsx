@@ -20,8 +20,17 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Detectar tipo de archivo por extensión
+  // Detectar tipo de archivo por extensión o URL
   const getFileType = (url: string) => {
+    // Detectar URLs de WAHA
+    if (url.includes('/api/files/')) {
+      if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return 'video';
+      if (url.includes('.mp3') || url.includes('.wav') || url.includes('.m4a') || url.includes('.ogg')) return 'audio';
+      if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif')) return 'image';
+      if (url.includes('.pdf')) return 'pdf';
+    }
+    
+    // Detección por extensión estándar
     if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) return 'image';
     if (url.match(/\.(mp4|webm|mov|avi|mkv)$/i)) return 'video';
     if (url.match(/\.(mp3|wav|ogg|oga|m4a|aac)$/i)) return 'audio';
