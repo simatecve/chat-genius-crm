@@ -15,7 +15,8 @@ import Integrations from '@/components/Integrations';
 import WorkspaceManagement from '@/components/WorkspaceManagement';
 import WhatsAppConnections from '@/pages/WhatsAppConnections';
 import QuickReplies from '@/components/QuickReplies';
-import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare } from 'lucide-react';
+import UserManagement from '@/components/UserManagement';
+import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 
@@ -193,7 +194,7 @@ const Settings = () => {
       </div>
       
       <Tabs defaultValue="workspaces" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="workspaces" className="flex items-center space-x-2">
               <Briefcase className="h-4 w-4" />
               <span>Espacios</span>
@@ -205,6 +206,10 @@ const Settings = () => {
             <TabsTrigger value="quick-replies" className="flex items-center space-x-2">
               <MessageSquare className="h-4 w-4" />
               <span>Respuestas</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center space-x-2">
+              <UsersIcon className="h-4 w-4" />
+              <span>Usuarios</span>
             </TabsTrigger>
             <TabsTrigger value="profile" className="flex items-center space-x-2">
               <User className="h-4 w-4" />
@@ -230,6 +235,10 @@ const Settings = () => {
           
           <TabsContent value="quick-replies" className="mt-6">
             <QuickReplies />
+          </TabsContent>
+          
+          <TabsContent value="users" className="mt-6">
+            <UserManagement />
           </TabsContent>
           
           <TabsContent value="profile" className="mt-6">
