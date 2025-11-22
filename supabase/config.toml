@@ -12,6 +12,9 @@ verify_jwt = true
 [functions.waha-get-qr]
 verify_jwt = true
 
+[functions.waha-send-message]
+verify_jwt = true
+
 [functions.waha-session-status]
 verify_jwt = true
 

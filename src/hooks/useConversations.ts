@@ -113,20 +113,34 @@ export const useMessages = (conversationId: string | null) => {
     staleTime: 10000,
   });
 
-  // Mutation para enviar mensaje solo al webhook
+  // Mutation para enviar mensaje a través de WAHA
   const sendMessageMutation = useMutation({
-    mutationFn: ConversationService.sendMessageToWebhookOnly,
+    mutationFn: ({ 
+      conversationId, 
+      userId, 
+      message, 
+      sessionName, 
+      phoneNumber 
+    }: {
+      conversationId: string;
+      userId: string;
+      message: string;
+      sessionName: string;
+      phoneNumber: string;
+    }) => ConversationService.sendMessage(conversationId, userId, message, sessionName, phoneNumber),
     onSuccess: () => {
       toast({
         title: 'Mensaje enviado',
-        description: 'El mensaje se envió correctamente al webhook',
+        description: 'El mensaje se envió correctamente',
       });
+      // Invalidar mensajes para refrescar
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
     },
     onError: (error) => {
-      console.error('Error sending message to webhook:', error);
+      console.error('Error sending message:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo enviar el mensaje al webhook',
+        description: 'No se pudo enviar el mensaje',
         variant: 'destructive',
       });
     },

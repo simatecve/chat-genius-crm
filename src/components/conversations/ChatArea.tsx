@@ -378,7 +378,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   getInitials,
   conversation,
 }) => {
-  const isOutgoing = message.direction === 'outgoing';
+  const isOutgoing = message.direction === 'outbound';
   
   return (
     <div className={cn("flex items-end gap-2", isOutgoing ? "justify-end" : "justify-start")}>

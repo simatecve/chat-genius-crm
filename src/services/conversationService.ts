@@ -118,36 +118,40 @@ export class ConversationService {
   }
 
   /**
-   * Envía un nuevo mensaje
+   * Envía un nuevo mensaje a través de WAHA
    */
-  static async sendMessage(messageData: MessageInsert): Promise<Message | null> {
+  static async sendMessage(
+    conversationId: string,
+    userId: string,
+    message: string,
+    sessionName: string,
+    phoneNumber: string
+  ): Promise<Message | null> {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert(messageData)
-        .select()
-        .single();
+      console.log('Sending message through WAHA edge function...');
+      
+      // Llamar al edge function que envía el mensaje a WAHA
+      const { data, error } = await supabase.functions.invoke('waha-send-message', {
+        body: {
+          sessionName,
+          phoneNumber,
+          message,
+          userId,
+          conversationId
+        }
+      });
 
       if (error) {
-        console.error('Error sending message:', error);
+        console.error('Error calling waha-send-message:', error);
         throw error;
       }
 
-      // Actualizar la conversación con el último mensaje
-      if (data && data.conversation_id) {
-        await this.updateConversationLastMessage(
-          data.conversation_id,
-          data.message || '',
-          data.created_at
-        );
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to send message');
       }
 
-      // Enviar al webhook de n8n
-      if (data) {
-        this.sendToWebhook(data);
-      }
-
-      return data;
+      console.log('Message sent successfully:', data);
+      return data.savedMessage;
     } catch (error) {
       console.error('Error in sendMessage:', error);
       throw error;
