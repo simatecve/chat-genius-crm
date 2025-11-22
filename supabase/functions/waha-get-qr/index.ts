@@ -26,11 +26,12 @@ serve(async (req) => {
       throw new Error('session_name is required');
     }
 
-    // Obtener código QR de WAHA (GET request, not POST)
-    const wahaResponse = await fetch(`${WAHA_BASE_URL}/api/sessions/${session_name}/auth/qr`, {
-      method: 'GET',
+    // Obtener código QR de WAHA - correct endpoint from docs
+    const wahaResponse = await fetch(`${WAHA_BASE_URL}/api/${session_name}/auth/qr`, {
+      method: 'POST',
       headers: {
         'X-Api-Key': WAHA_API_KEY,
+        'Content-Type': 'application/json',
       },
     });
 
