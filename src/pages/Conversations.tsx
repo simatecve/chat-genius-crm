@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 import ConversationList from '@/components/conversations/ConversationList';
 import ChatArea from '@/components/conversations/ChatArea';
+import { ContactInfoPanel } from '@/components/conversations/ContactInfoPanel';
 import { useConversations, useMessages, useSearchConversations } from '@/hooks/useConversations';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
@@ -93,6 +94,14 @@ const Conversations = () => {
         onSendMessage={handleSendMessage}
         isSending={isSending}
       />
+
+      {selectedConversation && (
+        <ContactInfoPanel
+          conversationId={selectedConversation.id}
+          contactName={selectedConversation.contact_name || selectedConversation.pushname || 'Contacto'}
+          phoneNumber={selectedConversation.phone_number}
+        />
+      )}
     </div>
   );
 };

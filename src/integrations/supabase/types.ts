@@ -196,6 +196,56 @@ export type Database = {
           },
         ]
       }
+      contact_details: {
+        Row: {
+          agent_id: string | null
+          birth_date: string | null
+          conversation_id: string | null
+          created_at: string | null
+          funnel_stage: string | null
+          gender: string | null
+          id: string
+          notes: string | null
+          origin: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          birth_date?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          funnel_stage?: string | null
+          gender?: string | null
+          id?: string
+          notes?: string | null
+          origin?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          birth_date?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          funnel_stage?: string | null
+          gender?: string | null
+          id?: string
+          notes?: string | null
+          origin?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_details_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_list_members: {
         Row: {
           added_at: string | null
@@ -261,6 +311,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      contact_sales: {
+        Row: {
+          amount: number
+          contact_detail_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          sale_date: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          contact_detail_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          sale_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          contact_detail_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          sale_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_sales_contact_detail_id_fkey"
+            columns: ["contact_detail_id"]
+            isOneToOne: false
+            referencedRelation: "contact_details"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contacto_bloqueado_bot: {
         Row: {
