@@ -1,0 +1,440 @@
+import React, { useState, useEffect } from 'react';
+import { User, Calendar, MapPin, Users, Filter, FileText, DollarSign, ChevronDown, ChevronUp, Plus, Edit2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { contactDetailsService, ContactDetail, ContactSale } from '@/services/contactDetailsService';
+import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+
+interface ContactInfoPanelProps {
+  conversationId: string;
+  contactName: string;
+  phoneNumber: string;
+}
+
+export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
+  conversationId,
+  contactName,
+  phoneNumber,
+}) => {
+  const { effectiveUserId } = useEffectiveUserId();
+  const { toast } = useToast();
+  
+  const [contactDetails, setContactDetails] = useState<ContactDetail | null>(null);
+  const [sales, setSales] = useState<ContactSale[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    info: true,
+    personal: true,
+    agent: true,
+    funnel: true,
+    notes: true,
+    sales: true,
+  });
+
+  const [formData, setFormData] = useState({
+    gender: '',
+    origin: '',
+    birth_date: '',
+    agent_id: '',
+    funnel_stage: '',
+    notes: '',
+  });
+
+  const [newSale, setNewSale] = useState({
+    amount: '',
+    description: '',
+  });
+
+  useEffect(() => {
+    loadContactDetails();
+  }, [conversationId]);
+
+  const loadContactDetails = async () => {
+    const details = await contactDetailsService.getByConversation(conversationId);
+    if (details) {
+      setContactDetails(details);
+      setFormData({
+        gender: details.gender || '',
+        origin: details.origin || '',
+        birth_date: details.birth_date || '',
+        agent_id: details.agent_id || '',
+        funnel_stage: details.funnel_stage || '',
+        notes: details.notes || '',
+      });
+      
+      const salesData = await contactDetailsService.getSales(details.id);
+      setSales(salesData);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!effectiveUserId) return;
+
+    try {
+      await contactDetailsService.upsert(
+        {
+          gender: formData.gender as any || null,
+          origin: formData.origin || null,
+          birth_date: formData.birth_date || null,
+          agent_id: formData.agent_id || null,
+          funnel_stage: formData.funnel_stage || null,
+          notes: formData.notes || null,
+        },
+        conversationId,
+        effectiveUserId
+      );
+
+      toast({
+        title: 'Guardado exitoso',
+        description: 'La información del contacto se ha actualizado.',
+      });
+
+      setIsEditing(false);
+      loadContactDetails();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo guardar la información.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCreateSale = async () => {
+    if (!effectiveUserId || !contactDetails) return;
+
+    try {
+      await contactDetailsService.createSale({
+        contact_detail_id: contactDetails.id,
+        user_id: effectiveUserId,
+        amount: parseFloat(newSale.amount) || 0,
+        description: newSale.description || null,
+        sale_date: new Date().toISOString(),
+        status: 'completed',
+      });
+
+      toast({
+        title: 'Venta registrada',
+        description: 'La venta se ha registrado exitosamente.',
+      });
+
+      setNewSale({ amount: '', description: '' });
+      loadContactDetails();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo registrar la venta.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const totalSales = sales.reduce((sum, sale) => sum + parseFloat(sale.amount.toString()), 0);
+
+  return (
+    <div className="w-80 border-l border-border bg-card overflow-y-auto">
+      <div className="p-4 space-y-4">
+        {/* Header con botón de editar */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Información</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* INFORMACIÓN */}
+        <Card className="p-3">
+          <button
+            onClick={() => toggleSection('info')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <User className="h-4 w-4 text-primary" />
+              <h3 className="font-medium text-sm">INFORMACIÓN</h3>
+            </div>
+            {expandedSections.info ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {expandedSections.info && (
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex items-center space-x-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Nombre</p>
+                  <p className="font-medium">{contactName}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                  <p className="font-medium">{phoneNumber}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* DATOS PERSONALES */}
+        <Card className="p-3">
+          <button
+            onClick={() => toggleSection('personal')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <User className="h-4 w-4 text-primary" />
+              <h3 className="font-medium text-sm">DATOS PERSONALES</h3>
+            </div>
+            {expandedSections.personal ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {expandedSections.personal && (
+            <div className="mt-3 space-y-3">
+              <div>
+                <Label className="text-xs">Género</Label>
+                {isEditing ? (
+                  <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Femenino">Femenino</SelectItem>
+                      <SelectItem value="Otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm mt-1">{formData.gender || 'No especificado'}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-xs">Origen</Label>
+                {isEditing ? (
+                  <Input
+                    value={formData.origin}
+                    onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                    placeholder="Describe el origen..."
+                    className="h-8"
+                  />
+                ) : (
+                  <p className="text-sm mt-1">{formData.origin || 'No especificado'}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-xs">Fecha de Nacimiento</Label>
+                {isEditing ? (
+                  <Input
+                    type="date"
+                    value={formData.birth_date}
+                    onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                    className="h-8"
+                  />
+                ) : (
+                  <p className="text-sm mt-1">
+                    {formData.birth_date ? format(new Date(formData.birth_date), 'dd/MM/yyyy') : 'No especificado'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* AGENTE */}
+        <Card className="p-3">
+          <button
+            onClick={() => toggleSection('agent')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4 text-primary" />
+              <h3 className="font-medium text-sm">AGENTE</h3>
+            </div>
+            {expandedSections.agent ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {expandedSections.agent && (
+            <div className="mt-3">
+              {isEditing ? (
+                <Input
+                  value={formData.agent_id}
+                  onChange={(e) => setFormData({ ...formData, agent_id: e.target.value })}
+                  placeholder="Seleccionar agente..."
+                  className="h-8"
+                />
+              ) : (
+                <p className="text-sm">{formData.agent_id || 'Sin agente asignado'}</p>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* EMBUDO */}
+        <Card className="p-3">
+          <button
+            onClick={() => toggleSection('funnel')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-primary" />
+              <h3 className="font-medium text-sm">EMBUDO</h3>
+            </div>
+            {expandedSections.funnel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {expandedSections.funnel && (
+            <div className="mt-3">
+              {isEditing ? (
+                <Input
+                  value={formData.funnel_stage}
+                  onChange={(e) => setFormData({ ...formData, funnel_stage: e.target.value })}
+                  placeholder="Etapa del embudo..."
+                  className="h-8"
+                />
+              ) : (
+                <p className="text-sm">{formData.funnel_stage || 'PRIMER CONTACTO'}</p>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* NOTAS */}
+        <Card className="p-3">
+          <button
+            onClick={() => toggleSection('notes')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4 text-primary" />
+              <h3 className="font-medium text-sm">NOTAS</h3>
+            </div>
+            {expandedSections.notes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {expandedSections.notes && (
+            <div className="mt-3">
+              {isEditing ? (
+                <Textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Añade notas sobre este contacto..."
+                  className="min-h-20"
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{formData.notes || 'Sin notas'}</p>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* VENTAS */}
+        <Card className="p-3">
+          <button
+            onClick={() => toggleSection('sales')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <DollarSign className="h-4 w-4 text-success" />
+              <h3 className="font-medium text-sm">VENTAS</h3>
+            </div>
+            {expandedSections.sales ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+
+          {expandedSections.sales && (
+            <div className="mt-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">{sales.length} ventas registradas</p>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-7">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Nueva
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Registrar Venta</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <Label>Monto</Label>
+                        <Input
+                          type="number"
+                          value={newSale.amount}
+                          onChange={(e) => setNewSale({ ...newSale, amount: e.target.value })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <Label>Descripción</Label>
+                        <Textarea
+                          value={newSale.description}
+                          onChange={(e) => setNewSale({ ...newSale, description: e.target.value })}
+                          placeholder="Detalles de la venta..."
+                        />
+                      </div>
+                      <Button onClick={handleCreateSale} className="w-full">
+                        Registrar Venta
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className="text-center p-4 bg-muted rounded-lg">
+                <DollarSign className="h-8 w-8 mx-auto mb-2 text-success" />
+                <p className="text-2xl font-bold">${totalSales.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">Total en ventas</p>
+              </div>
+
+              {sales.length === 0 && (
+                <p className="text-xs text-center text-muted-foreground py-4">
+                  No hay ventas registradas
+                </p>
+              )}
+
+              {sales.map((sale) => (
+                <div key={sale.id} className="p-2 bg-muted/50 rounded text-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">${parseFloat(sale.amount.toString()).toFixed(2)}</p>
+                      {sale.description && (
+                        <p className="text-xs text-muted-foreground">{sale.description}</p>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(sale.sale_date), 'dd/MM/yy')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {isEditing && (
+          <Button onClick={handleSave} className="w-full">
+            Guardar Cambios
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
