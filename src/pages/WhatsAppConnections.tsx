@@ -12,8 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import UsageLimitAlert from '@/components/UsageLimitAlert';
-
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface WhatsAppConnection {
   id: string;
@@ -21,6 +20,12 @@ interface WhatsAppConnection {
   phone_number: string;
   status: string;
   created_at: string;
+  workspace_id?: string | null;
+}
+
+interface Workspace {
+  id: string;
+  name: string;
 }
 
 const colorOptions = [
@@ -34,6 +39,7 @@ const colorOptions = [
 
 const WhatsAppConnections = () => {
   const [connections, setConnections] = useState<WhatsAppConnection[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -42,10 +48,11 @@ const WhatsAppConnections = () => {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<string>('');
-  const [verifying, setVerifying] = useState<string | null>(null); // Agregar esta línea
+  const [verifying, setVerifying] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    phone_number: ''
+    phone_number: '',
+    workspace_id: ''
   });
   const { toast } = useToast();
   const { user } = useAuth();
@@ -56,6 +63,7 @@ const WhatsAppConnections = () => {
     // Solo ejecutar fetchConnections cuando tenemos un effectiveUserId válido
     if (!userIdLoading && effectiveUserId) {
       fetchConnections();
+      fetchWorkspaces();
     }
   }, [effectiveUserId, userIdLoading]);
 
@@ -85,6 +93,25 @@ const WhatsAppConnections = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWorkspaces = async () => {
+    if (!effectiveUserId) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('id, name')
+        .eq('user_id', effectiveUserId)
+        .order('position');
+
+      if (error) throw error;
+      setWorkspaces(data || []);
+    } catch (error) {
+      console.error('Error fetching workspaces:', error);
     }
   };
 
@@ -313,7 +340,8 @@ const WhatsAppConnections = () => {
           user_id: effectiveUserId,
           name: formData.name,
           phone_number: formData.phone_number,
-          status: 'desconectado'
+          status: 'desconectado',
+          workspace_id: formData.workspace_id || null
         })
         .select()
         .single();
@@ -329,7 +357,7 @@ const WhatsAppConnections = () => {
       });
 
       setDialogOpen(false);
-      setFormData({ name: '', phone_number: '' });
+      setFormData({ name: '', phone_number: '', workspace_id: '' });
       fetchConnections();
     } catch (error: any) {
       console.error('Error creating connection:', error);
@@ -540,6 +568,25 @@ const WhatsAppConnections = () => {
                   onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
                   disabled={creating}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="workspace">Espacio de trabajo</Label>
+                <Select
+                  value={formData.workspace_id}
+                  onValueChange={(value) => setFormData({ ...formData, workspace_id: value })}
+                  disabled={creating}
+                >
+                  <SelectTrigger id="workspace">
+                    <SelectValue placeholder="Seleccionar espacio de trabajo (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaces.map((workspace) => (
+                      <SelectItem key={workspace.id} value={workspace.id}>
+                        {workspace.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button 
                 type="submit"
