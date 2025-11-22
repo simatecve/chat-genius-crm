@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Phone, MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot } from 'lucide-react';
+import { Phone, MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,6 +15,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useBotBlock } from '@/hooks/useBotBlock';
 import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuickReplies } from '@/hooks/useQuickReplies';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -34,6 +36,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -41,6 +44,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { quickReplies } = useQuickReplies();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
     conversation?.whatsapp_number || null,
     conversation?.pushname || null
@@ -109,6 +113,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const handleEmojiSelect = (emoji: any) => {
     setNewMessage(prev => prev + emoji.emoji);
     setShowEmojiPicker(false);
+  };
+
+  // Manejar selección de respuesta rápida
+  const handleQuickReplySelect = (reply: any) => {
+    setNewMessage(reply.message);
+    setShowQuickReplies(false);
   };
 
   // Remover archivo seleccionado
@@ -313,6 +323,40 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           >
             <Paperclip className="h-4 w-4" />
           </Button>
+
+          {/* Botón de respuestas rápidas */}
+          {quickReplies.length > 0 && (
+            <Popover open={showQuickReplies} onOpenChange={setShowQuickReplies}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  disabled={isUploading || isSending}
+                >
+                  <Zap className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-2" align="start">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium px-2 py-1">Respuestas Rápidas</p>
+                  <ScrollArea className="max-h-[300px]">
+                    {quickReplies.map((reply) => (
+                      <button
+                        key={reply.id}
+                        onClick={() => handleQuickReplySelect(reply)}
+                        className="w-full text-left px-2 py-2 hover:bg-muted rounded-md transition-colors"
+                      >
+                        <p className="font-medium text-sm">{reply.title}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          {reply.message}
+                        </p>
+                      </button>
+                    ))}
+                  </ScrollArea>
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           
           <div className="flex-1 relative">
             <Input
@@ -378,7 +422,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   getInitials,
   conversation,
 }) => {
-  const isOutgoing = message.direction === 'outbound';
+  const isOutgoing = message.direction === 'outbound' || message.direction === 'outgoing';
   
   return (
     <div className={cn("flex items-end gap-2", isOutgoing ? "justify-end" : "justify-start")}>
