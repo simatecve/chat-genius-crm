@@ -38,47 +38,41 @@ const Conversations = () => {
   const handleSendMessage = async (messageText: string, attachment?: File) => {
     if ((!messageText.trim() && !attachment) || !selectedConversation || !effectiveUserId) return;
 
-    let attachmentUrl = null;
-    
-    // Subir archivo si existe
-    if (attachment) {
-      try {
-        const fileExt = attachment.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${effectiveUserId}/${fileName}`;
+    try {
+      // Obtener la sesión de WhatsApp asociada al número
+      const { data: whatsappConnection, error: connectionError } = await supabase
+        .from('whatsapp_connections')
+        .select('name')
+        .eq('user_id', effectiveUserId)
+        .eq('status', 'WORKING')
+        .limit(1)
+        .single();
 
-        const { data, error } = await supabase.storage
-          .from('message-attachments')
-          .upload(filePath, attachment);
-
-        if (error) {
-          console.error('Error uploading file:', error);
-          return;
-        }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('message-attachments')
-          .getPublicUrl(filePath);
-
-        attachmentUrl = publicUrl;
-      } catch (error) {
-        console.error('Error uploading attachment:', error);
+      if (connectionError || !whatsappConnection) {
+        console.error('No active WhatsApp connection found');
         return;
       }
-    }
 
-    sendMessage({
-      conversation_id: selectedConversation.id,
-      message: messageText.trim() || '',
-      direction: 'outgoing',
-      whatsapp_number: selectedConversation.whatsapp_number,
-      instance_name: selectedConversation.whatsapp_number || '',
-      user_id: effectiveUserId,
-      message_type: attachment ? 'file' : 'text',
-      is_bot: false,
-      attachment_url: attachmentUrl,
-      file_url: attachmentUrl,
-    });
+      const sessionName = whatsappConnection.name;
+      const phoneNumber = selectedConversation.phone_number;
+
+      // Por ahora solo soportamos mensajes de texto
+      if (attachment) {
+        console.warn('Attachments not yet supported with WAHA');
+        // TODO: Implementar envío de archivos con WAHA
+        return;
+      }
+
+      await sendMessage({
+        conversationId: selectedConversation.id,
+        userId: effectiveUserId,
+        message: messageText.trim(),
+        sessionName: sessionName,
+        phoneNumber: phoneNumber
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
   };
 
   return (

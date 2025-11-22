@@ -91,7 +91,8 @@ async function getOrCreateConversation(
   phoneNumber: string,
   pushName: string | null,
   messageContent: string,
-  messageTimestamp: number
+  messageTimestamp: number,
+  fromMe: boolean
 ) {
   // Buscar conversación existente
   let { data: conversation, error } = await supabase
@@ -133,14 +134,20 @@ async function getOrCreateConversation(
     return created;
   } else {
     // Actualizar conversación existente
+    const updateData: any = {
+      last_message: messageContent,
+      last_message_time: new Date(messageTimestamp * 1000).toISOString(),
+      pushname: pushName || conversation.pushname,
+    };
+    
+    // Solo incrementar unread_count si es mensaje entrante
+    if (!fromMe) {
+      updateData.unread_count = conversation.unread_count + 1;
+    }
+    
     const { data: updated, error: updateError } = await supabase
       .from('conversations')
-      .update({
-        last_message: messageContent,
-        last_message_time: new Date(messageTimestamp * 1000).toISOString(),
-        unread_count: conversation.unread_count + 1,
-        pushname: pushName || conversation.pushname,
-      })
+      .update(updateData)
       .eq('id', conversation.id)
       .select()
       .single();
@@ -303,14 +310,15 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
 
     console.log(`User ID: ${userId}`);
 
-    // Buscar o crear conversación
+  // Buscar o crear conversación
     const conversation = await getOrCreateConversation(
       supabase,
       userId,
       phoneNumber,
       pushName,
       messageContent,
-      timestamp
+      timestamp,
+      fromMe
     );
 
     if (!conversation) {
@@ -329,6 +337,9 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
         // Vincular conversación con lead si aún no está vinculada
         await linkConversationToLead(supabase, conversation.id, lead.id);
       }
+    } else {
+      // Si es mensaje saliente y ya hay un lead vinculado, mantenerlo
+      console.log('Outgoing message from user, lead handling skipped');
     }
 
     console.log('Message processing completed successfully');
