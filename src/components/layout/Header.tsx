@@ -1,8 +1,9 @@
 import React from 'react';
-import { Bell, Sun, Moon, LogOut } from 'lucide-react';
+import { Bell, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { ThemeToggle } from '@/components/ThemeToggle';
 export const Header = () => {
   const {
     signOut,
@@ -32,7 +33,7 @@ export const Header = () => {
           </Button>
 
           {/* Theme toggle */}
-          
+          <ThemeToggle />
 
           {/* Logout */}
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
