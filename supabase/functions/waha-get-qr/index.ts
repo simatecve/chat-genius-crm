@@ -26,12 +26,12 @@ serve(async (req) => {
       throw new Error('session_name is required');
     }
 
-    // Obtener código QR de WAHA - correct endpoint from docs
+    // Get QR code from WAHA - it's a GET request that returns JSON when Accept header is set
     const wahaResponse = await fetch(`${WAHA_BASE_URL}/api/${session_name}/auth/qr`, {
-      method: 'POST',
+      method: 'GET',
       headers: {
         'X-Api-Key': WAHA_API_KEY,
-        'Content-Type': 'application/json',
+        'Accept': 'application/json', // Get base64 image instead of binary
       },
     });
 
