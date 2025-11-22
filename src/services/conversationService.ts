@@ -130,13 +130,19 @@ export class ConversationService {
     try {
       console.log('Sending message directly to WAHA API...');
       
-      // Configuración de WAHA (deberían estar en variables de entorno o configuración)
-      const WAHA_BASE_URL = 'https://ws.koonetxa.cloud';
-      const WAHA_API_KEY = 'your-api-key'; // TODO: Mover a configuración segura
+      // Obtener configuración de variables de entorno
+      const WAHA_BASE_URL = import.meta.env.VITE_WAHA_BASE_URL;
+      const WAHA_API_KEY = import.meta.env.VITE_WAHA_API_KEY;
+      
+      if (!WAHA_BASE_URL || !WAHA_API_KEY) {
+        throw new Error('WAHA configuration missing in environment variables');
+      }
       
       // Formatear número de teléfono para WAHA
       const formattedPhone = phoneNumber.replace(/[^0-9]/g, '');
       const chatId = `${formattedPhone}@c.us`;
+      
+      console.log('Sending to WAHA:', { url: `${WAHA_BASE_URL}/api/sendText`, session: sessionName, chatId });
       
       // Enviar mensaje a WAHA
       const wahaResponse = await fetch(`${WAHA_BASE_URL}/api/sendText`, {
