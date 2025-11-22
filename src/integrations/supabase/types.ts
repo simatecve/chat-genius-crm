@@ -752,6 +752,39 @@ export type Database = {
           },
         ]
       }
+      quick_replies: {
+        Row: {
+          attachment_urls: string[] | null
+          created_at: string | null
+          hotkey: string | null
+          id: string
+          message: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          attachment_urls?: string[] | null
+          created_at?: string | null
+          hotkey?: string | null
+          id?: string
+          message: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          attachment_urls?: string[] | null
+          created_at?: string | null
+          hotkey?: string | null
+          id?: string
+          message?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       scheduled_messages: {
         Row: {
           created_at: string | null
