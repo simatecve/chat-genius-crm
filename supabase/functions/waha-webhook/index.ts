@@ -425,9 +425,9 @@ serve(async (req) => {
       }
     }
 
-    // Procesar mensajes recibidos
-    if (event === 'message') {
-      console.log('Message event detected');
+    // Procesar mensajes recibidos - capturar todos los eventos de tipo message
+    if (event === 'message' || event === 'message.any') {
+      console.log('Message event detected:', event);
       await processMessageEvent(supabase, eventPayload, session);
     }
 
