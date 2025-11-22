@@ -5,3 +5,15 @@ verify_jwt = false
 
 [functions.process-scheduled-messages]
 verify_jwt = false
+
+[functions.waha-create-session]
+verify_jwt = true
+
+[functions.waha-get-qr]
+verify_jwt = true
+
+[functions.waha-session-status]
+verify_jwt = true
+
+[functions.waha-webhook]
+verify_jwt = false
