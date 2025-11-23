@@ -124,6 +124,40 @@ const Leads = () => {
       return;
     }
 
+    // Si no hay workspaces, crear uno por defecto
+    if (!data || data.length === 0) {
+      const { data: newWorkspace, error: createError } = await supabase
+        .from('workspaces')
+        .insert({
+          user_id: user?.id,
+          name: 'Mi Espacio de Trabajo',
+          position: 0
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating default workspace:', createError);
+        return;
+      }
+
+      // Crear columna por defecto en el nuevo workspace
+      await supabase
+        .from('lead_columns')
+        .insert({
+          user_id: user?.id,
+          workspace_id: newWorkspace.id,
+          name: 'Nuevos Contactos',
+          color: '#22c55e',
+          position: 0,
+          is_default: true
+        });
+
+      setWorkspaces([newWorkspace]);
+      setSelectedWorkspace(newWorkspace.id);
+      return;
+    }
+
     setWorkspaces(data || []);
     // Seleccionar el primer workspace por defecto
     if (data && data.length > 0 && !selectedWorkspace) {
