@@ -57,7 +57,7 @@ export const Sidebar = () => {
     {
       label: 'Gestión',
       items: [
-        { label: 'Leads', icon: UserPlus, href: '/leads' },
+        { label: 'Embudos', icon: UserPlus, href: '/leads' },
         { label: 'Listas de Contactos', icon: Users, href: '/listas-contactos' },
         { label: 'Asistente IA', icon: Bot, href: '/asistente-ia' },
       ]
