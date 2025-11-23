@@ -133,13 +133,10 @@ export const UserList: React.FC<UserListProps> = ({
       "border-r border-border flex flex-col bg-card",
       isMobile ? "w-full" : "w-80"
     )}>
-      {/* Header */}
+      {/* Search y Badge */}
       <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Chat Interno</h2>
-          </div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-muted-foreground">Usuarios</h3>
           {Object.values(unreadCounts).reduce((a, b) => a + b, 0) > 0 && (
             <Badge variant="default" className="bg-primary">
               {Object.values(unreadCounts).reduce((a, b) => a + b, 0)}

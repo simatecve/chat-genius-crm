@@ -197,23 +197,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   return (
     <div className="flex-1 flex flex-col bg-background">
-      {/* Header */}
-      <div className="p-4 border-b border-border bg-card flex items-center gap-3">
+      {/* Header del chat */}
+      <div className="p-3 border-b border-border bg-card flex items-center gap-3">
         {isMobile && onBack && (
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
         )}
         
-        <Avatar className="h-10 w-10">
-          <AvatarFallback className="bg-primary/10 text-primary font-medium">
+        <Avatar className="h-9 w-9">
+          <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
             {getInitials(selectedUser)}
           </AvatarFallback>
         </Avatar>
         
-        <div className="flex-1">
-          <h2 className="font-semibold">{getDisplayName(selectedUser)}</h2>
-          <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-medium text-sm">{getDisplayName(selectedUser)}</h2>
+          <p className="text-xs text-muted-foreground truncate">{selectedUser.email}</p>
         </div>
       </div>
 
