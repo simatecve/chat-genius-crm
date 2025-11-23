@@ -33,6 +33,7 @@ serve(async (req) => {
       phone_number,
       workspace_id,
       workspace_name,
+      default_column_id,
       email,
       first_name,
       last_name,
@@ -100,6 +101,7 @@ serve(async (req) => {
         name: session_name,
         phone_number,
         workspace_id: workspace_id || null,
+        default_column_id: default_column_id || null,
         status: 'STARTING',
       })
       .select()

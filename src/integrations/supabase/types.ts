@@ -1246,6 +1246,7 @@ export type Database = {
       whatsapp_connections: {
         Row: {
           created_at: string | null
+          default_column_id: string | null
           id: string
           name: string | null
           phone_number: string
@@ -1258,6 +1259,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          default_column_id?: string | null
           id?: string
           name?: string | null
           phone_number: string
@@ -1270,6 +1272,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          default_column_id?: string | null
           id?: string
           name?: string | null
           phone_number?: string
@@ -1281,6 +1284,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_connections_default_column_id_fkey"
+            columns: ["default_column_id"]
+            isOneToOne: false
+            referencedRelation: "lead_columns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_connections_workspace_id_fkey"
             columns: ["workspace_id"]

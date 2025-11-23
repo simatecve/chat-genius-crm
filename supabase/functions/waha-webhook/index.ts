@@ -33,9 +33,22 @@ async function getUserIdFromSession(supabase: any, sessionName: string): Promise
   return data?.user_id || null;
 }
 
-// Obtener columna por defecto del usuario
-async function getDefaultColumn(supabase: any, userId: string): Promise<string | null> {
-  // Intentar obtener la columna marcada como default
+// Obtener columna por defecto del usuario o de la conexión
+async function getDefaultColumn(supabase: any, userId: string, sessionName: string): Promise<string | null> {
+  // Primero intentar obtener la columna configurada en la conexión de WhatsApp
+  const { data: connection, error: connError } = await supabase
+    .from('whatsapp_connections')
+    .select('default_column_id')
+    .eq('name', sessionName)
+    .eq('user_id', userId)
+    .single();
+
+  if (!connError && connection?.default_column_id) {
+    console.log('Using default column from connection:', connection.default_column_id);
+    return connection.default_column_id;
+  }
+
+  // Si no hay columna en la conexión, buscar la columna marcada como default
   let { data, error } = await supabase
     .from('lead_columns')
     .select('id')
@@ -209,7 +222,8 @@ async function getOrCreateLead(
   supabase: any,
   userId: string,
   phoneNumber: string,
-  pushName: string | null
+  pushName: string | null,
+  sessionName: string
 ) {
   // Buscar lead existente por teléfono
   let { data: lead, error } = await supabase
@@ -225,8 +239,8 @@ async function getOrCreateLead(
   }
 
   if (!lead) {
-    // Obtener columna por defecto
-    const defaultColumnId = await getDefaultColumn(supabase, userId);
+    // Obtener columna por defecto (primero de la conexión, luego del usuario)
+    const defaultColumnId = await getDefaultColumn(supabase, userId, sessionName);
     if (!defaultColumnId) {
       console.error('No default column found for user');
       return null;
@@ -362,7 +376,7 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
 
     // Solo crear lead para mensajes entrantes (!fromMe)
     if (!fromMe) {
-      const lead = await getOrCreateLead(supabase, userId, phoneNumber, pushName);
+      const lead = await getOrCreateLead(supabase, userId, phoneNumber, pushName, session);
       
       if (lead && !conversation.lead_id) {
         // Vincular conversación con lead si aún no está vinculada
