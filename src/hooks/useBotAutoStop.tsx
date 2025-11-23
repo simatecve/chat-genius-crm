@@ -80,6 +80,8 @@ export const useBotAutoStop = () => {
           user_id: user.id,
           auto_stop_on_human_reply: newValue,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) throw error;
@@ -116,6 +118,8 @@ export const useBotAutoStop = () => {
           user_id: user.id,
           bot_enabled: newValue,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) throw error;
