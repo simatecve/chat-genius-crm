@@ -442,37 +442,64 @@ export type Database = {
       }
       contacts: {
         Row: {
+          address: string | null
+          birth_date: string | null
           company: string | null
           created_at: string | null
           email: string | null
+          first_name: string | null
+          gender: string | null
           id: string
+          is_blocked: boolean | null
+          last_name: string | null
           name: string
           notes: string | null
+          origin: string | null
           phone_number: string
+          tags: string[] | null
           updated_at: string | null
           user_id: string
+          website: string | null
         }
         Insert: {
+          address?: string | null
+          birth_date?: string | null
           company?: string | null
           created_at?: string | null
           email?: string | null
+          first_name?: string | null
+          gender?: string | null
           id?: string
+          is_blocked?: boolean | null
+          last_name?: string | null
           name: string
           notes?: string | null
+          origin?: string | null
           phone_number: string
+          tags?: string[] | null
           updated_at?: string | null
           user_id: string
+          website?: string | null
         }
         Update: {
+          address?: string | null
+          birth_date?: string | null
           company?: string | null
           created_at?: string | null
           email?: string | null
+          first_name?: string | null
+          gender?: string | null
           id?: string
+          is_blocked?: boolean | null
+          last_name?: string | null
           name?: string
           notes?: string | null
+          origin?: string | null
           phone_number?: string
+          tags?: string[] | null
           updated_at?: string | null
           user_id?: string
+          website?: string | null
         }
         Relationships: []
       }
