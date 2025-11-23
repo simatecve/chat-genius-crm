@@ -10,6 +10,7 @@ import { TriggerActivationService } from '@/services/triggerActivationService';
 import { useAuth } from '@/hooks/useAuth';
 import { useBotBlock } from '@/hooks/useBotBlock';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
@@ -58,9 +59,21 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) =>
   const hasConversation = lead.conversations && lead.conversations.length > 0;
   const conversation = hasConversation ? lead.conversations[0] : null;
 
-  const handleOpenConversation = () => {
-    if (conversation) {
-      navigate('/conversations', { state: { conversationId: conversation.id } });
+  const handleOpenConversation = async () => {
+    if (lead.phone) {
+      // Buscar conversación por número de teléfono
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('phone_number', lead.phone.replace(/\D/g, ''))
+        .limit(1);
+      
+      if (conversations && conversations.length > 0) {
+        navigate('/conversations', { state: { conversationId: conversations[0].id } });
+      } else if (conversation) {
+        // Fallback a la conversación pre-cargada
+        navigate('/conversations', { state: { conversationId: conversation.id } });
+      }
     }
   };
 
@@ -73,14 +86,23 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) =>
           {...provided.dragHandleProps}
           className={`mb-3 ${snapshot.isDragging ? 'opacity-50' : ''}`}
         >
-          <Card className="p-3 hover:shadow-md transition-shadow cursor-pointer">
+          <Card 
+            className="p-3 hover:shadow-md transition-shadow cursor-pointer"
+            onClick={(e) => {
+              // Solo navegar si no se hizo clic en un botón o menú
+              const target = e.target as HTMLElement;
+              if (!target.closest('button') && lead.phone) {
+                handleOpenConversation();
+              }
+            }}
+          >
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="font-medium text-sm truncate flex-1">
                   {lead.name}
                 </div>
                 <div className="flex items-center gap-1">
-                  {hasConversation && (
+                  {lead.phone && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -99,7 +121,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) =>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        {hasConversation && (
+                        {lead.phone && (
                           <DropdownMenuItem onClick={handleOpenConversation}>
                             <MessageSquare className="h-3 w-3 mr-2" />
                             Ver Conversación
