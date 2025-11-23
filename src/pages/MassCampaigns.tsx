@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Users, Clock } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
-import AppLayout from '@/components/layout/AppLayout';
 
 type Campaign = Database['public']['Tables']['mass_campaigns']['Row'];
 
@@ -172,17 +171,14 @@ export function MassCampaigns() {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </AppLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Campañas Masivas</h1>
@@ -311,7 +307,6 @@ export function MassCampaigns() {
           </div>
         )}
       </div>
-    </AppLayout>
   );
 }
 

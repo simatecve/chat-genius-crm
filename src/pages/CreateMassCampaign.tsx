@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/integrations/supabase/types';
-import AppLayout from '@/components/layout/AppLayout';
 
 type ContactList = Database['public']['Tables']['contact_lists']['Row'];
 type WhatsAppConnection = Database['public']['Tables']['whatsapp_connections']['Row'];
@@ -333,17 +332,14 @@ const CreateMassCampaign = () => {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </AppLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
         <div className="flex items-center space-x-4">
           <Button
             variant="ghost"
@@ -603,7 +599,6 @@ const CreateMassCampaign = () => {
           </div>
         </form>
       </div>
-    </AppLayout>
   );
 };
 
