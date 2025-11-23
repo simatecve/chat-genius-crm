@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
@@ -41,6 +41,10 @@ export const Sidebar = () => {
       icon: MessageSquare,
       href: '/conversaciones',
       badge: unreadCount > 0 ? unreadCount : undefined
+    }, {
+      label: 'Chat Interno',
+      icon: MessagesSquare,
+      href: '/chat-interno'
     }, {
       label: 'Campañas Masivas',
       icon: Send,
