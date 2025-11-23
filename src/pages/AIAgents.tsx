@@ -33,6 +33,7 @@ interface FormData {
   temperature: number;
   max_tokens: number;
   is_active: boolean;
+  model: string;
 }
 
 const AIAgents = () => {
@@ -50,7 +51,8 @@ const AIAgents = () => {
     system_prompt: '',
     temperature: 0.7,
     max_tokens: 500,
-    is_active: false
+    is_active: false,
+    model: 'google/gemini-2.5-flash'
   });
   const { toast } = useToast();
   const { user } = useAuth();
@@ -143,7 +145,8 @@ const AIAgents = () => {
           system_prompt: formData.system_prompt.trim(),
           temperature: formData.temperature,
           max_tokens: formData.max_tokens,
-          is_active: formData.is_active
+          is_active: formData.is_active,
+          model: formData.model
         })
         .select()
         .single();
@@ -182,6 +185,7 @@ const AIAgents = () => {
           temperature: formData.temperature,
           max_tokens: formData.max_tokens,
           is_active: formData.is_active,
+          model: formData.model,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingAgent.id)
@@ -282,7 +286,8 @@ const AIAgents = () => {
       system_prompt: agent.system_prompt,
       temperature: agent.temperature || 0.7,
       max_tokens: agent.max_tokens || 500,
-      is_active: agent.is_active || false
+      is_active: agent.is_active || false,
+      model: agent.model || 'google/gemini-2.5-flash'
     });
     setDialogOpen(true);
   };
@@ -293,7 +298,8 @@ const AIAgents = () => {
       system_prompt: '',
       temperature: 0.7,
       max_tokens: 500,
-      is_active: false
+      is_active: false,
+      model: 'google/gemini-2.5-flash'
     });
     setEditingAgent(null);
   };
@@ -344,16 +350,39 @@ const AIAgents = () => {
               </DialogHeader>
               
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nombre del Agente *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Ej: Asistente de Ventas"
-                      required
-                    />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nombre del Agente *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Ej: Asistente de Ventas"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="model">Modelo de IA *</Label>
+                      <Select
+                        value={formData.model}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, model: value }))}
+                      >
+                        <SelectTrigger id="model">
+                          <SelectValue placeholder="Selecciona un modelo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="google/gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+                          <SelectItem value="google/gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                          <SelectItem value="google/gemini-3-pro-preview">Gemini 3 Pro Preview</SelectItem>
+                          <SelectItem value="google/gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
+                          <SelectItem value="openai/gpt-5">GPT-5</SelectItem>
+                          <SelectItem value="openai/gpt-5-mini">GPT-5 Mini</SelectItem>
+                          <SelectItem value="openai/gpt-5-nano">GPT-5 Nano</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
@@ -366,6 +395,9 @@ const AIAgents = () => {
                       rows={6}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Define las instrucciones y el comportamiento del agente
+                    </p>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -380,6 +412,9 @@ const AIAgents = () => {
                         value={formData.temperature}
                         onChange={(e) => setFormData(prev => ({ ...prev, temperature: parseFloat(e.target.value) || 0.7 }))}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        0 = Preciso, 2 = Creativo
+                      </p>
                     </div>
                     
                     <div className="space-y-2">
@@ -393,6 +428,9 @@ const AIAgents = () => {
                         value={formData.max_tokens}
                         onChange={(e) => setFormData(prev => ({ ...prev, max_tokens: parseInt(e.target.value) || 500 }))}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Longitud máxima de respuesta
+                      </p>
                     </div>
                   </div>
                   
@@ -408,6 +446,9 @@ const AIAgents = () => {
                         {formData.is_active ? 'Activo' : 'Inactivo'}
                       </Label>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Solo un agente puede estar activo a la vez
+                    </p>
                   </div>
                 </div>
                 
