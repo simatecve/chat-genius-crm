@@ -33,19 +33,21 @@ export default function ChatModal({
   if (!isOpen || !chat) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-      <div className="bg-[var(--bg-primary)] rounded-lg w-full max-w-6xl h-[80vh] flex flex-col border border-[var(--border-primary)] relative">
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+      <div className="bg-[var(--bg-primary)] rounded-lg w-full max-w-6xl h-[85vh] border border-[var(--border-primary)] relative overflow-hidden flex flex-col">
         {/* Botón de cerrar */}
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 z-[70] text-[var(--text-muted)] hover:text-[var(--text-primary)] p-2 rounded cursor-pointer transition-colors bg-[var(--bg-secondary)] border border-[var(--border-primary)]"
+          className="absolute top-4 right-4 z-[70] text-[var(--text-muted)] hover:text-[var(--text-primary)] p-2 rounded cursor-pointer transition-colors bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-lg"
           title="Cerrar"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Componente de Chat */}
-        <Chat chat={chat} onContactUpdate={onContactUpdate} />
+        {/* Componente de Chat - ocupa todo el espacio disponible */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <Chat chat={chat} onContactUpdate={onContactUpdate} />
+        </div>
       </div>
     </div>
   );
