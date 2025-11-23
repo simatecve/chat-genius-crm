@@ -51,7 +51,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   };
 
   return (
-    <div className="w-1/3 border-r border-border flex flex-col">
+    <div className="w-[23%] border-r border-border flex flex-col">{/* Reducido 30% desde w-1/3 (33%) */}
       {/* Header de conversaciones */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-4">

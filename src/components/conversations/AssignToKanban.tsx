@@ -33,12 +33,14 @@ interface AssignToKanbanProps {
   conversationPhone?: string;
   conversationName?: string;
   onLeadAssigned?: (lead: Lead) => void;
+  iconOnly?: boolean;
 }
 
 export const AssignToKanban: React.FC<AssignToKanbanProps> = ({
   conversationPhone,
   conversationName,
-  onLeadAssigned
+  onLeadAssigned,
+  iconOnly = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [columns, setColumns] = useState<LeadColumn[]>([]);
@@ -180,10 +182,16 @@ export const AssignToKanban: React.FC<AssignToKanbanProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Kanban className="h-4 w-4" />
-          Asignar a Kanban
-        </Button>
+        {iconOnly ? (
+          <Button variant="ghost" size="sm" title="Asignar a Kanban">
+            <Kanban className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="gap-2">
+            <Kanban className="h-4 w-4" />
+            Asignar a Kanban
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
