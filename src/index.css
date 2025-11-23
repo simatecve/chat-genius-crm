@@ -6,157 +6,103 @@
 
 @layer base {
   :root {
-    /* Base colors - Professional theme */
-    --background: 250 250% 100%;
-    --foreground: 222 47% 11%;
+    /* Base colors - CapibetCRM Dark Theme */
+    --background: 215 18% 11%;
+    /* #1a1d23 */
+    --foreground: 0 0% 100%;
+    /* #FFFFFF */
 
     /* Card system */
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 216 12% 16%;
+    /* #2a2d35 */
+    --card-foreground: 0 0% 100%;
 
     /* Popover system */
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover: 216 12% 16%;
+    /* #2a2d35 */
+    --popover-foreground: 0 0% 100%;
 
-    /* Primary - Professional blue */
-    --primary: 217 91% 60%;
+    /* Primary - CapibetCRM Orange */
+    --primary: 35 89% 54%;
+    /* #F29A1F */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 217 91% 55%;
+    --primary-hover: 35 89% 48%;
 
-    /* Secondary - Soft gray */
-    --secondary: 220 13% 91%;
-    --secondary-foreground: 222 47% 11%;
+    /* Secondary - Dark gray */
+    --secondary: 215 11% 23%;
+    /* #3a3d45 */
+    --secondary-foreground: 210 11% 91%;
+    /* #E5E7EB */
 
     /* Muted colors */
-    --muted: 220 13% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 215 11% 23%;
+    /* #3a3d45 */
+    --muted-foreground: 218 11% 65%;
+    /* #9CA3AF */
 
-    /* Accent - WhatsApp green */
-    --accent: 142 76% 36%;
+    /* Accent - CapibetCRM Orange */
+    --accent: 35 89% 54%;
+    /* #F29A1F */
     --accent-foreground: 0 0% 100%;
 
-    /* Success - Fresh green */
+    /* Success - Green */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
 
-    /* Warning - Professional orange */
-    --warning: 38 92% 50%;
+    /* Warning - Orange */
+    --warning: 35 89% 54%;
+    /* #F29A1F */
     --warning-foreground: 0 0% 100%;
 
-    /* Destructive - Professional red */
+    /* Destructive - Red */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     /* Border and input */
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --border: 215 11% 23%;
+    /* #3a3d45 */
+    --input: 216 12% 16%;
+    /* #2a2d35 */
+    --ring: 35 89% 54%;
+    /* #F29A1F */
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(250 84% 60%));
-    --gradient-secondary: linear-gradient(135deg, hsl(220 13% 96%), hsl(0 0% 100%));
+    /* Simplified gradients for dark theme */
+    --gradient-primary: linear-gradient(135deg, hsl(35 89% 54%), hsl(35 89% 48%));
+    --gradient-secondary: linear-gradient(135deg, hsl(216 12% 16%), hsl(215 18% 11%));
     --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 46%));
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(250 84% 60%) 50%, hsl(284 82% 65%) 100%);
-
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
-    --shadow-glow: 0 0 40px hsl(217 91% 60% / 0.3);
-
-    /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-
-    --radius: 0.75rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    /* Base colors - Dark theme */
-    --background: 222 47% 6%;
-    --foreground: 220 13% 91%;
-
-    /* Card system */
-    --card: 222 47% 8%;
-    --card-foreground: 220 13% 91%;
-
-    /* Popover system */
-    --popover: 222 47% 8%;
-    --popover-foreground: 220 13% 91%;
-
-    /* Primary - Bright blue */
-    --primary: 217 91% 65%;
-    --primary-foreground: 222 47% 6%;
-    --primary-hover: 217 91% 60%;
-
-    /* Secondary - Dark gray */
-    --secondary: 222 47% 12%;
-    --secondary-foreground: 220 13% 91%;
-
-    /* Muted colors */
-    --muted: 222 47% 10%;
-    --muted-foreground: 220 9% 65%;
-
-    /* Accent - WhatsApp green */
-    --accent: 142 76% 42%;
-    --accent-foreground: 222 47% 6%;
-
-    /* Success - Fresh green */
-    --success: 142 76% 42%;
-    --success-foreground: 222 47% 6%;
-
-    /* Warning - Professional orange */
-    --warning: 38 92% 55%;
-    --warning-foreground: 222 47% 6%;
-
-    /* Destructive - Professional red */
-    --destructive: 0 84% 65%;
-    --destructive-foreground: 222 47% 6%;
-
-    /* Border and input */
-    --border: 222 47% 15%;
-    --input: 222 47% 15%;
-    --ring: 217 91% 65%;
-
-    /* Gradients - Dark theme */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 65%), hsl(250 84% 65%));
-    --gradient-secondary: linear-gradient(135deg, hsl(222 47% 10%), hsl(222 47% 8%));
-    --gradient-success: linear-gradient(135deg, hsl(142 76% 42%), hsl(142 76% 52%));
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 65%) 0%, hsl(250 84% 65%) 50%, hsl(284 82% 70%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(35 89% 54%) 0%, hsl(35 89% 48%) 100%);
 
     /* Shadows - Dark theme */
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.4);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.5), 0 4px 6px -4px hsl(0 0% 0% / 0.5);
     --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.6), 0 8px 10px -6px hsl(0 0% 0% / 0.6);
-    --shadow-glow: 0 0 40px hsl(217 91% 65% / 0.4);
+    --shadow-glow: 0 0 40px hsl(35 89% 54% / 0.3);
 
-    /* Sidebar dark theme */
-    --sidebar-background: 222 47% 4%;
-    --sidebar-foreground: 220 13% 91%;
-    --sidebar-primary: 217 91% 65%;
-    --sidebar-primary-foreground: 222 47% 4%;
-    --sidebar-accent: 222 47% 8%;
-    --sidebar-accent-foreground: 220 13% 91%;
-    --sidebar-border: 222 47% 12%;
-    --sidebar-ring: 217 91% 65%;
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Dark theme */
+    --sidebar-background: 215 18% 11%;
+    /* #1a1d23 */
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 35 89% 54%;
+    /* #F29A1F */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 216 12% 16%;
+    /* #2a2d35 */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 11% 23%;
+    /* #3a3d45 */
+    --sidebar-ring: 35 89% 54%;
+  }
+
+  .dark {
+    /* Dark mode uses same colors as light mode for CapibetCRM theme */
+    /* All colors remain the same as root */
   }
 }
 
@@ -169,7 +115,12 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
 
@@ -187,6 +138,7 @@
 }
 
 @layer components {
+
   /* Gradient backgrounds */
   .bg-gradient-primary {
     background: var(--gradient-primary);
@@ -222,7 +174,7 @@
   .card-gradient {
     @apply bg-card border border-border/50 rounded-lg shadow-lg;
     background: linear-gradient(var(--card), var(--card)) padding-box,
-                var(--gradient-primary) border-box;
+      var(--gradient-primary) border-box;
   }
 
   /* Glass effect */
@@ -230,16 +182,32 @@
     @apply bg-background/80 backdrop-blur-sm border border-border/50;
   }
 
-  /* Custom scrollbar */
+  /* CapibetCRM thin scrollbar - 6px width */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-background/50 rounded-full;
+    background: transparent;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-border/50 rounded-full hover:bg-border;
+    @apply bg-muted-foreground/30 rounded-full;
+    transition: background-color 0.2s ease;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Apply thin scrollbar globally */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
   }
 }
