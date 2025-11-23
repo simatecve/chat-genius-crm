@@ -21,6 +21,7 @@ import Leads from "./pages/Leads";
 import Conversations from "./pages/Conversations";
 import InternalChat from "./pages/InternalChat";
 import Sales from "./pages/Sales";
+import Calendar from "./pages/Calendar";
 import PaymentPlans from "./pages/PaymentPlans";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailure from "./pages/PaymentFailure";
@@ -44,140 +45,145 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } />
-            <Route path="/conexiones" element={
-              <ProtectedRoute>
-                <WhatsAppConnections />
-              </ProtectedRoute>
-            } />
-            <Route path="/asistente-ia" element={
-              <ProtectedRoute>
-                <AIAgents />
-              </ProtectedRoute>
-            } />
-            <Route path="/crear-agente" element={
-              <ProtectedRoute>
-                <CreateAIAgent />
-              </ProtectedRoute>
-            } />
-            <Route path="/listas-contactos" element={
-              <ProtectedRoute>
-                <ContactLists />
-              </ProtectedRoute>
-            } />
-            <Route path="/contactos/:listId" element={
-              <ProtectedRoute>
-                <Contacts />
-              </ProtectedRoute>
-            } />
-            <Route path="/contactos" element={
-              <ProtectedRoute>
-                <ContactsNew />
-              </ProtectedRoute>
-            } />
-            <Route path="/campanas-masivas" element={
-              <ProtectedRoute>
-                <MassCampaigns />
-              </ProtectedRoute>
-            } />
-            <Route path="/crear-campana-masiva" element={
-              <ProtectedRoute>
-                <CreateMassCampaign />
-              </ProtectedRoute>
-            } />
-            <Route path="/crear-campana-masiva/:id" element={
-              <ProtectedRoute>
-                <CreateMassCampaign />
-              </ProtectedRoute>
-            } />
-            <Route path="/configuracion" element={
-              <ProtectedRoute>
-                <Settings />
-              </ProtectedRoute>
-            } />
-            <Route path="/leads" element={
-              <ProtectedRoute>
-                <Leads />
-              </ProtectedRoute>
-            } />
-            <Route path="/conversaciones" element={
-              <ProtectedRoute>
-                <Conversations />
-              </ProtectedRoute>
-            } />
-            <Route path="/chat-interno" element={
-              <ProtectedRoute>
-                <InternalChat />
-              </ProtectedRoute>
-            } />
-            <Route path="/ventas" element={
-              <ProtectedRoute>
-                <Sales />
-              </ProtectedRoute>
-            } />
-            <Route path="/planes-pago" element={
-              <ProtectedRoute>
-                <PaymentPlans />
-              </ProtectedRoute>
-            } />
-            <Route path="/payment-success" element={
-              <ProtectedRoute>
-                <PaymentSuccess />
-              </ProtectedRoute>
-            } />
-            <Route path="/payment-failure" element={
-              <ProtectedRoute>
-                <PaymentFailure />
-              </ProtectedRoute>
-            } />
-            <Route path="/payment-pending" element={
-              <ProtectedRoute>
-                <PaymentPending />
-              </ProtectedRoute>
-            } />
-            <Route path="/uso-plan" element={
-              <ProtectedRoute>
-                <UsagePlan />
-              </ProtectedRoute>
-            } />
-            {/* Admin Routes */}
-            <Route path="/admin" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/usuarios" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminUsers />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/estadisticas" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminStatistics />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/mensajes" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminMessages />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/conversaciones" element={
-              <ProtectedRoute requireSuperAdmin>
-                <AdminConversations />
-              </ProtectedRoute>
-            } />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              } />
+              <Route path="/conexiones" element={
+                <ProtectedRoute>
+                  <WhatsAppConnections />
+                </ProtectedRoute>
+              } />
+              <Route path="/asistente-ia" element={
+                <ProtectedRoute>
+                  <AIAgents />
+                </ProtectedRoute>
+              } />
+              <Route path="/crear-agente" element={
+                <ProtectedRoute>
+                  <CreateAIAgent />
+                </ProtectedRoute>
+              } />
+              <Route path="/listas-contactos" element={
+                <ProtectedRoute>
+                  <ContactLists />
+                </ProtectedRoute>
+              } />
+              <Route path="/contactos/:listId" element={
+                <ProtectedRoute>
+                  <Contacts />
+                </ProtectedRoute>
+              } />
+              <Route path="/contactos" element={
+                <ProtectedRoute>
+                  <ContactsNew />
+                </ProtectedRoute>
+              } />
+              <Route path="/campanas-masivas" element={
+                <ProtectedRoute>
+                  <MassCampaigns />
+                </ProtectedRoute>
+              } />
+              <Route path="/crear-campana-masiva" element={
+                <ProtectedRoute>
+                  <CreateMassCampaign />
+                </ProtectedRoute>
+              } />
+              <Route path="/crear-campana-masiva/:id" element={
+                <ProtectedRoute>
+                  <CreateMassCampaign />
+                </ProtectedRoute>
+              } />
+              <Route path="/configuracion" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              <Route path="/leads" element={
+                <ProtectedRoute>
+                  <Leads />
+                </ProtectedRoute>
+              } />
+              <Route path="/conversaciones" element={
+                <ProtectedRoute>
+                  <Conversations />
+                </ProtectedRoute>
+              } />
+              <Route path="/calendario" element={
+                <ProtectedRoute>
+                  <Calendar />
+                </ProtectedRoute>
+              } />
+              <Route path="/chat-interno" element={
+                <ProtectedRoute>
+                  <InternalChat />
+                </ProtectedRoute>
+              } />
+              <Route path="/ventas" element={
+                <ProtectedRoute>
+                  <Sales />
+                </ProtectedRoute>
+              } />
+              <Route path="/planes-pago" element={
+                <ProtectedRoute>
+                  <PaymentPlans />
+                </ProtectedRoute>
+              } />
+              <Route path="/payment-success" element={
+                <ProtectedRoute>
+                  <PaymentSuccess />
+                </ProtectedRoute>
+              } />
+              <Route path="/payment-failure" element={
+                <ProtectedRoute>
+                  <PaymentFailure />
+                </ProtectedRoute>
+              } />
+              <Route path="/payment-pending" element={
+                <ProtectedRoute>
+                  <PaymentPending />
+                </ProtectedRoute>
+              } />
+              <Route path="/uso-plan" element={
+                <ProtectedRoute>
+                  <UsagePlan />
+                </ProtectedRoute>
+              } />
+              {/* Admin Routes */}
+              <Route path="/admin" element={
+                <ProtectedRoute requireSuperAdmin>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/usuarios" element={
+                <ProtectedRoute requireSuperAdmin>
+                  <AdminUsers />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/estadisticas" element={
+                <ProtectedRoute requireSuperAdmin>
+                  <AdminStatistics />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/mensajes" element={
+                <ProtectedRoute requireSuperAdmin>
+                  <AdminMessages />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/conversaciones" element={
+                <ProtectedRoute requireSuperAdmin>
+                  <AdminConversations />
+                </ProtectedRoute>
+              } />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

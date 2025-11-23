@@ -7,6 +7,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import EmbudosFilter from './EmbudosFilter';
+import { EmbudoResponse } from '@/services/embudoServices';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 
@@ -18,6 +20,9 @@ interface ConversationListProps {
   onSearchChange: (term: string) => void;
   isLoading: boolean;
   unreadCount: number;
+  embudos?: EmbudoResponse[];
+  selectedEmbudo?: EmbudoResponse | null;
+  onEmbudoSelect?: (embudo: EmbudoResponse | null) => void;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -28,6 +33,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onSearchChange,
   isLoading,
   unreadCount,
+  embudos = [],
+  selectedEmbudo = null,
+  onEmbudoSelect = () => { },
 }) => {
   // Formatear tiempo
   const formatTime = (dateString: string) => {
@@ -67,45 +75,56 @@ const ConversationList: React.FC<ConversationListProps> = ({
             </Button>
           </div>
         </div>
-        
-        {/* Barra de búsqueda */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar conversaciones..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+
       </div>
 
-      {/* Lista de conversaciones */}
-      <ScrollArea className="flex-1">
-        {isLoading ? (
-          <div className="p-4 text-center text-muted-foreground">
-            Cargando conversaciones...
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground">
-            {searchTerm ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {conversations.map((conversation) => (
-              <ConversationItem
-                key={conversation.id}
-                conversation={conversation}
-                isSelected={selectedConversation?.id === conversation.id}
-                onSelect={() => onSelectConversation(conversation)}
-                formatTime={formatTime}
-                getInitials={getInitials}
-              />
-            ))}
-          </div>
-        )}
-      </ScrollArea>
+      {/* Filtro de Embudos */}
+      {embudos.length > 0 && (
+        <EmbudosFilter
+          embudos={embudos}
+          selectedEmbudo={selectedEmbudo}
+          onEmbudoSelect={onEmbudoSelect}
+        />
+      )}
+
+      {/* Barra de búsqueda */}
+      <div className="relative p-4 pt-0">
+        <Search className="absolute left-7 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar conversaciones..."
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-10"
+        />
+      </div>
     </div>
+
+      {/* Lista de conversaciones */ }
+  <ScrollArea className="flex-1">
+    {isLoading ? (
+      <div className="p-4 text-center text-muted-foreground">
+        Cargando conversaciones...
+      </div>
+    ) : conversations.length === 0 ? (
+      <div className="p-4 text-center text-muted-foreground">
+        {searchTerm ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
+      </div>
+    ) : (
+      <div className="divide-y divide-border">
+        {conversations.map((conversation) => (
+          <ConversationItem
+            key={conversation.id}
+            conversation={conversation}
+            isSelected={selectedConversation?.id === conversation.id}
+            onSelect={() => onSelectConversation(conversation)}
+            formatTime={formatTime}
+            getInitials={getInitials}
+          />
+        ))}
+      </div>
+    )}
+  </ScrollArea>
+    </div >
   );
 };
 
@@ -139,7 +158,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             {getInitials(conversation.pushname)}
           </AvatarFallback>
         </Avatar>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <h3 className="font-medium truncate">
@@ -149,7 +168,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.last_message_time && formatTime(conversation.last_message_time)}
             </span>
           </div>
-          
+
           <div className="flex items-center justify-between mt-1">
             <p className="text-sm text-muted-foreground truncate">
               {conversation.last_message || 'Sin mensajes'}

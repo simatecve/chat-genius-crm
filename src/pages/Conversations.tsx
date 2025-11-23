@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { Database } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
+import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -21,14 +22,58 @@ const Conversations = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [embudos, setEmbudos] = useState<EmbudoResponse[]>([]);
+  const [selectedEmbudo, setSelectedEmbudo] = useState<EmbudoResponse | null>(null);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
   const { data: searchResults } = useSearchConversations(searchTerm);
   const { messages, sendMessage, isSending } = useMessages(selectedConversation?.id || null);
 
+  // Cargar embudos
+  useEffect(() => {
+    const loadEmbudos = async () => {
+      // Por ahora usamos un ID de espacio dummy o el primero que encontremos si implementamos espacios
+      // Como no tenemos espacios en el contexto actual, intentaremos cargar todos o los del usuario
+      // Para mantener compatibilidad, asumimos que embudoServices maneja la lógica de usuario
+      // Pero getEmbudosByEspacio requiere un ID.
+      // Vamos a buscar un workspace del usuario primero
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: workspaces } = await supabase
+            .from('workspaces')
+            .select('id')
+            .eq('user_id', user.id)
+            .limit(1);
+
+          if (workspaces && workspaces.length > 0) {
+            const response = await embudoServices.getEmbudosByEspacio(workspaces[0].id);
+            if (response.success && response.data) {
+              setEmbudos(response.data);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading embudos:', error);
+      }
+    };
+    loadEmbudos();
+  }, []);
+
   // Determinar qué conversaciones mostrar
-  const displayConversations = searchTerm ? (searchResults || []) : conversations;
+  const displayConversations = React.useMemo(() => {
+    let filtered = searchTerm ? (searchResults || []) : conversations;
+
+    if (selectedEmbudo) {
+      // Filtrar por embudo_id si existe en la conversación
+      // Nota: Necesitamos asegurarnos que el tipo Conversation tenga embudo_id
+      // Si no lo tiene en el tipo generado, TypeScript se quejará, pero funcionará en runtime si la columna existe
+      filtered = filtered.filter((conv: any) => conv.embudo_id === selectedEmbudo.id);
+    }
+
+    return filtered;
+  }, [searchTerm, searchResults, conversations, selectedEmbudo]);
 
   // Seleccionar conversación automáticamente desde navegación de embudos
   useEffect(() => {
@@ -102,8 +147,11 @@ const Conversations = () => {
         onSearchChange={setSearchTerm}
         isLoading={isLoading}
         unreadCount={unreadCount}
+        embudos={embudos}
+        selectedEmbudo={selectedEmbudo}
+        onEmbudoSelect={setSelectedEmbudo}
       />
-      
+
       <ChatArea
         conversation={selectedConversation}
         messages={messages}
