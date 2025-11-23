@@ -83,46 +83,28 @@ export function MassCampaigns() {
     setSendingCampaign(campaign.id);
     
     try {
-      const { error: updateError } = await supabase
-        .from('mass_campaigns')
-        .update({ status: 'sending' })
-        .eq('id', campaign.id);
+      // Iniciar el envío usando el edge function local
+      const { data, error } = await supabase.functions.invoke('send-mass-campaign', {
+        body: { campaign_id: campaign.id }
+      });
 
-      if (updateError) throw updateError;
+      if (error) throw error;
 
+      // Actualizar el estado local
       setCampaigns(campaigns.map(c => 
         c.id === campaign.id ? { ...c, status: 'sending' } : c
       ));
 
-      const response = await fetch('https://n8n.kanbanpro.com.ar/webhook/envio-masivo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          campaign_id: campaign.id,
-          name: campaign.name,
-          description: campaign.description,
-          whatsapp_connection_name: campaign.whatsapp_connection_name,
-          campaign_message: campaign.campaign_message,
-          edit_with_ai: campaign.edit_with_ai,
-          min_delay: campaign.min_delay,
-          max_delay: campaign.max_delay,
-          contact_list_id: campaign.contact_list_id,
-          attachment_urls: campaign.attachment_urls,
-          attachment_names: campaign.attachment_names,
-          user_id: campaign.user_id
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error en el envío');
-      }
-
       toast({
         title: 'Éxito',
-        description: 'Campaña iniciada correctamente',
+        description: `Campaña iniciada: ${data.sent_count}/${data.total_count} mensajes enviados`,
       });
+
+      // Recargar campañas para obtener el estado actualizado
+      setTimeout(() => {
+        fetchCampaigns();
+      }, 1000);
+
     } catch (error) {
       console.error('Error sending campaign:', error);
       
@@ -158,6 +140,7 @@ export function MassCampaigns() {
       ready: { label: 'Lista', variant: 'default' as const },
       sending: { label: 'Enviando', variant: 'default' as const },
       sent: { label: 'Enviada', variant: 'default' as const },
+      partial: { label: 'Parcial', variant: 'secondary' as const },
       failed: { label: 'Fallida', variant: 'destructive' as const },
     };
 
@@ -257,9 +240,22 @@ export function MassCampaigns() {
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">
-                        {campaign.min_delay}s - {campaign.max_delay}s
+                        Delay: {campaign.min_delay}s - {campaign.max_delay}s
                       </span>
                     </div>
+                    {campaign.edit_with_ai && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-primary">✨ Con IA</span>
+                      </div>
+                    )}
+                    {(campaign.sent_count || 0) > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          {campaign.sent_count}/{campaign.total_count} enviados
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2">
