@@ -189,9 +189,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const messageGroups = groupMessagesByDate(messages);
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col bg-[#0d1418]">
       {/* Header del chat */}
-      <div className="p-4 border-b border-border bg-muted/30">
+      <div className="p-3 border-b border-border/20 bg-[#202c33]">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
             <AvatarFallback className="bg-primary text-primary-foreground">
@@ -249,13 +249,20 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
 
       {/* Área de mensajes */}
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        <div className="space-y-6">
+      <ScrollArea 
+        className="flex-1 p-4 bg-[#0d1418]" 
+        ref={scrollAreaRef}
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23111b21' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat'
+        }}
+      >
+        <div className="space-y-4">
           {Object.entries(messageGroups).map(([date, dateMessages]) => (
             <div key={date}>
               {/* Separador de fecha */}
-              <div className="flex items-center justify-center mb-4">
-                <div className="bg-muted px-3 py-1 rounded-full text-xs text-muted-foreground">
+              <div className="flex items-center justify-center mb-3">
+                <div className="bg-[#182229] px-3 py-1.5 rounded-md text-xs text-[#8696a0] shadow-sm">
                   {date}
                 </div>
               </div>
@@ -285,7 +292,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       </ScrollArea>
 
       {/* Input de mensaje */}
-      <div className="p-4 border-t border-border">
+      <div className="p-3 border-t border-border/20 bg-[#202c33]">
         {/* Preview de archivo seleccionado */}
         {selectedFile && (
           <div className="mb-3 p-3 bg-muted rounded-lg flex items-center justify-between">
@@ -369,7 +376,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   handleSendMessage();
                 }
               }}
-              className="pr-10"
+              className="pr-10 bg-[#2a3942] border-none text-[#e9edef] placeholder:text-[#8696a0]"
               disabled={isSending || isUploading}
             />
             <Button
@@ -425,10 +432,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isOutgoing = message.direction === 'outbound' || message.direction === 'outgoing';
   
   return (
-    <div className={cn("flex items-end gap-2", isOutgoing ? "justify-end" : "justify-start")}>
+    <div className={cn("flex items-end gap-2 mb-1", isOutgoing ? "justify-end" : "justify-start")}>
       {!isOutgoing && (
         <Avatar className={cn("h-8 w-8", !showAvatar && "invisible")}>
-          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+          <AvatarFallback className="bg-[#00a884] text-white text-xs">
             {getInitials(conversation.pushname)}
           </AvatarFallback>
         </Avatar>
@@ -436,10 +443,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       
       <div
         className={cn(
-          "max-w-[70%] rounded-lg px-3 py-2 text-sm relative",
+          "max-w-[70%] rounded-lg px-3 py-2 text-sm relative shadow-md",
           isOutgoing
-            ? "bg-primary text-primary-foreground rounded-br-sm"
-            : "bg-muted rounded-bl-sm"
+            ? "bg-[#005c4b] text-white rounded-tr-none"
+            : "bg-[#202c33] text-[#e9edef] rounded-tl-none"
         )}
       >
         {/* Contenido del mensaje */}
@@ -457,17 +464,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         
         {/* Información del mensaje */}
         <div className={cn(
-          "flex items-center justify-end gap-1 mt-1 text-xs",
+          "flex items-center justify-end gap-1 mt-1 text-[10px]",
           isOutgoing
-            ? "text-primary-foreground/70"
-            : "text-muted-foreground"
+            ? "text-white/60"
+            : "text-[#8696a0]"
         )}>
           {message.is_bot && (
-            <span className="mr-1">🤖</span>
+            <span className="mr-1 text-xs">🤖</span>
           )}
           <span>{formatTime(message.created_at)}</span>
           {isOutgoing && (
-            <span className="ml-1">✓</span>
+            <svg viewBox="0 0 16 15" width="16" height="15" className="ml-1">
+              <path fill="currentColor" d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.879a.32.32 0 0 1-.484.033l-.358-.325a.319.319 0 0 0-.484.032l-.378.483a.418.418 0 0 0 .036.541l1.32 1.266c.143.14.361.125.484-.033l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.879a.32.32 0 0 1-.484.033L1.891 7.769a.366.366 0 0 0-.515.006l-.423.433a.364.364 0 0 0 .006.514l3.258 3.185c.143.14.361.125.484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"/>
+            </svg>
           )}
         </div>
       </div>
