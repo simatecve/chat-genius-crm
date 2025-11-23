@@ -191,7 +191,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const messageGroups = groupMessagesByDate(messages);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0d1418]">
+    <div className="h-full flex flex-col bg-[#0d1418]">
       {/* Header del chat */}
       <div className="p-3 border-b border-border/20 bg-[#202c33]">
         <div className="flex items-center gap-3">
