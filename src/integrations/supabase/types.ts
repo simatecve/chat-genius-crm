@@ -1172,6 +1172,7 @@ export type Database = {
       user_bot_settings: {
         Row: {
           auto_stop_on_human_reply: boolean | null
+          bot_enabled: boolean
           created_at: string | null
           id: string
           updated_at: string | null
@@ -1179,6 +1180,7 @@ export type Database = {
         }
         Insert: {
           auto_stop_on_human_reply?: boolean | null
+          bot_enabled?: boolean
           created_at?: string | null
           id?: string
           updated_at?: string | null
@@ -1186,6 +1188,7 @@ export type Database = {
         }
         Update: {
           auto_stop_on_human_reply?: boolean | null
+          bot_enabled?: boolean
           created_at?: string | null
           id?: string
           updated_at?: string | null

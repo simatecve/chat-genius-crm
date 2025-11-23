@@ -7,6 +7,7 @@ export const useBotAutoStop = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [autoStopEnabled, setAutoStopEnabled] = useState(true);
+  const [botEnabled, setBotEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export const useBotAutoStop = () => {
     try {
       const { data, error } = await supabase
         .from('user_bot_settings')
-        .select('auto_stop_on_human_reply')
+        .select('auto_stop_on_human_reply, bot_enabled')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -31,12 +32,13 @@ export const useBotAutoStop = () => {
 
       if (data) {
         setAutoStopEnabled(data.auto_stop_on_human_reply);
+        setBotEnabled(data.bot_enabled);
       } else {
         // Si no existe, crear configuración por defecto
         await createDefaultSettings();
       }
     } catch (error) {
-      console.error('Error fetching bot auto-stop settings:', error);
+      console.error('Error fetching bot settings:', error);
     } finally {
       setIsLoading(false);
     }
@@ -51,6 +53,7 @@ export const useBotAutoStop = () => {
         .insert({
           user_id: user.id,
           auto_stop_on_human_reply: true,
+          bot_enabled: true,
         })
         .select()
         .single();
@@ -58,6 +61,7 @@ export const useBotAutoStop = () => {
       if (error) throw error;
 
       setAutoStopEnabled(data.auto_stop_on_human_reply);
+      setBotEnabled(data.bot_enabled);
     } catch (error) {
       console.error('Error creating default bot settings:', error);
     }
@@ -99,9 +103,47 @@ export const useBotAutoStop = () => {
     }
   };
 
+  const toggleBotEnabled = async () => {
+    if (!user) return;
+
+    const newValue = !botEnabled;
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('user_bot_settings')
+        .upsert({
+          user_id: user.id,
+          bot_enabled: newValue,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) throw error;
+
+      setBotEnabled(newValue);
+      toast({
+        title: newValue ? 'Bot activado' : 'Bot desactivado',
+        description: newValue 
+          ? 'El bot responderá automáticamente en los chats'
+          : 'El bot no responderá en los chats',
+      });
+    } catch (error) {
+      console.error('Error toggling bot enabled:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo cambiar la configuración',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     autoStopEnabled,
+    botEnabled,
     isLoading,
     toggleAutoStop,
+    toggleBotEnabled,
   };
 };

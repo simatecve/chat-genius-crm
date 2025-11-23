@@ -398,9 +398,28 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
         await linkConversationToLead(supabase, conversation.id, lead.id);
       }
 
-      // Llamar al agente de IA si hay uno activo
-      console.log('Checking for active AI agent...');
+      // Llamar al agente de IA si hay uno activo y el bot está habilitado
+      console.log('Checking bot settings and active AI agent...');
       try {
+        // Verificar si el bot está habilitado para el usuario
+        const { data: botSettings, error: settingsError } = await supabase
+          .from('user_bot_settings')
+          .select('bot_enabled')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (settingsError) {
+          console.error('Error fetching bot settings:', settingsError);
+        }
+
+        const isBotEnabled = botSettings?.bot_enabled !== false; // Default a true si no existe
+
+        if (!isBotEnabled) {
+          console.log('Bot is disabled for this user, skipping AI response');
+          return;
+        }
+
+        console.log('Bot is enabled, calling AI agent...');
         const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-agent-response', {
           body: {
             conversationId: conversation.id,
