@@ -45,6 +45,13 @@ serve(async (req) => {
       throw new Error('session_name and user_id are required');
     }
 
+    // Sanitize session name: only allow alphanumeric, hyphens, and underscores
+    const sanitizedSessionName = session_name
+      .trim()
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/[^a-zA-Z0-9-_]/g, '') // Remove invalid characters
+      .toLowerCase();
+
     // Configurar webhook URL para recibir actualizaciones de WAHA
     const webhookUrl = `${SUPABASE_URL}/functions/v1/waha-webhook`;
 
@@ -56,7 +63,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: session_name,
+        name: sanitizedSessionName,
         config: {
           webhooks: [
             {
@@ -81,7 +88,7 @@ serve(async (req) => {
     console.log('WAHA session created:', wahaData);
 
     // Iniciar la sesión
-    const startResponse = await fetch(`${WAHA_BASE_URL}/api/sessions/${session_name}/start`, {
+    const startResponse = await fetch(`${WAHA_BASE_URL}/api/sessions/${sanitizedSessionName}/start`, {
       method: 'POST',
       headers: {
         'X-Api-Key': WAHA_API_KEY,
@@ -98,7 +105,7 @@ serve(async (req) => {
       .from('whatsapp_connections')
       .insert({
         user_id,
-        name: session_name,
+        name: sanitizedSessionName,
         phone_number,
         workspace_id: workspace_id || null,
         default_column_id: default_column_id || null,
