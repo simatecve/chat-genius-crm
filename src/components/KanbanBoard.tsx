@@ -9,12 +9,23 @@ import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautif
 import { TriggerActivationService } from '@/services/triggerActivationService';
 import { useAuth } from '@/hooks/useAuth';
 import { useBotBlock } from '@/hooks/useBotBlock';
+import { useNavigate } from 'react-router-dom';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 
+interface ConversationSummary {
+  id: string;
+  phone_number: string;
+  pushname: string | null;
+  last_message: string | null;
+  last_message_time: string | null;
+  unread_count: number | null;
+}
+
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
+  conversations?: ConversationSummary[];
 }
 
 interface KanbanBoardProps {
@@ -31,17 +42,27 @@ interface KanbanBoardProps {
 }
 
 interface LeadCardProps {
-  lead: Lead;
+  lead: LeadWithColumn;
   index: number;
   onEdit?: (lead: Lead) => void;
   onDelete?: (leadId: string) => void;
 }
 
 const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) => {
+  const navigate = useNavigate();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
     lead.phone || null,
     lead.name || null
   );
+  
+  const hasConversation = lead.conversations && lead.conversations.length > 0;
+  const conversation = hasConversation ? lead.conversations[0] : null;
+
+  const handleOpenConversation = () => {
+    if (conversation) {
+      navigate('/conversations', { state: { conversationId: conversation.id } });
+    }
+  };
 
   return (
     <Draggable draggableId={lead.id} index={index}>
@@ -54,54 +75,73 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) =>
         >
           <Card className="p-3 hover:shadow-md transition-shadow cursor-pointer">
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div className="font-medium text-sm truncate flex-1">
                   {lead.name}
                 </div>
-                {(onEdit || onDelete || lead.phone) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                        <MoreVertical className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      {lead.phone && (
-                        <DropdownMenuItem 
-                          onClick={toggleBotBlock}
-                          disabled={isBotToggling}
-                        >
-                          {isBlocked ? (
-                            <>
-                              <Bot className="h-3 w-3 mr-2" />
-                              Activar Bot
-                            </>
-                          ) : (
-                            <>
-                              <BotOff className="h-3 w-3 mr-2" />
-                              Desactivar Bot
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                      )}
-                      {onEdit && (
-                        <DropdownMenuItem onClick={() => onEdit(lead)}>
-                          <Edit className="h-3 w-3 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                      )}
-                      {onDelete && (
-                        <DropdownMenuItem 
-                          onClick={() => onDelete(lead.id)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-3 w-3 mr-2" />
-                          Eliminar
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                <div className="flex items-center gap-1">
+                  {hasConversation && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0 hover:bg-primary/10"
+                      onClick={handleOpenConversation}
+                      title="Abrir conversación"
+                    >
+                      <MessageSquare className="h-3 w-3 text-primary" />
+                    </Button>
+                  )}
+                  {(onEdit || onDelete || lead.phone) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {hasConversation && (
+                          <DropdownMenuItem onClick={handleOpenConversation}>
+                            <MessageSquare className="h-3 w-3 mr-2" />
+                            Ver Conversación
+                          </DropdownMenuItem>
+                        )}
+                        {lead.phone && (
+                          <DropdownMenuItem 
+                            onClick={toggleBotBlock}
+                            disabled={isBotToggling}
+                          >
+                            {isBlocked ? (
+                              <>
+                                <Bot className="h-3 w-3 mr-2" />
+                                Activar Bot
+                              </>
+                            ) : (
+                              <>
+                                <BotOff className="h-3 w-3 mr-2" />
+                                Desactivar Bot
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                        )}
+                        {onEdit && (
+                          <DropdownMenuItem onClick={() => onEdit(lead)}>
+                            <Edit className="h-3 w-3 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                        )}
+                        {onDelete && (
+                          <DropdownMenuItem 
+                            onClick={() => onDelete(lead.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
               
               {lead.company && (
@@ -135,6 +175,29 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) =>
               {lead.notes && (
                 <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded text-ellipsis overflow-hidden">
                   {lead.notes.length > 50 ? `${lead.notes.substring(0, 50)}...` : lead.notes}
+                </div>
+              )}
+              
+              {hasConversation && conversation && (
+                <div className="mt-2 pt-2 border-t border-border">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span className="flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" />
+                      Conversación activa
+                    </span>
+                    {conversation.unread_count > 0 && (
+                      <Badge variant="destructive" className="h-4 px-1 text-[10px]">
+                        {conversation.unread_count}
+                      </Badge>
+                    )}
+                  </div>
+                  {conversation.last_message && (
+                    <div className="text-xs text-muted-foreground bg-muted/30 p-1.5 rounded truncate">
+                      {conversation.last_message.length > 40 
+                        ? `${conversation.last_message.substring(0, 40)}...` 
+                        : conversation.last_message}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

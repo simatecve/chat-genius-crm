@@ -22,8 +22,18 @@ type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 type Workspace = Tables<'workspaces'>;
 
+interface ConversationSummary {
+  id: string;
+  phone_number: string;
+  pushname: string | null;
+  last_message: string | null;
+  last_message_time: string | null;
+  unread_count: number | null;
+}
+
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
+  conversations?: ConversationSummary[];
 }
 
 const Leads = () => {
@@ -177,7 +187,15 @@ const Leads = () => {
       .from('leads')
       .select(`
         *,
-        lead_columns(*)
+        lead_columns(*),
+        conversations:conversations!conversations_lead_id_fkey(
+          id,
+          phone_number,
+          pushname,
+          last_message,
+          last_message_time,
+          unread_count
+        )
       `)
       .order('position');
 
