@@ -527,9 +527,9 @@ const Leads = () => {
       <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Embudos</h1>
           <p className="text-muted-foreground">
-            Gestiona tus leads en un tablero Kanban
+            Gestiona tus embudos en un tablero Kanban
           </p>
         </div>
         <Button onClick={openCreateColumnDialog}>
@@ -564,9 +564,9 @@ const Leads = () => {
            <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-200">
              <div className="flex items-center space-x-2">
                <Search className="h-4 w-4 text-blue-600" />
-               <span className="text-sm text-blue-700">
-                 Mostrando {filteredLeads.length} de {leads.length} leads que coinciden con "{searchFilter}"
-               </span>
+                <span className="text-sm text-blue-700">
+                  Mostrando {filteredLeads.length} de {leads.length} embudos que coinciden con "{searchFilter}"
+                </span>
              </div>
              {filteredLeads.length === 0 && (
                <span className="text-sm text-blue-600">No se encontraron resultados</span>
@@ -596,7 +596,7 @@ const Leads = () => {
                 {editingColumn ? 'Editar Columna' : 'Nueva Columna'}
               </DialogTitle>
               <DialogDescription>
-                {editingColumn ? 'Modifica los datos de la columna' : 'Crea una nueva columna para organizar tus leads'}
+                {editingColumn ? 'Modifica los datos de la columna' : 'Crea una nueva columna para organizar tus embudos'}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -640,9 +640,9 @@ const Leads = () => {
         <Dialog open={showLeadDialog} onOpenChange={setShowLeadDialog}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Nuevo Lead</DialogTitle>
+              <DialogTitle>Nuevo Embudo</DialogTitle>
               <DialogDescription>
-                Agrega un nuevo lead a la columna
+                Agrega un nuevo embudo a la columna
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -721,8 +721,8 @@ const Leads = () => {
             <DialogHeader>
               <DialogTitle>Convertir a Lista de Contactos</DialogTitle>
               <DialogDescription>
-                Convertir todos los leads de la columna "{convertingColumn?.name}" en una lista de contactos.
-                Solo se convertirán los leads que tengan número de teléfono.
+                Convertir todos los embudos de la columna "{convertingColumn?.name}" en una lista de contactos.
+                Solo se convertirán los embudos que tengan número de teléfono.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
