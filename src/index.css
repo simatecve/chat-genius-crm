@@ -229,4 +229,17 @@
   .glass-effect {
     @apply bg-background/80 backdrop-blur-sm border border-border/50;
   }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-background/50 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-border/50 rounded-full hover:bg-border;
+  }
 }
