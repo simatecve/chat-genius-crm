@@ -24,7 +24,7 @@ const InternalChat = () => {
 
   return (
     <AppLayout>
-      <div className="h-full flex bg-background">
+      <div className="absolute inset-0 flex bg-background -m-6">
         {/* Lista de usuarios - ocultar en móvil cuando hay usuario seleccionado */}
         {(!isMobileView || !selectedUser) && (
           <UserList
