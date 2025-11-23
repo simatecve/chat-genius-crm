@@ -40,7 +40,7 @@ import {
 // import { CSS } from '@dnd-kit/utilities';
 import DraggableEmbudo from './components/DraggableEmbudo';
 import DraggableChat from './components/DraggableChat';
-import ChatModal from '../chats/components/ChatModal';
+import ChatModalV2 from '../chats/components/ChatModalV2';
 
 export default function EmbudosPage() {
   const [espaciosConEmbudos, setEspaciosConEmbudos] = useState<EspacioConEmbudos[]>([]);
@@ -571,7 +571,7 @@ export default function EmbudosPage() {
       />
 
       {/* Modal de Chat */}
-      <ChatModal
+      <ChatModalV2
         isOpen={isChatModalOpen}
         onClose={() => {
           setIsChatModalOpen(false);
