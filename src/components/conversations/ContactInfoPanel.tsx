@@ -13,6 +13,7 @@ import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { casinoApiService } from '@/services/casinoApiService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ContactInfoPanelProps {
   conversationId: string;
@@ -61,6 +62,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     agent_id: '',
     funnel_stage: '',
     notes: '',
+    phone_number: '',
   });
 
   const [newSale, setNewSale] = useState({
@@ -83,6 +85,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         agent_id: details.agent_id || '',
         funnel_stage: details.funnel_stage || '',
         notes: details.notes || '',
+        phone_number: phoneNumber || '',
       });
       
       const salesData = await contactDetailsService.getSales(details.id);
@@ -94,6 +97,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     if (!effectiveUserId) return;
 
     try {
+      // Actualizar detalles del contacto
       await contactDetailsService.upsert(
         {
           gender: formData.gender as any || null,
@@ -106,6 +110,16 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         conversationId,
         effectiveUserId
       );
+
+      // Actualizar número de teléfono en la conversación si cambió
+      if (formData.phone_number && formData.phone_number !== phoneNumber) {
+        const { error: conversationError } = await supabase
+          .from('conversations')
+          .update({ phone_number: formData.phone_number })
+          .eq('id', conversationId);
+
+        if (conversationError) throw conversationError;
+      }
 
       toast({
         title: 'Guardado exitoso',
@@ -318,20 +332,29 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           </button>
 
           {expandedSections.info && (
-            <div className="mt-3 space-y-2 text-sm">
+            <div className="mt-3 space-y-3 text-sm">
               <div className="flex items-center space-x-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <div>
+                <div className="w-full">
                   <p className="text-xs text-muted-foreground">Nombre</p>
                   <p className="font-medium">{contactName}</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <div>
+              <div>
+                <div className="flex items-center space-x-2 mb-1">
+                  <Users className="h-4 w-4 text-muted-foreground" />
                   <p className="text-xs text-muted-foreground">Teléfono</p>
-                  <p className="font-medium">{phoneNumber}</p>
                 </div>
+                {isEditing ? (
+                  <Input
+                    value={formData.phone_number}
+                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                    placeholder="Ej: 593983859723"
+                    className="h-8 ml-6"
+                  />
+                ) : (
+                  <p className="font-medium ml-6">{formData.phone_number || phoneNumber}</p>
+                )}
               </div>
             </div>
           )}
