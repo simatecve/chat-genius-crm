@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.process-scheduled-messages]
 verify_jwt = false
 
+[functions.send-mass-campaign]
+verify_jwt = true
+
 [functions.waha-create-session]
 verify_jwt = true
 

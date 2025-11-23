@@ -149,6 +149,66 @@ export type Database = {
           },
         ]
       }
+      campaign_sends: {
+        Row: {
+          campaign_id: string
+          contact_id: string | null
+          contact_name: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_sent: string
+          phone_number: string
+          sent_at: string | null
+          status: string
+          user_id: string
+          was_personalized: boolean | null
+        }
+        Insert: {
+          campaign_id: string
+          contact_id?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_sent: string
+          phone_number: string
+          sent_at?: string | null
+          status?: string
+          user_id: string
+          was_personalized?: boolean | null
+        }
+        Update: {
+          campaign_id?: string
+          contact_id?: string | null
+          contact_name?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_sent?: string
+          phone_number?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+          was_personalized?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_sends_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "mass_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_sends_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       column_message_triggers: {
         Row: {
           column_id: string
