@@ -50,7 +50,7 @@ const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
-  const { autoStopEnabled, isLoading: isBotLoading, toggleAutoStop } = useBotAutoStop();
+  const { autoStopEnabled, botEnabled, isLoading: isBotLoading, toggleAutoStop, toggleBotEnabled } = useBotAutoStop();
 
   useEffect(() => {
     fetchProfile();
@@ -444,6 +444,24 @@ const Settings = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="flex items-center justify-between pb-6 border-b">
+                  <div className="space-y-1 flex-1">
+                    <Label htmlFor="bot-enabled" className="text-base font-medium">
+                      Activar/Desactivar Bot
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Cuando está activo, el bot responderá automáticamente a los mensajes entrantes en todos los chats. 
+                      Si está desactivado, el bot no responderá en ninguna conversación.
+                    </p>
+                  </div>
+                  <Switch
+                    id="bot-enabled"
+                    checked={botEnabled}
+                    onCheckedChange={toggleBotEnabled}
+                    disabled={isBotLoading}
+                  />
+                </div>
+                
                 <div className="flex items-center justify-between">
                   <div className="space-y-1 flex-1">
                     <Label htmlFor="auto-stop" className="text-base font-medium">
@@ -458,7 +476,7 @@ const Settings = () => {
                     id="auto-stop"
                     checked={autoStopEnabled}
                     onCheckedChange={toggleAutoStop}
-                    disabled={isBotLoading}
+                    disabled={isBotLoading || !botEnabled}
                   />
                 </div>
                 
