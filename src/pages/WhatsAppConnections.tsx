@@ -21,11 +21,19 @@ interface WhatsAppConnection {
   status: string;
   created_at: string;
   workspace_id?: string | null;
+  default_column_id?: string | null;
 }
 
 interface Workspace {
   id: string;
   name: string;
+}
+
+interface LeadColumn {
+  id: string;
+  name: string;
+  is_default: boolean;
+  workspace_id: string | null;
 }
 
 const colorOptions = [
@@ -40,6 +48,7 @@ const colorOptions = [
 const WhatsAppConnections = () => {
   const [connections, setConnections] = useState<WhatsAppConnection[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [leadColumns, setLeadColumns] = useState<LeadColumn[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -52,7 +61,8 @@ const WhatsAppConnections = () => {
   const [formData, setFormData] = useState({
     name: '',
     phone_number: '',
-    workspace_id: ''
+    workspace_id: '',
+    default_column_id: ''
   });
   const { toast } = useToast();
   const { user } = useAuth();
@@ -64,8 +74,18 @@ const WhatsAppConnections = () => {
     if (!userIdLoading && effectiveUserId) {
       fetchConnections();
       fetchWorkspaces();
+      fetchLeadColumns();
     }
   }, [effectiveUserId, userIdLoading]);
+
+  // Cargar columnas cuando cambia el workspace seleccionado
+  useEffect(() => {
+    if (formData.workspace_id && effectiveUserId) {
+      fetchLeadColumns(formData.workspace_id);
+    } else if (!formData.workspace_id && effectiveUserId) {
+      fetchLeadColumns();
+    }
+  }, [formData.workspace_id, effectiveUserId]);
 
   const fetchConnections = async () => {
     // Verificar que tengamos un effectiveUserId válido antes de hacer la consulta
@@ -112,6 +132,41 @@ const WhatsAppConnections = () => {
       setWorkspaces(data || []);
     } catch (error) {
       console.error('Error fetching workspaces:', error);
+    }
+  };
+
+  const fetchLeadColumns = async (workspaceId?: string) => {
+    if (!effectiveUserId) {
+      return;
+    }
+
+    try {
+      let query = supabase
+        .from('lead_columns')
+        .select('id, name, is_default, workspace_id')
+        .eq('user_id', effectiveUserId)
+        .order('position');
+
+      if (workspaceId) {
+        query = query.eq('workspace_id', workspaceId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setLeadColumns(data || []);
+      
+      // Auto-seleccionar la columna por defecto
+      if (data && data.length > 0 && !formData.default_column_id) {
+        const defaultColumn = data.find(col => col.is_default);
+        if (defaultColumn) {
+          setFormData(prev => ({ ...prev, default_column_id: defaultColumn.id }));
+        } else {
+          setFormData(prev => ({ ...prev, default_column_id: data[0].id }));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching lead columns:', error);
     }
   };
 
@@ -221,7 +276,16 @@ const WhatsAppConnections = () => {
     if (!formData.name || !formData.phone_number) {
       toast({
         title: "Error",
-        description: "Por favor, completa todos los campos",
+        description: "Por favor, completa todos los campos requeridos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.default_column_id) {
+      toast({
+        title: "Error",
+        description: "Por favor, selecciona un embudo donde se guardarán los leads",
         variant: "destructive",
       });
       return;
@@ -266,6 +330,7 @@ const WhatsAppConnections = () => {
           phone_number: formData.phone_number,
           workspace_id: formData.workspace_id || null,
           workspace_name: workspaceName,
+          default_column_id: formData.default_column_id,
           email: profileData?.email || user.email,
           first_name: profileData?.first_name,
           last_name: profileData?.last_name,
@@ -284,7 +349,7 @@ const WhatsAppConnections = () => {
       });
 
       setDialogOpen(false);
-      setFormData({ name: '', phone_number: '', workspace_id: '' });
+      setFormData({ name: '', phone_number: '', workspace_id: '', default_column_id: '' });
       fetchConnections();
     } catch (error: any) {
       console.error('Error creating connection:', error);
@@ -454,7 +519,9 @@ const WhatsAppConnections = () => {
                 <Label htmlFor="workspace">Espacio de trabajo</Label>
                 <Select
                   value={formData.workspace_id}
-                  onValueChange={(value) => setFormData({ ...formData, workspace_id: value })}
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, workspace_id: value, default_column_id: '' });
+                  }}
                   disabled={creating}
                 >
                   <SelectTrigger id="workspace">
@@ -468,6 +535,28 @@ const WhatsAppConnections = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="column">Embudo para leads automáticos *</Label>
+                <Select
+                  value={formData.default_column_id}
+                  onValueChange={(value) => setFormData({ ...formData, default_column_id: value })}
+                  disabled={creating || leadColumns.length === 0}
+                >
+                  <SelectTrigger id="column">
+                    <SelectValue placeholder="Seleccionar embudo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leadColumns.map((column) => (
+                      <SelectItem key={column.id} value={column.id}>
+                        {column.name} {column.is_default && '(Por defecto)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Los leads de WhatsApp se crearán automáticamente en este embudo
+                </p>
               </div>
               <Button 
                 type="submit"
