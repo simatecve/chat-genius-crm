@@ -18,6 +18,7 @@ import CreateMassCampaign from "./pages/CreateMassCampaign";
 import Settings from "./pages/Settings";
 import Leads from "./pages/Leads";
 import Conversations from "./pages/Conversations";
+import Sales from "./pages/Sales";
 import PaymentPlans from "./pages/PaymentPlans";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailure from "./pages/PaymentFailure";
@@ -101,6 +102,11 @@ const App = () => (
             <Route path="/conversaciones" element={
               <ProtectedRoute>
                 <Conversations />
+              </ProtectedRoute>
+            } />
+            <Route path="/ventas" element={
+              <ProtectedRoute>
+                <Sales />
               </ProtectedRoute>
             } />
             <Route path="/planes-pago" element={

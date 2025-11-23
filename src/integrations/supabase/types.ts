@@ -820,6 +820,39 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          price: number
+          stock: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          price?: number
+          stock?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number
+          stock?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company_name: string | null
@@ -928,6 +961,60 @@ export type Database = {
             columns: ["permission_id"]
             isOneToOne: false
             referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          product_id: string
+          quantity: number
+          sale_date: string
+          seller_id: string
+          total_amount: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          id?: string
+          product_id: string
+          quantity: number
+          sale_date?: string
+          seller_id: string
+          total_amount?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          quantity?: number
+          sale_date?: string
+          seller_id?: string
+          total_amount?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_client"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_product"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
