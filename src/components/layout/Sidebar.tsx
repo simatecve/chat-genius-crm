@@ -9,7 +9,8 @@ import {
   Menu, 
   X,
   Bot,
-  Phone
+  Phone,
+  ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -60,6 +61,7 @@ export const Sidebar = () => {
         { label: 'Embudos', icon: UserPlus, href: '/leads' },
         { label: 'Listas de Contactos', icon: Users, href: '/listas-contactos' },
         { label: 'Asistente IA', icon: Bot, href: '/asistente-ia' },
+        { label: 'Ventas', icon: ShoppingCart, href: '/ventas' },
       ]
     },
     {
