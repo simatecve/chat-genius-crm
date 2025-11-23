@@ -24,42 +24,57 @@ const Conversations = () => {
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [embudos, setEmbudos] = useState<EmbudoResponse[]>([]);
   const [selectedEmbudo, setSelectedEmbudo] = useState<EmbudoResponse | null>(null);
+  const [workspaces, setWorkspaces] = useState<any[]>([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<any | null>(null);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
   const { data: searchResults } = useSearchConversations(searchTerm);
   const { messages, sendMessage, isSending } = useMessages(selectedConversation?.id || null);
 
-  // Cargar embudos
+  // Cargar workspaces
   useEffect(() => {
-    const loadEmbudos = async () => {
-      // Por ahora usamos un ID de espacio dummy o el primero que encontremos si implementamos espacios
-      // Como no tenemos espacios en el contexto actual, intentaremos cargar todos o los del usuario
-      // Para mantener compatibilidad, asumimos que embudoServices maneja la lógica de usuario
-      // Pero getEmbudosByEspacio requiere un ID.
-      // Vamos a buscar un workspace del usuario primero
+    const loadWorkspaces = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: workspaces } = await supabase
+          const { data: workspacesData } = await supabase
             .from('workspaces')
-            .select('id')
+            .select('*')
             .eq('user_id', user.id)
-            .limit(1);
+            .order('position');
 
-          if (workspaces && workspaces.length > 0) {
-            const response = await embudoServices.getEmbudosByEspacio(workspaces[0].id);
-            if (response.success && response.data) {
-              setEmbudos(response.data);
-            }
+          if (workspacesData && workspacesData.length > 0) {
+            setWorkspaces(workspacesData);
+            setSelectedWorkspace(workspacesData[0]);
           }
+        }
+      } catch (error) {
+        console.error('Error loading workspaces:', error);
+      }
+    };
+    loadWorkspaces();
+  }, []);
+
+  // Cargar embudos cuando cambia el workspace seleccionado
+  useEffect(() => {
+    const loadEmbudos = async () => {
+      if (!selectedWorkspace) {
+        setEmbudos([]);
+        return;
+      }
+
+      try {
+        const response = await embudoServices.getEmbudosByEspacio(selectedWorkspace.id);
+        if (response.success && response.data) {
+          setEmbudos(response.data);
         }
       } catch (error) {
         console.error('Error loading embudos:', error);
       }
     };
     loadEmbudos();
-  }, []);
+  }, [selectedWorkspace]);
 
   // Determinar qué conversaciones mostrar
   const displayConversations = React.useMemo(() => {
@@ -147,6 +162,9 @@ const Conversations = () => {
         onSearchChange={setSearchTerm}
         isLoading={isLoading}
         unreadCount={unreadCount}
+        workspaces={workspaces}
+        selectedWorkspace={selectedWorkspace}
+        onWorkspaceSelect={setSelectedWorkspace}
         embudos={embudos}
         selectedEmbudo={selectedEmbudo}
         onEmbudoSelect={setSelectedEmbudo}

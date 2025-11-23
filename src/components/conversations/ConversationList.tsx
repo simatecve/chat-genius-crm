@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, MoreVertical } from 'lucide-react';
+import { Search, MoreVertical, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,8 +9,24 @@ import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import EmbudosFilter from './EmbudosFilter';
 import { EmbudoResponse } from '@/services/embudoServices';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
+
+interface Workspace {
+  id: string;
+  name: string;
+  position: number;
+  user_id: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -20,6 +36,9 @@ interface ConversationListProps {
   onSearchChange: (term: string) => void;
   isLoading: boolean;
   unreadCount: number;
+  workspaces?: Workspace[];
+  selectedWorkspace?: Workspace | null;
+  onWorkspaceSelect?: (workspace: Workspace | null) => void;
   embudos?: EmbudoResponse[];
   selectedEmbudo?: EmbudoResponse | null;
   onEmbudoSelect?: (embudo: EmbudoResponse | null) => void;
@@ -33,6 +52,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onSearchChange,
   isLoading,
   unreadCount,
+  workspaces = [],
+  selectedWorkspace = null,
+  onWorkspaceSelect = () => { },
   embudos = [],
   selectedEmbudo = null,
   onEmbudoSelect = () => { },
@@ -63,7 +85,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       {/* Header de conversaciones */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold">Conversaciones</h1>
+          <h1 className="text-xl font-semibold">Chats</h1>
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <Badge variant="destructive" className="text-xs">
@@ -75,6 +97,30 @@ const ConversationList: React.FC<ConversationListProps> = ({
             </Button>
           </div>
         </div>
+
+        {/* Selector de Workspace */}
+        {workspaces.length > 0 && (
+          <Select
+            value={selectedWorkspace?.id || ''}
+            onValueChange={(value) => {
+              const workspace = workspaces.find(w => w.id === value);
+              onWorkspaceSelect(workspace || null);
+            }}
+          >
+            <SelectTrigger className="w-full bg-primary text-primary-foreground border-2 border-primary hover:bg-primary/90 font-medium">
+              <SelectValue placeholder="Seleccionar espacio">
+                {selectedWorkspace?.name || 'Seleccionar espacio'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {workspaces.map((workspace) => (
+                <SelectItem key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Filtro de Embudos */}
