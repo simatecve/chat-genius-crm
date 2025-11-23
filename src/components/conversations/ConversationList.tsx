@@ -155,7 +155,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium truncate">
+            <h3 className="text-base font-medium truncate">
               {conversation.pushname || conversation.whatsapp_number}
             </h3>
             <span className="text-xs text-muted-foreground">
