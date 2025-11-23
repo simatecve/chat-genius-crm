@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import type { Tables } from '@/integrations/supabase/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -19,6 +20,7 @@ import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
+type Workspace = Tables<'workspaces'>;
 
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
@@ -28,9 +30,11 @@ const Leads = () => {
   const { user } = useAuth();
   const [columns, setColumns] = useState<LeadColumn[]>([]);
   const [leads, setLeads] = useState<LeadWithColumn[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [newColumnName, setNewColumnName] = useState('');
-  const [newColumnColor, setNewColumnColor] = useState('#3b82f6');
+  const [newColumnColor, setNewColumnColor] = useState('#22c55e');
   const [editingColumn, setEditingColumn] = useState<LeadColumn | null>(null);
   const [newLead, setNewLead] = useState({
     name: '',
@@ -51,12 +55,21 @@ const Leads = () => {
   const [selectedColumnForTriggers, setSelectedColumnForTriggers] = useState<LeadColumn | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [filteredLeads, setFilteredLeads] = useState<LeadWithColumn[]>([]);
+  const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       loadData();
     }
   }, [user]);
+
+  // Reload columns when workspace changes
+  useEffect(() => {
+    if (user && selectedWorkspace) {
+      loadColumns();
+      loadLeads();
+    }
+  }, [selectedWorkspace]);
 
   // Filtrar leads en tiempo real
   useEffect(() => {
@@ -76,7 +89,7 @@ const Leads = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadColumns(), loadLeads()]);
+      await Promise.all([loadWorkspaces(), loadColumns(), loadLeads()]);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -89,24 +102,50 @@ const Leads = () => {
     }
   };
 
-  const loadColumns = async () => {
+  const loadWorkspaces = async () => {
     const { data, error } = await supabase
-      .from('lead_columns')
+      .from('workspaces')
       .select('*')
       .eq('user_id', user?.id)
       .order('position');
+
+    if (error) {
+      console.error('Error loading workspaces:', error);
+      return;
+    }
+
+    setWorkspaces(data || []);
+    // Seleccionar el primer workspace por defecto
+    if (data && data.length > 0 && !selectedWorkspace) {
+      setSelectedWorkspace(data[0].id);
+    }
+  };
+
+  const loadColumns = async () => {
+    const query = supabase
+      .from('lead_columns')
+      .select('*')
+      .eq('user_id', user?.id);
+
+    // Filtrar por workspace si está seleccionado
+    if (selectedWorkspace) {
+      query.eq('workspace_id', selectedWorkspace);
+    }
+
+    const { data, error } = await query.order('position');
 
     if (error) {
       console.error('Error loading columns:', error);
       return;
     }
 
-    if (data.length === 0) {
-      // Crear columna inicial por defecto
+    if (!data || data.length === 0) {
+      // Crear columna por defecto si no existe ninguna
       await createDefaultColumn();
-    } else {
-      setColumns(data);
+      return;
     }
+
+    setColumns(data);
   };
 
   const createDefaultColumn = async () => {
@@ -114,10 +153,11 @@ const Leads = () => {
       .from('lead_columns')
       .insert({
         name: 'Nuevos Leads',
-        color: '#3b82f6',
+        color: '#22c55e',
         position: 0,
         is_default: true,
-        user_id: user?.id
+        user_id: user?.id,
+        workspace_id: selectedWorkspace
       })
       .select()
       .single();
@@ -150,16 +190,33 @@ const Leads = () => {
   };
 
   const handleCreateColumn = async () => {
-    if (!newColumnName.trim()) return;
+    if (!newColumnName.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre de la columna es requerido",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    const { data, error } = await supabase
+    if (!selectedWorkspace) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona un espacio de trabajo primero",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { data, error} = await supabase
       .from('lead_columns')
       .insert({
         name: newColumnName,
         color: newColumnColor,
         position: columns.length,
         is_default: false,
-        user_id: user?.id
+        user_id: user?.id,
+        workspace_id: selectedWorkspace
       })
       .select()
       .single();
@@ -176,7 +233,7 @@ const Leads = () => {
 
     setColumns([...columns, data]);
     setNewColumnName('');
-    setNewColumnColor('#3b82f6');
+    setNewColumnColor('#22c55e');
     setShowColumnDialog(false);
     toast({
       title: "Éxito",
@@ -384,9 +441,17 @@ const Leads = () => {
   };
 
   const openCreateColumnDialog = () => {
+    if (!selectedWorkspace) {
+      toast({
+        title: "Atención",
+        description: "Por favor selecciona un espacio de trabajo primero",
+        variant: "default"
+      });
+      return;
+    }
     setEditingColumn(null);
     setNewColumnName('');
-    setNewColumnColor('#3b82f6');
+    setNewColumnColor('#22c55e');
     setShowColumnDialog(true);
   };
 
@@ -523,70 +588,211 @@ const Leads = () => {
   }
 
   return (
-    
-      <div className="space-y-6">
+    <div className="space-y-6 bg-background min-h-screen p-6">
+      {/* Header with Workspace Selector */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Embudos</h1>
-          <p className="text-muted-foreground">
-            Gestiona tus embudos en un tablero Kanban
-          </p>
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          
+          <Select value={selectedWorkspace || ''} onValueChange={setSelectedWorkspace}>
+            <SelectTrigger className="w-[280px] bg-card/50 border-border/50 text-lg font-semibold uppercase">
+              <SelectValue placeholder="Seleccionar espacio" />
+            </SelectTrigger>
+            <SelectContent>
+              {workspaces.map((workspace) => (
+                <SelectItem key={workspace.id} value={workspace.id}>
+                  {workspace.name.toUpperCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Button onClick={openCreateColumnDialog}>
+        
+        <Button onClick={openCreateColumnDialog} className="bg-primary hover:bg-primary/90">
           <Plus className="h-4 w-4 mr-2" />
           Nueva Columna
         </Button>
       </div>
 
-        {/* Search Filter */}
-        <div className="flex items-center space-x-2 bg-white p-4 rounded-lg border">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="🔍 Filtrar por nombre o número de teléfono..."
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            className="flex-1"
-          />
-          {searchFilter && (
-             <Button
-               variant="ghost"
-               size="sm"
-               onClick={() => setSearchFilter('')}
-               className="text-muted-foreground hover:text-foreground"
-             >
-               Limpiar
-             </Button>
-           )}
-         </div>
-
-         {/* Filter Results Info */}
-         {searchFilter && (
-           <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg border border-blue-200">
-             <div className="flex items-center space-x-2">
-               <Search className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-blue-700">
-                  Mostrando {filteredLeads.length} de {leads.length} embudos que coinciden con "{searchFilter}"
-                </span>
-             </div>
-             {filteredLeads.length === 0 && (
-               <span className="text-sm text-blue-600">No se encontraron resultados</span>
-             )}
-           </div>
-         )}
-
-        {/* Kanban Board */}
-        <KanbanBoard
-          columns={columns}
-          leads={filteredLeads}
-          onEditColumn={openEditColumnDialog}
-          onDeleteColumn={handleDeleteColumn}
-          onCreateLead={openCreateLeadDialog}
-          onEditLead={undefined}
-          onDeleteLead={handleDeleteLead}
-          onMoveLeadToColumn={handleMoveLeadToColumn}
-          onConvertToContactList={openConvertDialog}
-          onManageMessageTriggers={openMessageTriggersDialog}
+      {/* Search Filter */}
+      <div className="flex items-center space-x-2 bg-card/30 p-4 rounded-lg border border-border/50">
+        <Search className="h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="🔍 Filtrar por nombre o número de teléfono..."
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+          className="flex-1 border-0 bg-transparent focus-visible:ring-0"
         />
+        {searchFilter && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSearchFilter('')}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Limpiar
+          </Button>
+        )}
+      </div>
+
+      {/* Filter Results Info */}
+      {searchFilter && (
+        <div className="flex items-center justify-between bg-primary/10 p-3 rounded-lg border border-primary/20">
+          <div className="flex items-center space-x-2">
+            <Search className="h-4 w-4 text-primary" />
+            <span className="text-sm text-foreground">
+              Mostrando {filteredLeads.length} de {leads.length} embudos que coinciden con "{searchFilter}"
+            </span>
+          </div>
+          {filteredLeads.length === 0 && (
+            <span className="text-sm text-muted-foreground">No se encontraron resultados</span>
+          )}
+        </div>
+      )}
+
+      {/* Kanban Board - New Dark Design */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {columns.map((column) => {
+          const columnLeads = filteredLeads.filter(lead => lead.column_id === column.id);
+          const isSelected = selectedColumn === column.id;
+          
+          return (
+            <div
+              key={column.id}
+              onClick={() => setSelectedColumn(column.id)}
+              className={`
+                relative bg-card/50 rounded-xl p-5 cursor-pointer transition-all
+                border-2 hover:border-primary/50
+                ${isSelected ? 'border-[#22c55e] shadow-lg shadow-[#22c55e]/20' : 'border-border/30'}
+              `}
+              style={{
+                borderColor: isSelected ? '#22c55e' : undefined
+              }}
+            >
+              {/* Column Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-base font-bold uppercase tracking-wide text-foreground mb-1">
+                    {column.name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    ({columnLeads.length} {columnLeads.length === 1 ? 'chat' : 'chats'})
+                  </p>
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      openEditColumnDialog(column);
+                    }}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      openMessageTriggersDialog(column);
+                    }}>
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Disparadores de Mensaje
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      openConvertDialog(column);
+                    }}>
+                      <Users className="h-4 w-4 mr-2" />
+                      Convertir a Lista de Contactos
+                    </DropdownMenuItem>
+                    {!column.is_default && (
+                      <DropdownMenuItem 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteColumn(column.id);
+                        }}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Eliminar
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Leads List */}
+              <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar">
+                {columnLeads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className="bg-background/50 border border-border/50 rounded-lg p-3 hover:bg-background/70 transition-colors"
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 bg-[#25D366] rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg viewBox="0 0 24 24" className="w-6 h-6 text-white fill-current">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-semibold text-sm text-foreground truncate">
+                              {lead.name}
+                            </p>
+                            {lead.phone && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {lead.phone}
+                              </p>
+                            )}
+                            {lead.notes && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {lead.notes}
+                              </p>
+                            )}
+                          </div>
+                          
+                          <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                            {new Date(lead.created_at || '').toLocaleDateString('es-ES', { 
+                              day: '2-digit', 
+                              month: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {columnLeads.length === 0 && (
+                  <div className="text-center text-muted-foreground text-sm py-8">
+                    No hay embudos en esta columna
+                  </div>
+                )}
+              </div>
+
+              {/* Add Lead Button */}
+              <Button 
+                variant="outline" 
+                className="w-full mt-4 hover:bg-primary/10 hover:border-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openCreateLeadDialog(column.id);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Embudo
+              </Button>
+            </div>
+          );
+        })}
+      </div>
 
         {/* Column Dialog */}
         <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
