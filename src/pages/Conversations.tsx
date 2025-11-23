@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 
 import ConversationList from '@/components/conversations/ConversationList';
 import ChatArea from '@/components/conversations/ChatArea';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ContactInfoPanel } from '@/components/conversations/ContactInfoPanel';
 import { useConversations, useMessages, useSearchConversations } from '@/hooks/useConversations';
 import { useAuth } from '@/hooks/useAuth';
@@ -154,37 +155,50 @@ const Conversations = () => {
 
   return (
     <div className="flex h-full bg-background">
-      <ConversationList
-        conversations={displayConversations}
-        selectedConversation={selectedConversation}
-        onSelectConversation={handleSelectConversation}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        isLoading={isLoading}
-        unreadCount={unreadCount}
-        workspaces={workspaces}
-        selectedWorkspace={selectedWorkspace}
-        onWorkspaceSelect={setSelectedWorkspace}
-        embudos={embudos}
-        selectedEmbudo={selectedEmbudo}
-        onEmbudoSelect={setSelectedEmbudo}
-      />
+      <ResizablePanelGroup direction="horizontal">
+        <ResizablePanel defaultSize={23} minSize={15} maxSize={40}>
+          <ConversationList
+            conversations={displayConversations}
+            selectedConversation={selectedConversation}
+            onSelectConversation={handleSelectConversation}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            isLoading={isLoading}
+            unreadCount={unreadCount}
+            workspaces={workspaces}
+            selectedWorkspace={selectedWorkspace}
+            onWorkspaceSelect={setSelectedWorkspace}
+            embudos={embudos}
+            selectedEmbudo={selectedEmbudo}
+            onEmbudoSelect={setSelectedEmbudo}
+          />
+        </ResizablePanel>
 
-      <ChatArea
-        conversation={selectedConversation}
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        isSending={isSending}
-        onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
-      />
+        <ResizableHandle withHandle />
 
-      {selectedConversation && showInfoPanel && (
-        <ContactInfoPanel
-          conversationId={selectedConversation.id}
-          contactName={selectedConversation.contact_name || selectedConversation.pushname || 'Contacto'}
-          phoneNumber={selectedConversation.phone_number}
-        />
-      )}
+        <ResizablePanel defaultSize={showInfoPanel ? 52 : 77} minSize={40}>
+          <ChatArea
+            conversation={selectedConversation}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isSending={isSending}
+            onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
+          />
+        </ResizablePanel>
+
+        {selectedConversation && showInfoPanel && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+              <ContactInfoPanel
+                conversationId={selectedConversation.id}
+                contactName={selectedConversation.contact_name || selectedConversation.pushname || 'Contacto'}
+                phoneNumber={selectedConversation.phone_number}
+              />
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
     </div>
   );
 };
