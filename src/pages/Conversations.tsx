@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 import ConversationList from '@/components/conversations/ConversationList';
 import ChatArea from '@/components/conversations/ChatArea';
@@ -15,6 +16,7 @@ type Message = Database['public']['Tables']['messages']['Row'];
 const Conversations = () => {
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
+  const location = useLocation();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [newMessage, setNewMessage] = useState('');
@@ -26,6 +28,19 @@ const Conversations = () => {
 
   // Determinar qué conversaciones mostrar
   const displayConversations = searchTerm ? (searchResults || []) : conversations;
+
+  // Seleccionar conversación automáticamente desde navegación de embudos
+  useEffect(() => {
+    const state = location.state as { conversationId?: string } | null;
+    if (state?.conversationId && conversations.length > 0) {
+      const conversation = conversations.find(conv => conv.id === state.conversationId);
+      if (conversation) {
+        handleSelectConversation(conversation);
+        // Limpiar el estado de navegación
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, conversations]);
 
   // Manejar selección de conversación
   const handleSelectConversation = (conversation: Conversation) => {
