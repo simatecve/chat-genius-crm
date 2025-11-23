@@ -17,6 +17,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from '@/components/ui/badge';
 import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
+import ChatModal from '@/components/conversations/ChatModal';
+import { useMessages } from '@/hooks/useConversations';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
@@ -68,14 +70,38 @@ const Leads = () => {
   const [filteredLeads, setFilteredLeads] = useState<LeadWithColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
 
-  // Función para manejar click en lead y abrir conversación
-  const handleLeadClick = (lead: LeadWithColumn) => {
-    // Si el lead tiene conversaciones asociadas, navegar a la primera
+  // Estado para el modal de chat
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<any>(null);
+
+  // Hook para mensajes del chat seleccionado
+  const { messages, sendMessage, isSending } = useMessages(selectedConversationId);
+
+  // Función para manejar click en lead y abrir conversación en modal
+  const handleLeadClick = async (lead: LeadWithColumn) => {
+    // Si el lead tiene conversaciones asociadas, abrir modal con la primera
     if (lead.conversations && lead.conversations.length > 0) {
       const firstConversation = lead.conversations[0];
-      navigate('/conversaciones', {
-        state: { conversationId: firstConversation.id }
-      });
+
+      // Cargar datos completos de la conversación
+      const { data: fullConversation, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', firstConversation.id)
+        .single();
+
+      if (fullConversation && !error) {
+        setSelectedConversation(fullConversation);
+        setSelectedConversationId(fullConversation.id);
+        setIsChatModalOpen(true);
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo cargar la conversación",
+          variant: "destructive"
+        });
+      }
     } else {
       // Si no tiene conversaciones, mostrar un mensaje
       toast({
@@ -1068,6 +1094,19 @@ const Leads = () => {
         isOpen={showMessageTriggersDialog}
         onClose={closeMessageTriggersDialog}
         column={selectedColumnForTriggers}
+      />
+      {/* Modal de Chat */}
+      <ChatModal
+        isOpen={isChatModalOpen}
+        onClose={() => {
+          setIsChatModalOpen(false);
+          setSelectedConversation(null);
+          setSelectedConversationId(null);
+        }}
+        conversation={selectedConversation}
+        messages={messages}
+        onSendMessage={sendMessage}
+        isSending={isSending}
       />
     </div>
 
