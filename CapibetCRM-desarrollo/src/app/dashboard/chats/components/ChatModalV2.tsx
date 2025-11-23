@@ -166,9 +166,9 @@ export default function ChatModalV2({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg w-full max-w-7xl h-[90vh] border border-border flex flex-col overflow-hidden shadow-2xl">
+      <div className="bg-background rounded-lg w-full max-w-7xl h-[90vh] border border-border flex flex-col shadow-2xl">
         {/* Botón de cerrar - posicionado de forma relativa dentro del flujo */}
-        <div className="flex-shrink-0 flex justify-end p-2 border-b border-border">
+        <div className="flex-shrink-0 flex justify-end p-2 border-b border-border bg-background">
           <button 
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground p-2 rounded-lg cursor-pointer transition-colors hover:bg-accent"
@@ -179,22 +179,24 @@ export default function ChatModalV2({
         </div>
 
         {/* Contenido del modal con ResizablePanel */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={showInfoPanel ? 75 : 100} minSize={50}>
-              <ChatArea
-                conversation={conversation}
-                messages={messages}
-                onSendMessage={handleSendMessage}
-                isSending={isSending}
-                onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
-              />
+        <div className="flex-1 min-h-0">
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel defaultSize={showInfoPanel ? 75 : 100} minSize={50} className="h-full">
+              <div className="h-full">
+                <ChatArea
+                  conversation={conversation}
+                  messages={messages}
+                  onSendMessage={handleSendMessage}
+                  isSending={isSending}
+                  onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
+                />
+              </div>
             </ResizablePanel>
 
             {showInfoPanel && conversation && (
               <>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="h-full">
                   <ContactInfoPanel
                     conversationId={conversation.id}
                     contactName={conversation.contact_name || conversation.pushname || 'Sin nombre'}
