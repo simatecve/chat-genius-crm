@@ -382,6 +382,27 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
         // Vincular conversación con lead si aún no está vinculada
         await linkConversationToLead(supabase, conversation.id, lead.id);
       }
+
+      // Llamar al agente de IA si hay uno activo
+      console.log('Checking for active AI agent...');
+      try {
+        const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-agent-response', {
+          body: {
+            conversationId: conversation.id,
+            userId: userId,
+            messageContent: messageContent,
+            sessionName: session
+          }
+        });
+
+        if (aiError) {
+          console.error('Error calling AI agent:', aiError);
+        } else {
+          console.log('AI agent response:', aiResult);
+        }
+      } catch (aiError) {
+        console.error('Exception calling AI agent:', aiError);
+      }
     } else {
       // Si es mensaje saliente y ya hay un lead vinculado, mantenerlo
       console.log('Outgoing message from user, lead handling skipped');
