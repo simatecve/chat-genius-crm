@@ -301,7 +301,7 @@ export default function Chat({ chat, onContactUpdate }: ChatProps) {
   }
 
   return (
-    <>
+    <div className="flex flex-col h-full overflow-hidden">
 
       {/* Header del chat */}
       <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] p-4 flex-shrink-0">
@@ -486,10 +486,10 @@ export default function Chat({ chat, onContactUpdate }: ChatProps) {
              </button>
           </div>
         )}
-      </div>
+    </div>
 
-      {/* Menú de información del contacto */}
-      <ContactInfoMenu
+    {/* Menú de información del contacto */}
+    <ContactInfoMenu
         isOpen={isContactInfoMenuOpen}
         onClose={() => setIsContactInfoMenuOpen(false)}
         contacto={chat.contacto}
