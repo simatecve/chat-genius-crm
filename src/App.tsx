@@ -13,8 +13,8 @@ import AIAgents from "./pages/AIAgents";
 import CreateAIAgent from "./pages/CreateAIAgent";
 import ContactLists from "./pages/ContactLists";
 import Contacts from "./pages/Contacts";
-import Campaigns from "./pages/Campaigns";
-import CreateCampaign from "./pages/CreateCampaign";
+import MassCampaigns from "./pages/MassCampaigns";
+import CreateMassCampaign from "./pages/CreateMassCampaign";
 import Settings from "./pages/Settings";
 import Leads from "./pages/Leads";
 import Conversations from "./pages/Conversations";
@@ -75,17 +75,17 @@ const App = () => (
             } />
             <Route path="/campanas-masivas" element={
               <ProtectedRoute>
-                <Campaigns />
+                <MassCampaigns />
               </ProtectedRoute>
             } />
-            <Route path="/crear-campana" element={
+            <Route path="/crear-campana-masiva" element={
               <ProtectedRoute>
-                <CreateCampaign />
+                <CreateMassCampaign />
               </ProtectedRoute>
             } />
-            <Route path="/crear-campana/:id" element={
+            <Route path="/crear-campana-masiva/:id" element={
               <ProtectedRoute>
-                <CreateCampaign />
+                <CreateMassCampaign />
               </ProtectedRoute>
             } />
             <Route path="/configuracion" element={

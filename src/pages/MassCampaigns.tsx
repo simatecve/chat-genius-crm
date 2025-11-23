@@ -11,16 +11,13 @@ import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Users, Clock 
 import { Database } from '@/integrations/supabase/types';
 import AppLayout from '@/components/layout/AppLayout';
 
-
 type Campaign = Database['public']['Tables']['mass_campaigns']['Row'];
-type ContactList = Database['public']['Tables']['contact_lists']['Row'];
 
-export function Campaigns() {
+export function MassCampaigns() {
   const { effectiveUserId } = useEffectiveUserId();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [contactLists, setContactLists] = useState<ContactList[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null);
@@ -28,7 +25,6 @@ export function Campaigns() {
   useEffect(() => {
     if (effectiveUserId) {
       fetchCampaigns();
-      fetchContactLists();
     }
   }, [effectiveUserId]);
 
@@ -53,23 +49,6 @@ export function Campaigns() {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchContactLists = async () => {
-    if (!effectiveUserId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('contact_lists')
-        .select('*')
-        .eq('user_id', effectiveUserId)
-        .order('name');
-
-      if (error) throw error;
-      setContactLists(data || []);
-    } catch (error) {
-      console.error('Error fetching contact lists:', error);
     }
   };
 
@@ -105,7 +84,6 @@ export function Campaigns() {
     setSendingCampaign(campaign.id);
     
     try {
-      // Cambiar el estado a 'sending' al iniciar el proceso
       const { error: updateError } = await supabase
         .from('mass_campaigns')
         .update({ status: 'sending' })
@@ -113,7 +91,6 @@ export function Campaigns() {
 
       if (updateError) throw updateError;
 
-      // Actualizar la campaña en el estado local
       setCampaigns(campaigns.map(c => 
         c.id === campaign.id ? { ...c, status: 'sending' } : c
       ));
@@ -145,12 +122,11 @@ export function Campaigns() {
 
       toast({
         title: 'Éxito',
-        description: 'Campaña iniciada correctamente. El estado se actualizará automáticamente.',
+        description: 'Campaña iniciada correctamente',
       });
     } catch (error) {
       console.error('Error sending campaign:', error);
       
-      // Si hay error, revertir el estado a 'ready'
       const { error: revertError } = await supabase
         .from('mass_campaigns')
         .update({ status: 'ready' })
@@ -176,12 +152,6 @@ export function Campaigns() {
     campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     campaign.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const getContactListName = (listId: string | null) => {
-    if (!listId) return 'Sin lista asignada';
-    const list = contactLists.find(l => l.id === listId);
-    return list?.name || 'Lista no encontrada';
-  };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -213,14 +183,13 @@ export function Campaigns() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Campañas Masivas</h1>
             <p className="text-muted-foreground">Gestiona tus campañas de WhatsApp</p>
           </div>
           <Button 
-            onClick={() => navigate('/crear-campana')}
+            onClick={() => navigate('/crear-campana-masiva')}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -228,7 +197,6 @@ export function Campaigns() {
           </Button>
         </div>
 
-        {/* Search */}
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
@@ -239,7 +207,6 @@ export function Campaigns() {
           />
         </div>
 
-        {/* Campaigns Grid */}
         {filteredCampaigns.length === 0 ? (
           <Card className="border-border">
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -255,7 +222,7 @@ export function Campaigns() {
               </p>
               {!searchTerm && (
                 <Button 
-                  onClick={() => navigate('/crear-campana')}
+                  onClick={() => navigate('/crear-campana-masiva')}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -286,21 +253,15 @@ export function Campaigns() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">
-                        {getContactListName(campaign.contact_list_id)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">
-                        {campaign.whatsapp_connection_name}
+                        {campaign.whatsapp_connection_name || 'Sin conexión'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">
-                        {campaign.min_delay}ms - {campaign.max_delay}ms
+                        {campaign.min_delay}s - {campaign.max_delay}s
                       </span>
                     </div>
                   </div>
@@ -309,7 +270,7 @@ export function Campaigns() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => navigate(`/crear-campana/${campaign.id}`)}
+                      onClick={() => navigate(`/crear-campana-masiva/${campaign.id}`)}
                       className="flex-1 border-border hover:bg-accent"
                     >
                       <Edit className="h-4 w-4 mr-1" />
@@ -325,7 +286,7 @@ export function Campaigns() {
                     </Button>
                   </div>
 
-                  {campaign.status !== 'sent' && (
+                  {campaign.status !== 'sent' && campaign.status !== 'sending' && (
                     <Button
                       onClick={() => handleSendCampaign(campaign)}
                       disabled={sendingCampaign === campaign.id}
@@ -354,4 +315,4 @@ export function Campaigns() {
   );
 }
 
-export default Campaigns;
+export default MassCampaigns;
