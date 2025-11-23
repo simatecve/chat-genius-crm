@@ -306,6 +306,21 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
 
     // Extraer datos del mensaje
     const messageData = payload;
+    const wahaMessageId = messageData.id;
+    
+    // Verificar si el mensaje ya fue procesado (deduplicación)
+    const { data: existingMessage } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('metadata->>waha_id', wahaMessageId)
+      .limit(1)
+      .maybeSingle();
+    
+    if (existingMessage) {
+      console.log(`Message ${wahaMessageId} already processed, skipping...`);
+      return;
+    }
+
     const phoneNumber = normalizePhoneNumber(messageData.from);
     const pushName = messageData._data?.pushName || null;
     let messageContent = messageData.body || '';
