@@ -132,14 +132,14 @@ const Leads = () => {
   };
 
   const loadColumns = async () => {
-    const query = supabase
+    let query = supabase
       .from('lead_columns')
       .select('*')
       .eq('user_id', user?.id);
 
-    // Filtrar por workspace si está seleccionado
+    // Filtrar por workspace si está seleccionado (incluir también columnas sin workspace)
     if (selectedWorkspace) {
-      query.eq('workspace_id', selectedWorkspace);
+      query = query.or(`workspace_id.eq.${selectedWorkspace},workspace_id.is.null`);
     }
 
     const { data, error } = await query.order('position');
@@ -185,11 +185,12 @@ const Leads = () => {
     let columnIds: string[] = [];
     
     if (selectedWorkspace) {
+      // Incluir columnas con workspace_id igual al seleccionado O sin workspace (null)
       const { data: columnsData, error: columnsError } = await supabase
         .from('lead_columns')
         .select('id')
         .eq('user_id', user?.id)
-        .eq('workspace_id', selectedWorkspace);
+        .or(`workspace_id.eq.${selectedWorkspace},workspace_id.is.null`);
       
       if (columnsError) {
         console.error('Error loading columns for leads:', columnsError);
