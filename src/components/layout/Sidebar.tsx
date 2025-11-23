@@ -57,6 +57,10 @@ export const Sidebar = () => {
       icon: UserPlus,
       href: '/leads'
     }, {
+      label: 'Contactos',
+      icon: Users,
+      href: '/contactos'
+    }, {
       label: 'Listas de Contactos',
       icon: Users,
       href: '/listas-contactos'
