@@ -13,6 +13,7 @@ import AIAgents from "./pages/AIAgents";
 import CreateAIAgent from "./pages/CreateAIAgent";
 import ContactLists from "./pages/ContactLists";
 import Contacts from "./pages/Contacts";
+import ContactsNew from "./pages/ContactsNew";
 import MassCampaigns from "./pages/MassCampaigns";
 import CreateMassCampaign from "./pages/CreateMassCampaign";
 import Settings from "./pages/Settings";
@@ -73,6 +74,11 @@ const App = () => (
             <Route path="/contactos/:listId" element={
               <ProtectedRoute>
                 <Contacts />
+              </ProtectedRoute>
+            } />
+            <Route path="/contactos" element={
+              <ProtectedRoute>
+                <ContactsNew />
               </ProtectedRoute>
             } />
             <Route path="/campanas-masivas" element={
