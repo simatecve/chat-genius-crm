@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Calendar, MapPin, Users, Filter, FileText, DollarSign, ChevronDown, ChevronUp, Plus, Edit2, Coins, TrendingUp, TrendingDown, UserPlus, Key, RefreshCw } from 'lucide-react';
+import { User, Calendar, MapPin, Users, Filter, FileText, DollarSign, ChevronDown, ChevronUp, Plus, Edit2, Coins, TrendingUp, TrendingDown, UserPlus, Key, RefreshCw, Bot, BotOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { casinoApiService } from '@/services/casinoApiService';
 import { supabase } from '@/integrations/supabase/client';
+import { useBotBlock } from '@/hooks/useBotBlock';
 
 interface ContactInfoPanelProps {
   conversationId: string;
@@ -28,12 +29,14 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 }) => {
   const { effectiveUserId } = useEffectiveUserId();
   const { toast } = useToast();
+  const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(phoneNumber, contactName);
   
   const [contactDetails, setContactDetails] = useState<ContactDetail | null>(null);
   const [sales, setSales] = useState<ContactSale[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     info: true,
+    bot: true,
     personal: true,
     agent: true,
     funnel: true,
@@ -357,6 +360,62 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                   <p className="font-medium ml-6">{formData.phone_number || phoneNumber}</p>
                 )}
               </div>
+            </div>
+          )}
+        </Card>
+
+        {/* CONTROL DE BOT */}
+        <Card className="p-3 bg-[#202c33] border-border/20">
+          <button
+            onClick={() => toggleSection('bot')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              {isBlocked ? (
+                <BotOff className="h-4 w-4 text-destructive" />
+              ) : (
+                <Bot className="h-4 w-4 text-green-500" />
+              )}
+              <h3 className="font-medium text-sm text-[#e9edef]">CONTROL DE BOT</h3>
+            </div>
+            {expandedSections.bot ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
+          </button>
+
+          {expandedSections.bot && (
+            <div className="mt-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[#e9edef] font-medium">
+                    Estado: {isBlocked ? 'Desactivado' : 'Activo'}
+                  </p>
+                  <p className="text-xs text-[#8696a0] mt-1">
+                    {isBlocked 
+                      ? 'El bot no responderá a este contacto' 
+                      : 'El bot puede responder automáticamente'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={toggleBotBlock}
+                disabled={isBotToggling}
+                variant={isBlocked ? 'default' : 'destructive'}
+                className="w-full"
+                size="sm"
+              >
+                {isBotToggling ? (
+                  'Procesando...'
+                ) : isBlocked ? (
+                  <>
+                    <Bot className="h-4 w-4 mr-2" />
+                    Activar Bot
+                  </>
+                ) : (
+                  <>
+                    <BotOff className="h-4 w-4 mr-2" />
+                    Desactivar Bot
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </Card>

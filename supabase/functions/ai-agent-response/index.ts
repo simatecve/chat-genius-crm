@@ -51,7 +51,58 @@ serve(async (req) => {
 
     console.log('Active agent found:', agent.name);
 
-    // 2. Obtener historial de mensajes de la conversación (últimos 10)
+    // 2. Verificar configuración global del bot para el usuario
+    const { data: botSettings } = await supabase
+      .from('user_bot_settings')
+      .select('bot_enabled')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (botSettings && !botSettings.bot_enabled) {
+      console.log('Bot globally disabled for user:', userId);
+      return new Response(
+        JSON.stringify({ 
+          processed: false, 
+          reason: 'Bot disabled' 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // 3. Verificar si el contacto específico tiene el bot bloqueado
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('phone_number')
+      .eq('id', conversationId)
+      .single();
+
+    if (conversation) {
+      const { data: blockedContact } = await supabase
+        .from('contacto_bloqueado_bot')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('numero', conversation.phone_number)
+        .maybeSingle();
+
+      if (blockedContact) {
+        console.log('Bot blocked for contact:', conversation.phone_number);
+        return new Response(
+          JSON.stringify({ 
+            processed: false, 
+            reason: 'Bot blocked for this contact' 
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      }
+    }
+
+    // 4. Obtener historial de mensajes de la conversación (últimos 10)
     const { data: messages, error: messagesError } = await supabase
       .from('messages')
       .select('content, direction, created_at')
@@ -73,7 +124,7 @@ serve(async (req) => {
 
     console.log('Conversation history length:', conversationHistory.length);
 
-    // 3. Llamar a Lovable AI con el agente configurado
+    // 5. Llamar a Lovable AI con el agente configurado
     const aiMessages = [
       {
         role: 'system',
@@ -121,18 +172,11 @@ serve(async (req) => {
 
     console.log('AI response received:', aiResponseText.substring(0, 100));
 
-    // 4. Obtener datos de la conversación para enviar respuesta
-    const { data: conversation, error: convError } = await supabase
-      .from('conversations')
-      .select('phone_number')
-      .eq('id', conversationId)
-      .single();
-
-    if (convError || !conversation) {
+    // 6. Enviar respuesta automática a través de WhatsApp (usar conversación ya obtenida)
+    if (!conversation) {
       throw new Error('Conversation not found');
     }
 
-    // 5. Enviar respuesta automática a través de WhatsApp
     const { data: sendResult, error: sendError } = await supabase.functions.invoke('waha-send-message', {
       body: {
         sessionName: sessionName,
