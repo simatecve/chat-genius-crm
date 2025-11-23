@@ -111,11 +111,11 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   switch (fileType) {
     case 'image':
       return (
-        <div className="mb-2">
+        <div className="mb-2 max-w-sm">
           <img 
             src={attachmentUrl} 
             alt="Imagen adjunta"
-            className="max-w-xs max-h-64 rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+            className="rounded-lg cursor-pointer hover:opacity-90 transition-opacity w-full h-auto"
             onClick={() => window.open(attachmentUrl, '_blank')}
             loading="lazy"
           />
@@ -124,11 +124,11 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
 
     case 'video':
       return (
-        <div className="mb-2">
+        <div className="mb-2 max-w-sm">
           <video 
             src={attachmentUrl} 
             controls 
-            className="max-w-xs max-h-64 rounded-md"
+            className="rounded-lg w-full h-auto"
             preload="metadata"
           />
         </div>
@@ -138,10 +138,10 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2">
           <div className={cn(
-            "flex items-center gap-3 p-3 rounded-lg min-w-[250px]",
+            "flex items-center gap-3 p-3 rounded-lg min-w-[280px]",
             isOutgoing 
-              ? "bg-primary/10" 
-              : "bg-background/50"
+              ? "bg-[#005c4b]/20" 
+              : "bg-[#202c33]"
           )}>
             <Button
               variant="ghost"
@@ -149,8 +149,8 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
               className={cn(
                 "h-10 w-10 rounded-full p-0",
                 isOutgoing 
-                  ? "hover:bg-primary-foreground/20" 
-                  : "hover:bg-muted/50"
+                  ? "hover:bg-white/10 text-white" 
+                  : "hover:bg-[#2a3942] text-[#00a884]"
               )}
               onClick={togglePlayPause}
               disabled={isLoading}
@@ -165,26 +165,41 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
             </Button>
 
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <Music className="h-4 w-4 opacity-70" />
-                <span className="text-sm font-medium truncate">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Music className={cn(
+                  "h-4 w-4",
+                  isOutgoing ? "text-white/70" : "text-[#8696a0]"
+                )} />
+                <span className={cn(
+                  "text-sm font-medium truncate",
+                  isOutgoing ? "text-white" : "text-[#e9edef]"
+                )}>
                   Audio
                 </span>
               </div>
               
               <div className="flex items-center gap-2">
                 <div 
-                  className="flex-1 h-1 bg-muted rounded-full cursor-pointer"
+                  className={cn(
+                    "flex-1 h-1.5 rounded-full cursor-pointer",
+                    isOutgoing ? "bg-white/20" : "bg-[#2a3942]"
+                  )}
                   onClick={handleSeek}
                 >
                   <div 
-                    className="h-full bg-primary rounded-full transition-all"
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      isOutgoing ? "bg-white" : "bg-[#00a884]"
+                    )}
                     style={{ 
                       width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' 
                     }}
                   />
                 </div>
-                <span className="text-xs opacity-70 min-w-[35px]">
+                <span className={cn(
+                  "text-xs min-w-[35px]",
+                  isOutgoing ? "text-white/70" : "text-[#8696a0]"
+                )}>
                   {duration > 0 ? formatTime(currentTime) : '0:00'}
                 </span>
               </div>
@@ -193,10 +208,15 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0"
+              className={cn(
+                "h-8 w-8 p-0",
+                isOutgoing 
+                  ? "hover:bg-white/10 text-white" 
+                  : "hover:bg-[#2a3942] text-[#8696a0]"
+              )}
               onClick={downloadFile}
             >
-              <Download className="h-3 w-3" />
+              <Download className="h-3.5 w-3.5" />
             </Button>
           </div>
 
@@ -217,69 +237,126 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
     case 'pdf':
       return (
         <div className="mb-2">
-          <div className={cn(
-            "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-90 transition-opacity",
-            isOutgoing 
-              ? "bg-primary/10" 
-              : "bg-background/50"
-          )}
-          onClick={() => window.open(attachmentUrl, '_blank')}
+          <a 
+            href={attachmentUrl}
+            download={fileName}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
           >
-            <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-red-600" />
+            <div className={cn(
+              "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-80 transition-opacity",
+              isOutgoing 
+                ? "bg-[#005c4b]/20" 
+                : "bg-[#202c33]"
+            )}>
+              <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                <FileText className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-sm font-medium truncate",
+                  isOutgoing ? "text-white" : "text-[#e9edef]"
+                )}>
+                  {fileName}
+                </p>
+                <p className={cn(
+                  "text-xs",
+                  isOutgoing ? "text-white/70" : "text-[#8696a0]"
+                )}>
+                  Documento PDF
+                </p>
+              </div>
+              <Download className={cn(
+                "h-4 w-4 flex-shrink-0",
+                isOutgoing ? "text-white/70" : "text-[#8696a0]"
+              )} />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium truncate">{fileName}</p>
-              <p className="text-xs opacity-70">Documento PDF</p>
-            </div>
-            <Download className="h-4 w-4 opacity-70" />
-          </div>
+          </a>
         </div>
       );
 
     case 'document':
       return (
         <div className="mb-2">
-          <div className={cn(
-            "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-90 transition-opacity",
-            isOutgoing 
-              ? "bg-primary/10" 
-              : "bg-background/50"
-          )}
-          onClick={() => window.open(attachmentUrl, '_blank')}
+          <a 
+            href={attachmentUrl}
+            download={fileName}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
           >
-            <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-blue-600" />
+            <div className={cn(
+              "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-80 transition-opacity",
+              isOutgoing 
+                ? "bg-[#005c4b]/20" 
+                : "bg-[#202c33]"
+            )}>
+              <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <FileText className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-sm font-medium truncate",
+                  isOutgoing ? "text-white" : "text-[#e9edef]"
+                )}>
+                  {fileName}
+                </p>
+                <p className={cn(
+                  "text-xs",
+                  isOutgoing ? "text-white/70" : "text-[#8696a0]"
+                )}>
+                  Documento Word
+                </p>
+              </div>
+              <Download className={cn(
+                "h-4 w-4 flex-shrink-0",
+                isOutgoing ? "text-white/70" : "text-[#8696a0]"
+              )} />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium truncate">{fileName}</p>
-              <p className="text-xs opacity-70">Documento</p>
-            </div>
-            <Download className="h-4 w-4 opacity-70" />
-          </div>
+          </a>
         </div>
       );
 
     default:
       return (
         <div className="mb-2">
-          <div className={cn(
-            "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-90 transition-opacity",
-            isOutgoing 
-              ? "bg-primary/10" 
-              : "bg-background/50"
-          )}
-          onClick={downloadFile}
+          <a 
+            href={attachmentUrl}
+            download={fileName}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
           >
-            <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-gray-600" />
+            <div className={cn(
+              "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-80 transition-opacity",
+              isOutgoing 
+                ? "bg-[#005c4b]/20" 
+                : "bg-[#202c33]"
+            )}>
+              <div className="h-10 w-10 rounded-lg bg-gray-500/20 flex items-center justify-center flex-shrink-0">
+                <FileText className="h-5 w-5 text-gray-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-sm font-medium truncate",
+                  isOutgoing ? "text-white" : "text-[#e9edef]"
+                )}>
+                  {fileName}
+                </p>
+                <p className={cn(
+                  "text-xs",
+                  isOutgoing ? "text-white/70" : "text-[#8696a0]"
+                )}>
+                  Archivo adjunto
+                </p>
+              </div>
+              <Download className={cn(
+                "h-4 w-4 flex-shrink-0",
+                isOutgoing ? "text-white/70" : "text-[#8696a0]"
+              )} />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium truncate">{fileName}</p>
-              <p className="text-xs opacity-70">Archivo adjunto</p>
-            </div>
-            <Download className="h-4 w-4 opacity-70" />
-          </div>
+          </a>
         </div>
       );
   }
