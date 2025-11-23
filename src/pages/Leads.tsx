@@ -78,6 +78,61 @@ const Leads = () => {
   // Hook para mensajes del chat seleccionado
   const { messages, sendMessage, isSending } = useMessages(selectedConversationId);
 
+  // Manejar envío de mensaje desde el modal
+  const handleSendMessage = async (messageText: string, attachment?: File) => {
+    if ((!messageText.trim() && !attachment) || !selectedConversation || !user) return;
+
+    try {
+      // Obtener la sesión de WhatsApp asociada al usuario
+      const { data: whatsappConnection, error: connectionError } = await supabase
+        .from('whatsapp_connections')
+        .select('name')
+        .eq('user_id', user.id)
+        .eq('status', 'WORKING')
+        .limit(1)
+        .single();
+
+      if (connectionError || !whatsappConnection) {
+        console.error('No active WhatsApp connection found');
+        toast({
+          title: "Error",
+          description: "No se encontró una conexión activa de WhatsApp",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const sessionName = whatsappConnection.name;
+      const phoneNumber = selectedConversation.phone_number;
+
+      // Por ahora solo soportamos mensajes de texto
+      if (attachment) {
+        console.warn('Attachments not yet supported with WAHA');
+        toast({
+          title: "No soportado",
+          description: "El envío de archivos aún no está disponible",
+          variant: "default"
+        });
+        return;
+      }
+
+      await sendMessage({
+        conversationId: selectedConversation.id,
+        userId: user.id,
+        message: messageText.trim(),
+        sessionName: sessionName,
+        phoneNumber: phoneNumber
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el mensaje",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Función para manejar click en lead y abrir conversación en modal
   const handleLeadClick = async (lead: LeadWithColumn) => {
     // Si el lead tiene conversaciones asociadas, abrir modal con la primera
@@ -876,7 +931,7 @@ const Leads = () => {
                                 {lead.name}
                               </p>
                               {lead.conversations && lead.conversations.length > 0 && (
-                                <MessageSquare className="h-3.5 w-3.5 text-primary flex-shrink-0" title="Tiene conversaciones" />
+                                <MessageSquare className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                               )}
                             </div>
                             {lead.phone && (
@@ -1105,7 +1160,7 @@ const Leads = () => {
         }}
         conversation={selectedConversation}
         messages={messages}
-        onSendMessage={sendMessage}
+        onSendMessage={handleSendMessage}
         isSending={isSending}
       />
     </div>

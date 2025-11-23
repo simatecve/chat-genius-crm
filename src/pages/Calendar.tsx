@@ -12,9 +12,11 @@ interface Task extends TareaResponse {
 }
 
 interface Usuario {
-    id: number;
-    nombre: string;
-    rol: string;
+    id: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+    profile_type: string | null;
 }
 
 const categorias = [
@@ -67,11 +69,11 @@ export default function Calendar() {
             return;
         }
 
-        // Get user details from usuarios table
+        // Get user details from profiles table
         const { data: userData } = await supabase
-            .from('usuarios')
+            .from('profiles')
             .select('*')
-            .eq('email', user.email)
+            .eq('id', user.id)
             .single();
 
         setCurrentUser(userData);
@@ -83,9 +85,9 @@ export default function Calendar() {
     const loadUsuarios = async () => {
         try {
             const { data, error } = await supabase
-                .from('usuarios')
-                .select('id, nombre, rol')
-                .order('nombre');
+                .from('profiles')
+                .select('id, email, first_name, last_name, profile_type')
+                .order('email');
 
             if (error) {
                 console.error('Error al cargar usuarios:', error);
@@ -104,12 +106,12 @@ export default function Calendar() {
         try {
             let result;
 
-            // Filtrar tareas según el rol del usuario
-            if (user?.rol === 'Comercial') {
-                // Los usuarios Comercial solo ven tareas asignadas a ellos
+            // Filtrar tareas según el tipo de perfil del usuario
+            if (user?.profile_type === 'client') {
+                // Los usuarios client solo ven tareas asignadas a ellos
                 result = await taskServices.getTareasByUser(user.id);
             } else {
-                // Los usuarios Admin ven todas las tareas
+                // Los usuarios admin/superadmin ven todas las tareas
                 result = await taskServices.getAllTareas();
             }
 
@@ -117,14 +119,14 @@ export default function Calendar() {
                 // Enriquecer tareas con información de usuarios y colores
                 const enrichedTasks = result.data.map((task: TareaResponse) => {
                     const categoria = categorias.find(c => c.id === task.categoria);
-                    const usuario = usuarios.find(u => u.id === task.asignada);
+                    const usuario = usuarios.find(u => u.id === task.asignada?.toString());
 
                     return {
                         ...task,
                         hora: task.hora || '09:00',
                         color: categoria?.color || '#4ecdc4',
                         completada: false,
-                        asignado_nombre: usuario?.nombre || undefined
+                        asignado_nombre: usuario ? `${usuario.first_name || ''} ${usuario.last_name || ''}`.trim() || usuario.email : undefined
                     };
                 });
 
@@ -343,7 +345,7 @@ export default function Calendar() {
                             ))}
                         </div>
 
-                        {currentUser?.rol !== 'Comercial' && (
+                        {currentUser?.profile_type !== 'client' && (
                             <button
                                 onClick={() => openNewTaskModal(selectedDate)}
                                 className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
@@ -730,7 +732,11 @@ export default function Calendar() {
                                     >
                                         <option value={0}>Sin asignar</option>
                                         {usuarios.map((user) => (
-                                            <option key={user.id} value={user.id}>{user.nombre}</option>
+                                            <option key={user.id} value={user.id}>
+                                                {user.first_name && user.last_name 
+                                                    ? `${user.first_name} ${user.last_name}` 
+                                                    : user.email}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
