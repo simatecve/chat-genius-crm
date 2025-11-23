@@ -166,18 +166,20 @@ export default function ChatModalV2({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg w-full max-w-7xl h-[90vh] border border-border relative flex flex-col overflow-hidden shadow-2xl">
-        {/* Botón de cerrar */}
-        <button 
-          onClick={onClose}
-          className="absolute top-3 right-3 z-[100] text-muted-foreground hover:text-foreground p-2 rounded-lg cursor-pointer transition-colors bg-background/95 border border-border shadow-lg hover:bg-accent"
-          title="Cerrar"
-        >
-          <X className="w-5 h-5" />
-        </button>
+      <div className="bg-background rounded-lg w-full max-w-7xl h-[90vh] border border-border flex flex-col overflow-hidden shadow-2xl">
+        {/* Botón de cerrar - posicionado de forma relativa dentro del flujo */}
+        <div className="flex-shrink-0 flex justify-end p-2 border-b border-border">
+          <button 
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground p-2 rounded-lg cursor-pointer transition-colors hover:bg-accent"
+            title="Cerrar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Contenido del modal con ResizablePanel */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={showInfoPanel ? 75 : 100} minSize={50}>
               <ChatArea
