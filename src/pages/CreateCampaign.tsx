@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/integrations/supabase/types';
+import AppLayout from '@/components/layout/AppLayout';
 
 type ContactList = Database['public']['Tables']['contact_lists']['Row'];
 type WhatsAppConnection = Database['public']['Tables']['whatsapp_connections']['Row'];
@@ -374,7 +375,8 @@ const CreateCampaign = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <AppLayout>
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -650,6 +652,7 @@ const CreateCampaign = () => {
           </CardContent>
         </Card>
       </div>
+    </AppLayout>
   );
 };
 
