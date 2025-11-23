@@ -528,40 +528,19 @@ const CreateMassCampaign = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {whatsappConnections.map((connection) => {
-                        const displayName = connection.name || connection.phone_number;
-                        const statusColor = connection.status === 'connected' ? 'text-green-500' : 'text-muted-foreground';
-                        const statusText = connection.status === 'connected' ? '● Conectada' : '○ Desconectada';
+                        const sessionName = connection.name || connection.phone_number;
                         
                         return (
                           <SelectItem 
                             key={connection.id} 
-                            value={displayName}
-                            disabled={connection.status !== 'connected'}
+                            value={sessionName}
                           >
-                            <div className="flex items-center justify-between w-full">
-                              <span>{displayName}</span>
-                              <span className={`text-xs ml-2 ${statusColor}`}>
-                                {statusText}
-                              </span>
-                            </div>
+                            {sessionName}
                           </SelectItem>
                         );
                       })}
                     </SelectContent>
                   </Select>
-                )}
-                {whatsappConnections.length > 0 && whatsappConnections.every(c => c.status !== 'connected') && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Todas las sesiones están desconectadas. Por favor, conecta una sesión desde{' '}
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="p-0 h-auto text-xs text-primary"
-                      onClick={() => navigate('/conexiones-whatsapp')}
-                    >
-                      Conexiones de WhatsApp
-                    </Button>
-                  </p>
                 )}
               </div>
 
