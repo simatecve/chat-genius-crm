@@ -75,7 +75,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
             </Button>
           </div>
         </div>
-
       </div>
 
       {/* Filtro de Embudos */}
@@ -97,34 +96,33 @@ const ConversationList: React.FC<ConversationListProps> = ({
           className="pl-10"
         />
       </div>
-    </div>
 
-      {/* Lista de conversaciones */ }
-  <ScrollArea className="flex-1">
-    {isLoading ? (
-      <div className="p-4 text-center text-muted-foreground">
-        Cargando conversaciones...
-      </div>
-    ) : conversations.length === 0 ? (
-      <div className="p-4 text-center text-muted-foreground">
-        {searchTerm ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
-      </div>
-    ) : (
-      <div className="divide-y divide-border">
-        {conversations.map((conversation) => (
-          <ConversationItem
-            key={conversation.id}
-            conversation={conversation}
-            isSelected={selectedConversation?.id === conversation.id}
-            onSelect={() => onSelectConversation(conversation)}
-            formatTime={formatTime}
-            getInitials={getInitials}
-          />
-        ))}
-      </div>
-    )}
-  </ScrollArea>
-    </div >
+      {/* Lista de conversaciones */}
+      <ScrollArea className="flex-1">
+        {isLoading ? (
+          <div className="p-4 text-center text-muted-foreground">
+            Cargando conversaciones...
+          </div>
+        ) : conversations.length === 0 ? (
+          <div className="p-4 text-center text-muted-foreground">
+            {searchTerm ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {conversations.map((conversation) => (
+              <ConversationItem
+                key={conversation.id}
+                conversation={conversation}
+                isSelected={selectedConversation?.id === conversation.id}
+                onSelect={() => onSelectConversation(conversation)}
+                formatTime={formatTime}
+                getInitials={getInitials}
+              />
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+    </div>
   );
 };
 

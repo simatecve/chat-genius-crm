@@ -559,6 +559,36 @@ export type Database = {
           },
         ]
       }
+      etiquetas: {
+        Row: {
+          color: string
+          creado_en: string
+          creado_por: string | null
+          descripcion: string | null
+          id: string
+          nombre: string
+          organizacion_id: string | null
+        }
+        Insert: {
+          color?: string
+          creado_en?: string
+          creado_por?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          organizacion_id?: string | null
+        }
+        Update: {
+          color?: string
+          creado_en?: string
+          creado_por?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          organizacion_id?: string | null
+        }
+        Relationships: []
+      }
       internal_messages: {
         Row: {
           content: string
@@ -1195,6 +1225,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tareas: {
+        Row: {
+          asignada: number | null
+          categoria: string
+          creado_por: number | null
+          created_at: string
+          descripion: string | null
+          fecha: string
+          hora: string | null
+          id: number
+          prioridad: string
+          titulo: string
+        }
+        Insert: {
+          asignada?: number | null
+          categoria?: string
+          creado_por?: number | null
+          created_at?: string
+          descripion?: string | null
+          fecha: string
+          hora?: string | null
+          id?: number
+          prioridad?: string
+          titulo: string
+        }
+        Update: {
+          asignada?: number | null
+          categoria?: string
+          creado_por?: number | null
+          created_at?: string
+          descripion?: string | null
+          fecha?: string
+          hora?: string | null
+          id?: number
+          prioridad?: string
+          titulo?: string
+        }
+        Relationships: []
       }
       usage_tracking: {
         Row: {
