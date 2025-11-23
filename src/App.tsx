@@ -18,6 +18,7 @@ import CreateMassCampaign from "./pages/CreateMassCampaign";
 import Settings from "./pages/Settings";
 import Leads from "./pages/Leads";
 import Conversations from "./pages/Conversations";
+import InternalChat from "./pages/InternalChat";
 import Sales from "./pages/Sales";
 import PaymentPlans from "./pages/PaymentPlans";
 import PaymentSuccess from "./pages/PaymentSuccess";
@@ -102,6 +103,11 @@ const App = () => (
             <Route path="/conversaciones" element={
               <ProtectedRoute>
                 <Conversations />
+              </ProtectedRoute>
+            } />
+            <Route path="/chat-interno" element={
+              <ProtectedRoute>
+                <InternalChat />
               </ProtectedRoute>
             } />
             <Route path="/ventas" element={
