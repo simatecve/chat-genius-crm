@@ -1,35 +1,34 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface EmbudoData {
-    nombre: string;
-    descripcion?: string;
-    espacio_id: string;
-    orden?: number;
+    name: string;
+    position: number;
     color?: string;
 }
 
 export interface EmbudoResponse {
     id: string;
-    nombre: string;
-    descripcion?: string;
-    creado_por?: string;
-    creado_en: string;
-    espacio_id: string;
-    orden: number;
-    color: string;
+    name: string;
+    user_id: string;
+    position: number;
+    color: string | null;
+    is_default: boolean | null;
+    workspace_id: string | null;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 class EmbudoServices {
     /**
-     * Obtiene todos los embudos de un espacio de trabajo
+     * Obtiene todas las columnas (embudos) de un espacio de trabajo
      */
-    async getEmbudosByEspacio(espacioId: string): Promise<{ success: boolean; data?: EmbudoResponse[]; error?: string }> {
+    async getEmbudosByEspacio(workspaceId: string): Promise<{ success: boolean; data?: EmbudoResponse[]; error?: string }> {
         try {
             const { data, error } = await supabase
-                .from('embudos')
+                .from('lead_columns')
                 .select('*')
-                .eq('espacio_id', espacioId)
-                .order('orden', { ascending: true });
+                .eq('workspace_id', workspaceId)
+                .order('position', { ascending: true });
 
             if (error) {
                 console.error('Error al obtener embudos:', error);
@@ -53,9 +52,9 @@ class EmbudoServices {
     }
 
     /**
-     * Crea un nuevo embudo
+     * Crea una nueva columna (embudo)
      */
-    async createEmbudo(embudoData: EmbudoData): Promise<{ success: boolean; data?: EmbudoResponse; error?: string }> {
+    async createEmbudo(embudoData: EmbudoData & { workspace_id: string }): Promise<{ success: boolean; data?: EmbudoResponse; error?: string }> {
         try {
             const { data: { user } } = await supabase.auth.getUser();
 
@@ -64,10 +63,13 @@ class EmbudoServices {
             }
 
             const { data, error } = await supabase
-                .from('embudos')
+                .from('lead_columns')
                 .insert([{
-                    ...embudoData,
-                    creado_por: user.id
+                    name: embudoData.name,
+                    position: embudoData.position,
+                    color: embudoData.color || '#3b82f6',
+                    workspace_id: embudoData.workspace_id,
+                    user_id: user.id
                 }])
                 .select()
                 .single();
@@ -94,12 +96,12 @@ class EmbudoServices {
     }
 
     /**
-     * Actualiza un embudo
+     * Actualiza una columna (embudo)
      */
     async updateEmbudo(id: string, embudoData: Partial<EmbudoData>): Promise<{ success: boolean; data?: EmbudoResponse; error?: string }> {
         try {
             const { data, error } = await supabase
-                .from('embudos')
+                .from('lead_columns')
                 .update(embudoData)
                 .eq('id', id)
                 .select()
@@ -127,12 +129,12 @@ class EmbudoServices {
     }
 
     /**
-     * Elimina un embudo
+     * Elimina una columna (embudo)
      */
     async deleteEmbudo(id: string): Promise<{ success: boolean; error?: string }> {
         try {
             const { error } = await supabase
-                .from('embudos')
+                .from('lead_columns')
                 .delete()
                 .eq('id', id);
 

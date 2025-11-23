@@ -48,10 +48,10 @@ export default function EmbudosFilter({
                                         ? 'bg-blue-600 text-white shadow-md scale-105'
                                         : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 border border-gray-200 dark:border-gray-600 hover:scale-105'
                                     }`}
-                                title={embudo.descripcion || embudo.nombre}
+                                title={embudo.name}
                             >
                                 <span className="flex items-center space-x-2">
-                                    <span>{embudo.nombre}</span>
+                                    <span>{embudo.name}</span>
                                 </span>
                             </button>
                         );
