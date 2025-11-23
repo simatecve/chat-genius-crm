@@ -304,46 +304,47 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   };
 
   return (
-    <div className="w-80 border-l border-border bg-card overflow-y-auto">
+    <div className="w-80 border-l border-border/20 bg-[#111b21] overflow-y-auto">
       <div className="p-4 space-y-4">
         {/* Header con botón de editar */}
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Información</h2>
+          <h2 className="text-lg font-semibold text-[#e9edef]">Información</h2>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setIsEditing(!isEditing)}
+            className="text-[#8696a0] hover:text-[#e9edef]"
           >
             <Edit2 className="h-4 w-4" />
           </Button>
         </div>
 
         {/* INFORMACIÓN */}
-        <Card className="p-3">
+        <Card className="p-3 bg-[#202c33] border-border/20">
           <button
             onClick={() => toggleSection('info')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <User className="h-4 w-4 text-primary" />
-              <h3 className="font-medium text-sm">INFORMACIÓN</h3>
+              <User className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#e9edef]">INFORMACIÓN</h3>
             </div>
-            {expandedSections.info ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expandedSections.info ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
           {expandedSections.info && (
             <div className="mt-3 space-y-3 text-sm">
               <div className="flex items-center space-x-2">
-                <User className="h-4 w-4 text-muted-foreground" />
+                <User className="h-4 w-4 text-[#8696a0]" />
                 <div className="w-full">
-                  <p className="text-xs text-muted-foreground">Nombre</p>
-                  <p className="font-medium">{contactName}</p>
+                  <p className="text-xs text-[#8696a0]">Nombre</p>
+                  <p className="font-medium text-[#e9edef]">{contactName}</p>
                 </div>
               </div>
               <div>
                 <div className="flex items-center space-x-2 mb-1">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                  <Users className="h-4 w-4 text-[#8696a0]" />
+                  <p className="text-xs text-[#8696a0]">Teléfono</p>
                 </div>
                 {isEditing ? (
                   <Input
@@ -361,16 +362,16 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         </Card>
 
         {/* DATOS PERSONALES */}
-        <Card className="p-3">
+        <Card className="p-3 bg-[#202c33] border-border/20">
           <button
             onClick={() => toggleSection('personal')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <User className="h-4 w-4 text-primary" />
-              <h3 className="font-medium text-sm">DATOS PERSONALES</h3>
+              <User className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#e9edef]">DATOS PERSONALES</h3>
             </div>
-            {expandedSections.personal ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expandedSections.personal ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
           {expandedSections.personal && (
@@ -427,16 +428,16 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         </Card>
 
         {/* AGENTE */}
-        <Card className="p-3">
+        <Card className="p-3 bg-[#202c33] border-border/20">
           <button
             onClick={() => toggleSection('agent')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <Users className="h-4 w-4 text-primary" />
-              <h3 className="font-medium text-sm">AGENTE</h3>
+              <Users className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#e9edef]">AGENTE</h3>
             </div>
-            {expandedSections.agent ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expandedSections.agent ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
           {expandedSections.agent && (
@@ -456,16 +457,16 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         </Card>
 
         {/* EMBUDO */}
-        <Card className="p-3">
+        <Card className="p-3 bg-[#202c33] border-border/20">
           <button
             onClick={() => toggleSection('funnel')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-primary" />
-              <h3 className="font-medium text-sm">EMBUDO</h3>
+              <Filter className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#e9edef]">EMBUDO</h3>
             </div>
-            {expandedSections.funnel ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expandedSections.funnel ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
           {expandedSections.funnel && (
@@ -485,16 +486,16 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         </Card>
 
         {/* NOTAS */}
-        <Card className="p-3">
+        <Card className="p-3 bg-[#202c33] border-border/20">
           <button
             onClick={() => toggleSection('notes')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <h3 className="font-medium text-sm">NOTAS</h3>
+              <FileText className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#e9edef]">NOTAS</h3>
             </div>
-            {expandedSections.notes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expandedSections.notes ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
           {expandedSections.notes && (
@@ -514,16 +515,16 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         </Card>
 
         {/* VENTAS */}
-        <Card className="p-3">
+        <Card className="p-3 bg-[#202c33] border-border/20">
           <button
             onClick={() => toggleSection('sales')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4 text-success" />
-              <h3 className="font-medium text-sm">VENTAS</h3>
+              <DollarSign className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#e9edef]">VENTAS</h3>
             </div>
-            {expandedSections.sales ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expandedSections.sales ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
           {expandedSections.sales && (
@@ -599,16 +600,16 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         </Card>
 
         {/* CASINO */}
-        <Card className="p-3 border-[#22c55e]">
+        <Card className="p-3 bg-[#202c33] border-[#00a884]">
           <button
             onClick={() => toggleSection('casino')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <Coins className="h-4 w-4 text-[#22c55e]" />
-              <h3 className="font-medium text-sm text-[#22c55e]">CASINO</h3>
+              <Coins className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#00a884]">CASINO / BALANCE</h3>
             </div>
-            {expandedSections.casino ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expandedSections.casino ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
           {expandedSections.casino && (
