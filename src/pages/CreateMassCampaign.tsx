@@ -72,8 +72,7 @@ const CreateMassCampaign = () => {
           .from('whatsapp_connections')
           .select('*')
           .eq('user_id', user?.id)
-          .eq('status', 'connected')
-          .order('name')
+          .order('created_at', { ascending: false })
       ]);
 
       if (listsResult.error) throw listsResult.error;
@@ -505,21 +504,65 @@ const CreateMassCampaign = () => {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="whatsapp_connection">Sesión de WhatsApp *</Label>
-                <Select
-                  value={formData.whatsapp_connection_name}
-                  onValueChange={(value) => setFormData({ ...formData, whatsapp_connection_name: value })}
-                >
-                  <SelectTrigger className="bg-background border-border">
-                    <SelectValue placeholder="Selecciona una sesión" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {whatsappConnections.map((connection) => (
-                      <SelectItem key={connection.id} value={connection.name || connection.phone_number}>
-                        {connection.name || connection.phone_number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {whatsappConnections.length === 0 ? (
+                  <div className="p-4 border border-border rounded-md bg-muted/50">
+                    <p className="text-sm text-muted-foreground">
+                      No hay sesiones de WhatsApp configuradas.{' '}
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="p-0 h-auto text-primary"
+                        onClick={() => navigate('/conexiones-whatsapp')}
+                      >
+                        Crear una sesión
+                      </Button>
+                    </p>
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.whatsapp_connection_name}
+                    onValueChange={(value) => setFormData({ ...formData, whatsapp_connection_name: value })}
+                  >
+                    <SelectTrigger className="bg-background border-border">
+                      <SelectValue placeholder="Selecciona una sesión" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {whatsappConnections.map((connection) => {
+                        const displayName = connection.name || connection.phone_number;
+                        const statusColor = connection.status === 'connected' ? 'text-green-500' : 'text-muted-foreground';
+                        const statusText = connection.status === 'connected' ? '● Conectada' : '○ Desconectada';
+                        
+                        return (
+                          <SelectItem 
+                            key={connection.id} 
+                            value={displayName}
+                            disabled={connection.status !== 'connected'}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{displayName}</span>
+                              <span className={`text-xs ml-2 ${statusColor}`}>
+                                {statusText}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+                {whatsappConnections.length > 0 && whatsappConnections.every(c => c.status !== 'connected') && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Todas las sesiones están desconectadas. Por favor, conecta una sesión desde{' '}
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="p-0 h-auto text-xs text-primary"
+                      onClick={() => navigate('/conexiones-whatsapp')}
+                    >
+                      Conexiones de WhatsApp
+                    </Button>
+                  </p>
+                )}
               </div>
 
               <div>
