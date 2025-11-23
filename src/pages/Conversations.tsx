@@ -20,6 +20,7 @@ const Conversations = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [newMessage, setNewMessage] = useState('');
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
@@ -108,9 +109,10 @@ const Conversations = () => {
         messages={messages}
         onSendMessage={handleSendMessage}
         isSending={isSending}
+        onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
       />
 
-      {selectedConversation && (
+      {selectedConversation && showInfoPanel && (
         <ContactInfoPanel
           conversationId={selectedConversation.id}
           contactName={selectedConversation.contact_name || selectedConversation.pushname || 'Contacto'}

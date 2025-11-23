@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Phone, MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap } from 'lucide-react';
+import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -26,6 +26,7 @@ interface ChatAreaProps {
   messages: Message[];
   onSendMessage: (message: string, attachment?: File) => void;
   isSending: boolean;
+  onToggleInfoPanel: () => void;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -33,6 +34,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   messages,
   onSendMessage,
   isSending,
+  onToggleInfoPanel,
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -175,7 +177,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-            <Phone className="h-12 w-12 text-muted-foreground" />
+            <MessageSquare className="h-12 w-12 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium mb-2">Selecciona una conversación</h3>
           <p className="text-muted-foreground">
@@ -215,9 +217,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               onLeadAssigned={(lead) => {
                 console.log('Lead asignado:', lead);
               }}
+              iconOnly
             />
-            <Button variant="ghost" size="sm">
-              <Phone className="h-4 w-4" />
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={onToggleInfoPanel}
+              title="Mostrar/Ocultar información del contacto"
+            >
+              <UserCircle className="h-4 w-4" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
