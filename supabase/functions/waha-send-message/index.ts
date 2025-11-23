@@ -39,18 +39,37 @@ serve(async (req) => {
     });
 
     // Formatear número de teléfono para WAHA
-    // Formato: número@c.us (sin el + y sin espacios)
+    // Los números pueden tener dos formatos:
+    // - @c.us para números regulares
+    // - @lid para números de canales/listas de difusión
     const formattedPhone = phoneNumber.replace(/[^0-9]/g, '');
-    const chatId = `${formattedPhone}@c.us`;
+    
+    // Determinar el sufijo correcto según el número
+    // Los números que empiezan con ciertos patrones usan @lid
+    let chatId: string;
+    if (phoneNumber.includes('@lid') || phoneNumber.includes('@newsletter')) {
+      // Ya viene con el formato correcto
+      chatId = phoneNumber;
+    } else if (phoneNumber.includes('@c.us')) {
+      // Ya viene con el formato correcto
+      chatId = phoneNumber;
+    } else {
+      // Formatear el número
+      // Los números de grupos/canales pueden tener formato especial
+      chatId = `${formattedPhone}@c.us`;
+    }
 
     console.log('Formatted chatId:', chatId);
 
-    // Enviar mensaje a WAHA
+    // Enviar mensaje a WAHA según documentación oficial
     const wahaUrl = `${WAHA_BASE_URL}/api/sendText`;
     const wahaPayload = {
-      session: sessionName,
       chatId: chatId,
-      text: message
+      text: message,
+      session: sessionName,
+      linkPreview: true,
+      linkPreviewHighQuality: false,
+      reply_to: null
     };
 
     console.log('WAHA request:', { url: wahaUrl, payload: wahaPayload });
