@@ -181,9 +181,32 @@ const Leads = () => {
   };
 
   const loadLeads = async () => {
-    // Las políticas RLS se encargan del filtrado automáticamente
-    // Solo se mostrarán leads con user_id del usuario o instancias que le pertenecen
-    const { data, error } = await supabase
+    // Si hay workspace seleccionado, primero obtener los IDs de las columnas
+    let columnIds: string[] = [];
+    
+    if (selectedWorkspace) {
+      const { data: columnsData, error: columnsError } = await supabase
+        .from('lead_columns')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('workspace_id', selectedWorkspace);
+      
+      if (columnsError) {
+        console.error('Error loading columns for leads:', columnsError);
+        return;
+      }
+      
+      columnIds = columnsData?.map(col => col.id) || [];
+      
+      // Si no hay columnas en el workspace, no hay leads que mostrar
+      if (columnIds.length === 0) {
+        setLeads([]);
+        return;
+      }
+    }
+
+    // Construir query de leads
+    let query = supabase
       .from('leads')
       .select(`
         *,
@@ -196,8 +219,14 @@ const Leads = () => {
           last_message_time,
           unread_count
         )
-      `)
-      .order('position');
+      `);
+    
+    // Filtrar por columnas del workspace si está seleccionado
+    if (selectedWorkspace && columnIds.length > 0) {
+      query = query.in('column_id', columnIds);
+    }
+    
+    const { data, error } = await query.order('position');
 
     if (error) {
       console.error('Error loading leads:', error);
