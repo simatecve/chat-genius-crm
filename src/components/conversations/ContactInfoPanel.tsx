@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { casinoApiService } from '@/services/casinoApiService';
 import { supabase } from '@/integrations/supabase/client';
 import { useBotBlock } from '@/hooks/useBotBlock';
+import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
 
 interface ContactInfoPanelProps {
   conversationId: string;
@@ -34,6 +35,8 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   const [contactDetails, setContactDetails] = useState<ContactDetail | null>(null);
   const [sales, setSales] = useState<ContactSale[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [embudos, setEmbudos] = useState<EmbudoResponse[]>([]);
+  const [currentEmbudo, setCurrentEmbudo] = useState<EmbudoResponse | null>(null);
   const [expandedSections, setExpandedSections] = useState({
     info: true,
     bot: true,
@@ -75,7 +78,66 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
   useEffect(() => {
     loadContactDetails();
+    loadEmbudos();
   }, [conversationId]);
+
+  const loadEmbudos = async () => {
+    try {
+      // Cargar workspaces del usuario
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: workspacesData } = await supabase
+        .from('workspaces')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('position');
+
+      if (workspacesData && workspacesData.length > 0) {
+        // Cargar embudos de todos los workspaces
+        const allEmbudos: EmbudoResponse[] = [];
+        for (const workspace of workspacesData) {
+          const response = await embudoServices.getEmbudosByEspacio(workspace.id);
+          if (response.success && response.data) {
+            allEmbudos.push(...response.data);
+          }
+        }
+        setEmbudos(allEmbudos);
+
+        // Cargar embudo actual de la conversación
+        const { data: convData } = await supabase
+          .from('conversations')
+          .select('lead_id')
+          .eq('id', conversationId)
+          .single();
+
+        if (convData?.lead_id) {
+          const { data: leadData } = await supabase
+            .from('leads')
+            .select('column_id')
+            .eq('id', convData.lead_id)
+            .single();
+
+          if (leadData?.column_id) {
+            const { data: columnData } = await supabase
+              .from('lead_columns')
+              .select('workspace_id')
+              .eq('id', leadData.column_id)
+              .single();
+
+            if (columnData?.workspace_id) {
+              const response = await embudoServices.getEmbudosByEspacio(columnData.workspace_id);
+              if (response.success && response.data && response.data.length > 0) {
+                setCurrentEmbudo(response.data[0]);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading embudos:', error);
+    }
+  };
 
   const loadContactDetails = async () => {
     const details = await contactDetailsService.getByConversation(conversationId);
@@ -530,16 +592,9 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
           {expandedSections.funnel && (
             <div className="mt-3">
-              {isEditing ? (
-                <Input
-                  value={formData.funnel_stage}
-                  onChange={(e) => setFormData({ ...formData, funnel_stage: e.target.value })}
-                  placeholder="Etapa del embudo..."
-                  className="h-8"
-                />
-              ) : (
-                <p className="text-sm">{formData.funnel_stage || 'PRIMER CONTACTO'}</p>
-              )}
+              <p className="text-sm text-[#e9edef]">
+                {currentEmbudo ? currentEmbudo.name : formData.funnel_stage || 'PRIMER CONTACTO'}
+              </p>
             </div>
           )}
         </Card>
