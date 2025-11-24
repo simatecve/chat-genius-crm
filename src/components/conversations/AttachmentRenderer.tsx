@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Download, FileText, Image as ImageIcon, Video, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuthenticatedMedia } from '@/hooks/useAuthenticatedMedia';
 
 interface AttachmentRendererProps {
   attachmentUrl: string;
@@ -19,6 +20,9 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  
+  // Usar hook para cargar archivos con autenticación
+  const { blobUrl, isLoading: isLoadingMedia } = useAuthenticatedMedia(attachmentUrl);
 
   // Detectar tipo de archivo por extensión o URL
   const getFileType = (url: string) => {
@@ -100,12 +104,21 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
 
   const downloadFile = () => {
     const link = document.createElement('a');
-    link.href = attachmentUrl;
+    link.href = blobUrl || attachmentUrl;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
+
+  // Mostrar loader mientras carga el archivo con autenticación
+  if (isLoadingMedia) {
+    return (
+      <div className="mb-2 flex items-center justify-center p-4">
+        <div className="animate-spin h-6 w-6 border-2 border-current border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   // Renderizado según tipo de archivo
   switch (fileType) {
@@ -113,10 +126,10 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2 max-w-sm">
           <img 
-            src={attachmentUrl} 
+            src={blobUrl || attachmentUrl} 
             alt="Imagen adjunta"
             className="rounded-lg cursor-pointer hover:opacity-90 transition-opacity w-full h-auto"
-            onClick={() => window.open(attachmentUrl, '_blank')}
+            onClick={() => window.open(blobUrl || attachmentUrl, '_blank')}
             loading="lazy"
           />
         </div>
@@ -126,7 +139,7 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2 max-w-sm">
           <video 
-            src={attachmentUrl} 
+            src={blobUrl || attachmentUrl} 
             controls 
             className="rounded-lg w-full h-auto"
             preload="metadata"
@@ -222,7 +235,7 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
 
           <audio
             ref={audioRef}
-            src={attachmentUrl}
+            src={blobUrl || attachmentUrl}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
             onCanPlay={handleCanPlay}
