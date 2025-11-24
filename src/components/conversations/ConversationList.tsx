@@ -112,7 +112,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       {embudos.length > 0 && <EmbudosFilter embudos={embudos} selectedEmbudo={selectedEmbudo} onEmbudoSelect={onEmbudoSelect} />}
 
       {/* Barra de búsqueda */}
-      <div className="relative p-4 pt-0 my-[10px]">
+      <div className="relative p-4 pt-0 my-0 py-[16px]">
         <Search className="absolute left-7 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Buscar conversaciones..." value={searchTerm} onChange={e => onSearchChange(e.target.value)} className="pl-10" />
       </div>
