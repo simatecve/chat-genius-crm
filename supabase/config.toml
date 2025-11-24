@@ -1,4 +1,4 @@
-project_id = "qgdlrplbtgvkhjelqtio"
+project_id = "pxvembsxhwvpotydtiqa"
 
 [functions.ai-agent-response]
 verify_jwt = false
@@ -13,6 +13,9 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.waha-create-session]
+verify_jwt = true
+
+[functions.waha-get-file]
 verify_jwt = true
 
 [functions.waha-get-qr]
