@@ -195,36 +195,36 @@ const Settings = () => {
       </div>
 
       <Tabs defaultValue="workspaces" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="workspaces" className="flex items-center space-x-2">
+        <TabsList className="inline-flex w-auto overflow-x-auto overflow-y-hidden whitespace-nowrap">
+          <TabsTrigger value="workspaces" className="flex items-center space-x-2 flex-shrink-0">
             <Briefcase className="h-4 w-4" />
             <span>Espacios</span>
           </TabsTrigger>
-          <TabsTrigger value="sessions" className="flex items-center space-x-2">
+          <TabsTrigger value="sessions" className="flex items-center space-x-2 flex-shrink-0">
             <Smartphone className="h-4 w-4" />
             <span>Sesiones</span>
           </TabsTrigger>
-          <TabsTrigger value="quick-replies" className="flex items-center space-x-2">
+          <TabsTrigger value="quick-replies" className="flex items-center space-x-2 flex-shrink-0">
             <MessageSquare className="h-4 w-4" />
             <span>Respuestas</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center space-x-2">
+          <TabsTrigger value="users" className="flex items-center space-x-2 flex-shrink-0">
             <UsersIcon className="h-4 w-4" />
             <span>Usuarios</span>
           </TabsTrigger>
-          <TabsTrigger value="profile" className="flex items-center space-x-2">
+          <TabsTrigger value="profile" className="flex items-center space-x-2 flex-shrink-0">
             <User className="h-4 w-4" />
             <span>Perfil</span>
           </TabsTrigger>
-          <TabsTrigger value="bot" className="flex items-center space-x-2">
+          <TabsTrigger value="bot" className="flex items-center space-x-2 flex-shrink-0">
             <Bot className="h-4 w-4" />
             <span>Bot</span>
           </TabsTrigger>
-          <TabsTrigger value="integrations" className="flex items-center space-x-2">
+          <TabsTrigger value="integrations" className="flex items-center space-x-2 flex-shrink-0">
             <Key className="h-4 w-4" />
             <span>Integraciones</span>
           </TabsTrigger>
-          <TabsTrigger value="tags" className="flex items-center space-x-2">
+          <TabsTrigger value="tags" className="flex items-center space-x-2 flex-shrink-0">
             <Tag className="h-4 w-4" />
             <span>Etiquetas</span>
           </TabsTrigger>
