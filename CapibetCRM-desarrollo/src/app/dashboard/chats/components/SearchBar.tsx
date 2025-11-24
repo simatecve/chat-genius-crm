@@ -14,7 +14,7 @@ export default function SearchBar({
   placeholder = 'Buscar chats...' 
 }: SearchBarProps) {
   return (
-    <div className="p-4 border-b border-[var(--border-primary)] flex-shrink-0">
+    <div className="p-4 mt-4 border-b border-[var(--border-primary)] flex-shrink-0">
       <div className="relative">
         <input
           type="text"
