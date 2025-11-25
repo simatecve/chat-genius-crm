@@ -50,7 +50,7 @@ export class ConversationService {
             *
           )
         `)
-        .in('whatsapp_number', userWhatsAppNumbers)
+        .in('phone_number', userWhatsAppNumbers)
         .order('last_message_time', { ascending: false });
 
       if (error) {
@@ -121,7 +121,7 @@ export class ConversationService {
             *
           )
         `)
-        .in('whatsapp_number', userWhatsAppNumbers)
+        .in('phone_number', userWhatsAppNumbers)
         .or(`pushname.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`)
         .order('last_message_time', { ascending: false });
 
