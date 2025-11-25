@@ -16,6 +16,26 @@ export class ConversationService {
    */
   static async getConversations(userId: string): Promise<ConversationWithLastMessage[]> {
     try {
+      // Primero obtener las sesiones de WhatsApp del usuario
+      const { data: userSessions, error: sessionsError } = await supabase
+        .from('whatsapp_connections')
+        .select('phone_number')
+        .eq('user_id', userId);
+
+      if (sessionsError) {
+        console.error('Error fetching user sessions:', sessionsError);
+        throw sessionsError;
+      }
+
+      // Si no tiene sesiones, retornar array vacío
+      if (!userSessions || userSessions.length === 0) {
+        return [];
+      }
+
+      // Extraer los números de WhatsApp de las sesiones del usuario
+      const userWhatsAppNumbers = userSessions.map(s => s.phone_number).filter(Boolean);
+
+      // Obtener conversaciones que pertenezcan a las sesiones del usuario
       const { data, error } = await supabase
         .from('conversations')
         .select(`
@@ -24,7 +44,7 @@ export class ConversationService {
             *
           )
         `)
-        .eq('user_id', userId)
+        .in('whatsapp_number', userWhatsAppNumbers)
         .order('last_message_time', { ascending: false });
 
       if (error) {
@@ -67,6 +87,25 @@ export class ConversationService {
    */
   static async searchConversations(userId: string, searchTerm: string): Promise<ConversationWithLastMessage[]> {
     try {
+      // Primero obtener las sesiones de WhatsApp del usuario
+      const { data: userSessions, error: sessionsError } = await supabase
+        .from('whatsapp_connections')
+        .select('phone_number')
+        .eq('user_id', userId);
+
+      if (sessionsError) {
+        console.error('Error fetching user sessions:', sessionsError);
+        throw sessionsError;
+      }
+
+      // Si no tiene sesiones, retornar array vacío
+      if (!userSessions || userSessions.length === 0) {
+        return [];
+      }
+
+      // Extraer los números de WhatsApp de las sesiones del usuario
+      const userWhatsAppNumbers = userSessions.map(s => s.phone_number).filter(Boolean);
+
       const { data, error } = await supabase
         .from('conversations')
         .select(`
@@ -75,7 +114,7 @@ export class ConversationService {
             *
           )
         `)
-        .eq('user_id', userId)
+        .in('whatsapp_number', userWhatsAppNumbers)
         .or(`pushname.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`)
         .order('last_message_time', { ascending: false });
 
