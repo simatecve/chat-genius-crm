@@ -16,6 +16,8 @@ export class ConversationService {
    */
   static async getConversations(userId: string): Promise<ConversationWithLastMessage[]> {
     try {
+      console.log('[ConversationService] Fetching conversations for userId:', userId);
+      
       // Primero obtener las sesiones de WhatsApp del usuario
       const { data: userSessions, error: sessionsError } = await supabase
         .from('whatsapp_connections')
@@ -27,13 +29,17 @@ export class ConversationService {
         throw sessionsError;
       }
 
+      console.log('[ConversationService] User WhatsApp sessions:', userSessions);
+
       // Si no tiene sesiones, retornar array vacío
       if (!userSessions || userSessions.length === 0) {
+        console.log('[ConversationService] No WhatsApp sessions found for user');
         return [];
       }
 
       // Extraer los números de WhatsApp de las sesiones del usuario
       const userWhatsAppNumbers = userSessions.map(s => s.phone_number).filter(Boolean);
+      console.log('[ConversationService] Filtering conversations by phone numbers:', userWhatsAppNumbers);
 
       // Obtener conversaciones que pertenezcan a las sesiones del usuario
       const { data, error } = await supabase
@@ -52,6 +58,7 @@ export class ConversationService {
         throw error;
       }
 
+      console.log('[ConversationService] Found conversations:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('Error in getConversations:', error);
