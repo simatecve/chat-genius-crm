@@ -1,10 +1,10 @@
 // Supabase Configuration
 
 export const supabaseConfig = {
-  url: process.env.SUPABASE_URL,
-  anonKey: process.env.SUPABASE_ANON_KEY,
-  serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  restUrl: `${process.env.SUPABASE_URL}/rest/v1`
+  url: process.env.VITE_SUPABASE_URL,
+  anonKey: process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  serviceRoleKey: process.env.VITE_SUPABASE_SERVICE_ROLE_KEY,
+  restUrl: `${process.env.VITE_SUPABASE_URL}/rest/v1`
 };
 
 // API Endpoints
