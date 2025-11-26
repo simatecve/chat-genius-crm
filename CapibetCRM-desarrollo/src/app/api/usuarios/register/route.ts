@@ -73,23 +73,25 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Crear registro en la tabla usuarios
+    // Crear registro en la tabla usuarios con el rol que viene en el body
     const usuarioData = {
       id: user.id,
+      correo_electronico: correo_electronico,
       nombre,
       telefono: telefono || null,
       codigo_pais: codigo_pais || null,
-      rol: 'usuario', // Rol por defecto
+      rol: body.rol || 'Cliente', // Usar el rol del body o Cliente por defecto
       activo: true,
       organizacion_id: organizacion_id || null
     };
 
+    // Usar service role key para crear el usuario en la tabla
     const usuarioResponse = await fetch(`${supabaseConfig.restUrl}/usuarios`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'apikey': supabaseConfig.anonKey || '',
-        'Authorization': `Bearer ${access_token}`,
+        'Authorization': `Bearer ${supabaseConfig.serviceRoleKey}`,
         'Prefer': 'return=representation'
       },
       body: JSON.stringify(usuarioData)
