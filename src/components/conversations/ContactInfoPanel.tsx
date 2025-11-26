@@ -369,7 +369,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   };
 
   return (
-    <div className="w-80 border-l border-border/20 bg-[#111b21] overflow-y-auto">
+    <div className="h-full w-full min-w-0 border-l border-border/20 bg-[#111b21] overflow-y-auto">
       <div className="p-4 space-y-4">
         {/* Header con botón de editar */}
         <div className="flex items-center justify-between">

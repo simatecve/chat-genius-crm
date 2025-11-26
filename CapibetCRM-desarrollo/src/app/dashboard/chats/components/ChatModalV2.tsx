@@ -38,7 +38,7 @@ export default function ChatModalV2({
   chat,
   onContactUpdate 
 }: ChatModalV2Props) {
-  const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -50,49 +50,61 @@ export default function ChatModalV2({
 
     const loadData = async () => {
       try {
-        // Buscar la conversación asociada al contacto
         const { data: convData } = await supabase
           .from('conversations')
           .select('*')
           .eq('phone_number', chat.contacto.telefono || chat.contacto.whatsapp_jid || '')
           .single();
 
-        if (convData) {
-          setConversation(convData);
-          
-          // Cargar mensajes
-          setIsLoadingMessages(true);
-          const mensajesResult = await mensajesServices.getMensajesByChat(chat.id);
-          
-          if (mensajesResult.success && mensajesResult.data) {
-            // Convertir mensajes al formato de Message
-            const convertedMessages: Message[] = mensajesResult.data.map((msg: any) => ({
-              id: msg.id,
-              conversation_id: convData.id,
-              user_id: msg.remitente_id || '',
-              content: msg.content?.message_content || '',
-              direction: msg.remitente_id === '1' ? 'outbound' : 'inbound',
-              created_at: msg.creado_en,
-              status: msg.estado || null,
-              message_type: msg.content?.message_type || 'text',
-              attachment_url: msg.content?.media_url || null,
-              file_url: null,
-              message: null,
-              metadata: null,
-              is_bot: msg.is_bot || false,
-            }));
+        if (!convData) return;
 
-            setMessages(convertedMessages);
-          }
+        setConversation(convData);
+
+        setIsLoadingMessages(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
           setIsLoadingMessages(false);
+          return;
         }
+
+        const { data: msgData, error: msgError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', convData.id)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+
+        if (msgError) {
+          console.error('Error fetching messages:', msgError);
+        }
+
+        setMessages(msgData || []);
+        setIsLoadingMessages(false);
+
+        const channel = supabase
+          .channel(`conv-${convData.id}`)
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${convData.id}`
+          }, (payload) => {
+            const newMsg = payload.new as Message;
+            setMessages(prev => [...prev, newMsg]);
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
       } catch (error) {
         console.error('Error loading conversation data:', error);
         setIsLoadingMessages(false);
       }
     };
 
-    loadData();
+    const cleanup = loadData();
+    return () => { (async () => { await cleanup; })(); };
   }, [chat, isOpen]);
 
   // Manejar envío de mensaje
@@ -101,7 +113,6 @@ export default function ChatModalV2({
 
     setIsSending(true);
     try {
-      // Obtener conexión de WhatsApp activa
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -111,49 +122,27 @@ export default function ChatModalV2({
         .eq('user_id', user.id)
         .eq('status', 'WORKING')
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (!whatsappConnection) {
-        console.error('No active WhatsApp connection found');
-        setIsSending(false);
-        return;
-      }
+      const sessionName = whatsappConnection?.name || 'default';
+      const phoneNumber = conversation.phone_number || (chat.contacto.telefono || chat.contacto.whatsapp_jid || '');
 
-      // Enviar mensaje usando la API
-      const endpoint = '/api/chats/enviar-mensaje-whatsapp';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          telefono: chat.contacto.telefono || chat.contacto.whatsapp_jid,
-          mensaje: messageText,
-          sesion_id: chat.sesion.id
-        })
+      const { data, error } = await supabase.functions.invoke('waha-send-message', {
+        body: {
+          sessionName,
+          phoneNumber,
+          message: messageText,
+          userId: user.id,
+          conversationId: conversation.id
+        }
       });
 
-      const data = await response.json();
+      if (error) {
+        throw error;
+      }
 
-      if (data.success) {
-        // Agregar mensaje a la lista localmente
-        const newMessage: Message = {
-          id: Date.now().toString(),
-          conversation_id: conversation.id,
-          user_id: user.id,
-          content: messageText,
-          direction: 'outbound',
-          created_at: new Date().toISOString(),
-          status: 'sent',
-          message_type: 'text',
-          attachment_url: null,
-          file_url: null,
-          message: null,
-          metadata: null,
-          is_bot: false,
-        };
-
-        setMessages(prev => [...prev, newMessage]);
+      if (data?.success && data?.savedMessage) {
+        setMessages(prev => [...prev, data.savedMessage as Message]);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -166,7 +155,7 @@ export default function ChatModalV2({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-lg w-full max-w-7xl h-[90vh] border border-border flex flex-col shadow-2xl">
+      <div className="bg-background rounded-lg w-full max-w-[96vw] h-[95vh] border border-border flex flex-col shadow-2xl overflow-hidden">
         {/* Botón de cerrar - posicionado de forma relativa dentro del flujo */}
         <div className="flex-shrink-0 flex justify-end p-2 border-b border-border bg-background">
           <button 
@@ -181,7 +170,7 @@ export default function ChatModalV2({
         {/* Contenido del modal con ResizablePanel */}
         <div className="flex-1 min-h-0">
           <ResizablePanelGroup direction="horizontal" className="h-full">
-            <ResizablePanel defaultSize={showInfoPanel ? 75 : 100} minSize={50} className="h-full">
+            <ResizablePanel defaultSize={showInfoPanel ? 75 : 100} minSize={50} className="h-full min-h-0">
               <div className="h-full">
                 <ChatArea
                   conversation={conversation}
@@ -196,7 +185,7 @@ export default function ChatModalV2({
             {showInfoPanel && conversation && (
               <>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="h-full">
+                <ResizablePanel defaultSize={25} minSize={20} maxSize={40} className="h-full min-h-0">
                   <ContactInfoPanel
                     conversationId={conversation.id}
                     contactName={conversation.contact_name || conversation.pushname || 'Sin nombre'}

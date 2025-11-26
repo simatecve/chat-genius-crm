@@ -204,7 +204,7 @@ const Conversations = () => {
 
         <ResizableHandle withHandle />
 
-        <ResizablePanel defaultSize={showInfoPanel ? 52 : 77} minSize={40}>
+        <ResizablePanel defaultSize={showInfoPanel ? 52 : 77} minSize={40} className="h-full min-h-0">
           <ChatArea
             conversation={selectedConversation}
             messages={messages}
@@ -217,7 +217,7 @@ const Conversations = () => {
         {selectedConversation && showInfoPanel && (
           <>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+            <ResizablePanel defaultSize={25} minSize={20} maxSize={35} className="h-full min-h-0">
               <ContactInfoPanel
                 conversationId={selectedConversation.id}
                 contactName={selectedConversation.contact_name || selectedConversation.pushname || 'Contacto'}
