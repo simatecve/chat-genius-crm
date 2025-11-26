@@ -18,30 +18,6 @@ export class ConversationService {
     try {
       console.log('[ConversationService] Fetching conversations for userId:', userId);
       
-      // Primero obtener las sesiones de WhatsApp del usuario
-      const { data: userSessions, error: sessionsError } = await supabase
-        .from('whatsapp_connections')
-        .select('phone_number')
-        .eq('user_id', userId);
-
-      if (sessionsError) {
-        console.error('Error fetching user sessions:', sessionsError);
-        throw sessionsError;
-      }
-
-      console.log('[ConversationService] User WhatsApp sessions:', userSessions);
-
-      // Si no tiene sesiones, retornar array vacío
-      if (!userSessions || userSessions.length === 0) {
-        console.log('[ConversationService] No WhatsApp sessions found for user');
-        return [];
-      }
-
-      // Extraer los números de WhatsApp de las sesiones del usuario
-      const userWhatsAppNumbers = userSessions.map(s => s.phone_number).filter(Boolean);
-      console.log('[ConversationService] Filtering conversations by phone numbers:', userWhatsAppNumbers);
-
-      // Obtener conversaciones que pertenezcan a las sesiones del usuario
       const { data, error } = await supabase
         .from('conversations')
         .select(`
@@ -50,7 +26,7 @@ export class ConversationService {
             *
           )
         `)
-        .in('whatsapp_number', userWhatsAppNumbers)
+        .eq('user_id', userId)
         .order('last_message_time', { ascending: false });
 
       if (error) {
@@ -94,25 +70,6 @@ export class ConversationService {
    */
   static async searchConversations(userId: string, searchTerm: string): Promise<ConversationWithLastMessage[]> {
     try {
-      // Primero obtener las sesiones de WhatsApp del usuario
-      const { data: userSessions, error: sessionsError } = await supabase
-        .from('whatsapp_connections')
-        .select('phone_number')
-        .eq('user_id', userId);
-
-      if (sessionsError) {
-        console.error('Error fetching user sessions:', sessionsError);
-        throw sessionsError;
-      }
-
-      // Si no tiene sesiones, retornar array vacío
-      if (!userSessions || userSessions.length === 0) {
-        return [];
-      }
-
-      // Extraer los números de WhatsApp de las sesiones del usuario
-      const userWhatsAppNumbers = userSessions.map(s => s.phone_number).filter(Boolean);
-
       const { data, error } = await supabase
         .from('conversations')
         .select(`
@@ -121,7 +78,7 @@ export class ConversationService {
             *
           )
         `)
-        .in('whatsapp_number', userWhatsAppNumbers)
+        .eq('user_id', userId)
         .or(`pushname.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`)
         .order('last_message_time', { ascending: false });
 

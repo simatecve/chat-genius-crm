@@ -17,10 +17,6 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const { conversationId, userId, messageContent, sessionName } = await req.json();
@@ -135,42 +131,38 @@ serve(async (req) => {
 
     console.log('Calling Lovable AI with model:', agent.model || 'google/gemini-2.5-flash');
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: agent.model || 'google/gemini-2.5-flash',
-        messages: aiMessages,
-        temperature: agent.temperature || 0.7,
-        max_tokens: agent.max_tokens || 500,
-      }),
-    });
+    let aiResponseText: string | null = null;
+    if (LOVABLE_API_KEY) {
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: agent.model || 'google/gemini-2.5-flash',
+          messages: aiMessages,
+          temperature: agent.temperature || 0.7,
+          max_tokens: agent.max_tokens || 500,
+        }),
+      });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', errorText);
-      
-      if (aiResponse.status === 429) {
-        throw new Error('Rate limit exceeded. Please try again later.');
+      if (aiResponse.ok) {
+        const aiResult = await aiResponse.json();
+        aiResponseText = aiResult.choices?.[0]?.message?.content || null;
+      } else {
+        const errorText = await aiResponse.text();
+        console.error('Lovable AI error:', errorText);
       }
-      if (aiResponse.status === 402) {
-        throw new Error('Payment required. Please add credits to your Lovable AI workspace.');
-      }
-      
-      throw new Error(`AI API error: ${aiResponse.status} - ${errorText}`);
     }
-
-    const aiResult = await aiResponse.json();
-    const aiResponseText = aiResult.choices?.[0]?.message?.content;
 
     if (!aiResponseText) {
-      throw new Error('No response from AI');
+      const lastUserMessage = conversationHistory.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+      aiResponseText = lastUserMessage ? `Gracias por tu mensaje: "${lastUserMessage}".
+Nuestro equipo te responderá en breve.` : 'Gracias por tu mensaje. Nuestro equipo te responderá en breve.';
     }
 
-    console.log('AI response received:', aiResponseText.substring(0, 100));
+    console.log('AI response prepared:', aiResponseText.substring(0, 100));
 
     // 6. Enviar respuesta automática a través de WhatsApp (usar conversación ya obtenida)
     if (!conversation) {
@@ -183,7 +175,8 @@ serve(async (req) => {
         phoneNumber: conversation.phone_number,
         message: aiResponseText,
         userId: userId,
-        conversationId: conversationId
+        conversationId: conversationId,
+        isBot: true
       }
     });
 

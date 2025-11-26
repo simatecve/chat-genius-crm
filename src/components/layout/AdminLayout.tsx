@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import logo from '@/assets/supercrm-logo.png';
+import logo from '@/assets/supercrm-logo.jpg';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface AdminLayoutProps {

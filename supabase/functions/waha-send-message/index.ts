@@ -29,7 +29,8 @@ serve(async (req) => {
       phoneNumber, 
       message, 
       userId,
-      conversationId
+      conversationId,
+      isBot
     } = await req.json();
 
     console.log('Sending message via WAHA:', {
@@ -106,7 +107,7 @@ serve(async (req) => {
       direction: 'outbound',
       status: wahaResult.status === 'PENDING' ? 'sent' : 'delivered',
       message_type: 'text',
-      is_bot: false,
+      is_bot: Boolean(isBot),
       created_at: new Date().toISOString(),
       metadata: {
         waha_id: wahaResult.id || null,

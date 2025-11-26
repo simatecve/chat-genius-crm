@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useToast } from '@/hooks/use-toast';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
-import logo from '@/assets/supercrm-logo.png';
+import logo from '@/assets/supercrm-logo.jpg';
 
 const Login = () => {
   const [email, setEmail] = useState('');

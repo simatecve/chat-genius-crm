@@ -42,10 +42,61 @@ const AdminConversations = () => {
   const [totalConversations, setTotalConversations] = useState(0);
   const conversationsPerPage = 20;
   const { toast } = useToast();
+  const [users, setUsers] = useState<{ id: string; first_name: string | null; last_name: string | null }[]>([]);
+  const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>([]);
+  const [columns, setColumns] = useState<{ id: string; name: string }[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
+  const [selectedColumnId, setSelectedColumnId] = useState<string>('');
 
   useEffect(() => {
     fetchConversations();
-  }, [currentPage, dateFilter, searchTerm]);
+  }, [currentPage, dateFilter, searchTerm, selectedUserId, selectedWorkspaceId, selectedColumnId]);
+
+  useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .order('first_name', { ascending: true });
+
+        setUsers((profiles || []).map(p => ({ id: p.id as string, first_name: p.first_name || null, last_name: p.last_name || null })));
+
+        const { data: ws } = await supabase
+          .from('workspaces')
+          .select('id, name')
+          .order('position', { ascending: true });
+
+        setWorkspaces((ws || []).map(w => ({ id: w.id as string, name: w.name as string })));
+      } catch (e) {
+        /* silent */
+      }
+    };
+    loadFilters();
+  }, []);
+
+  useEffect(() => {
+    const loadColumns = async () => {
+      try {
+        if (!selectedWorkspaceId) {
+          setColumns([]);
+          setSelectedColumnId('');
+          return;
+        }
+        const { data: cols } = await supabase
+          .from('lead_columns')
+          .select('id, name')
+          .eq('workspace_id', selectedWorkspaceId)
+          .order('position', { ascending: true });
+        setColumns((cols || []).map(c => ({ id: c.id as string, name: c.name as string })));
+        if ((cols || []).length === 0) setSelectedColumnId('');
+      } catch (e) {
+        /* silent */
+      }
+    };
+    loadColumns();
+  }, [selectedWorkspaceId]);
 
   const fetchConversations = async () => {
     try {
@@ -80,6 +131,44 @@ const AdminConversations = () => {
 
       if (searchTerm) {
         query = query.or(`pushname.ilike.%${searchTerm}%,whatsapp_number.ilike.%${searchTerm}%`);
+      }
+
+      if (selectedUserId) {
+        query = query.eq('user_id', selectedUserId);
+      }
+
+      if (selectedColumnId || selectedWorkspaceId) {
+        let leadIds: string[] = [];
+        if (selectedColumnId) {
+          const { data: leadsData, error: leadsErr } = await supabase
+            .from('leads')
+            .select('id')
+            .eq('column_id', selectedColumnId);
+          if (leadsErr) throw leadsErr;
+          leadIds = (leadsData || []).map(l => l.id as string);
+        } else if (selectedWorkspaceId) {
+          const { data: colData, error: colErr } = await supabase
+            .from('lead_columns')
+            .select('id')
+            .eq('workspace_id', selectedWorkspaceId);
+          if (colErr) throw colErr;
+          const columnIds = (colData || []).map(c => c.id as string);
+          if (columnIds.length > 0) {
+            const { data: leadsData, error: leadsErr } = await supabase
+              .from('leads')
+              .select('id')
+              .in('column_id', columnIds);
+            if (leadsErr) throw leadsErr;
+            leadIds = (leadsData || []).map(l => l.id as string);
+          }
+        }
+        if (leadIds.length === 0) {
+          setConversations([]);
+          setTotalConversations(0);
+          setLoading(false);
+          return;
+        }
+        query = query.in('lead_id', leadIds);
       }
 
       const { data, error, count } = await query;
@@ -243,6 +332,48 @@ const AdminConversations = () => {
                 <SelectItem value="today">Hoy</SelectItem>
                 <SelectItem value="week">Esta semana</SelectItem>
                 <SelectItem value="month">Este mes</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+              <SelectTrigger className="w-full md:w-[220px]">
+                <User className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filtrar por usuario" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los usuarios</SelectItem>
+                {users.map(u => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {(u.first_name || '') + ' ' + (u.last_name || '')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedWorkspaceId} onValueChange={(v) => { setSelectedWorkspaceId(v); setSelectedColumnId(''); }}>
+              <SelectTrigger className="w-full md:w-[220px]">
+                <MessageCircle className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filtrar por espacio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los espacios</SelectItem>
+                {workspaces.map(w => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedColumnId} onValueChange={setSelectedColumnId} disabled={!selectedWorkspaceId}>
+              <SelectTrigger className="w-full md:w-[220px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Filtrar por embudo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Todos los embudos</SelectItem>
+                {columns.map(c => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

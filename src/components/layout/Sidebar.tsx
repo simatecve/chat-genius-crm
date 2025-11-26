@@ -3,7 +3,7 @@ import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
-import logo from '@/assets/supercrm-logo.png';
+import logo from '@/assets/supercrm-logo.jpg';
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{

@@ -27,6 +27,9 @@ const Conversations = () => {
   const [selectedEmbudo, setSelectedEmbudo] = useState<EmbudoResponse | null>(null);
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<any | null>(null);
+  const [columns, setColumns] = useState<{ id: string; name: string }[]>([]);
+  const [workspaceLeadIds, setWorkspaceLeadIds] = useState<string[]>([]);
+  const [embudoLeadIds, setEmbudoLeadIds] = useState<string[]>([]);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
@@ -62,6 +65,8 @@ const Conversations = () => {
     const loadEmbudos = async () => {
       if (!selectedWorkspace) {
         setEmbudos([]);
+        setColumns([]);
+        setWorkspaceLeadIds([]);
         return;
       }
 
@@ -69,6 +74,17 @@ const Conversations = () => {
         const response = await embudoServices.getEmbudosByEspacio(selectedWorkspace.id);
         if (response.success && response.data) {
           setEmbudos(response.data);
+          setColumns(response.data.map(e => ({ id: e.id, name: e.name })));
+          const columnIds = response.data.map(e => e.id);
+          if (columnIds.length > 0) {
+            const { data: leadsData } = await supabase
+              .from('leads')
+              .select('id')
+              .in('column_id', columnIds);
+            setWorkspaceLeadIds((leadsData || []).map(l => l.id as string));
+          } else {
+            setWorkspaceLeadIds([]);
+          }
         }
       } catch (error) {
         console.error('Error loading embudos:', error);
@@ -77,19 +93,31 @@ const Conversations = () => {
     loadEmbudos();
   }, [selectedWorkspace]);
 
+  useEffect(() => {
+    const loadLeadsByEmbudo = async () => {
+      if (!selectedEmbudo) {
+        setEmbudoLeadIds([]);
+        return;
+      }
+      const { data: leadsData } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('column_id', selectedEmbudo.id);
+      setEmbudoLeadIds((leadsData || []).map(l => l.id as string));
+    };
+    loadLeadsByEmbudo();
+  }, [selectedEmbudo]);
+
   // Determinar qué conversaciones mostrar
   const displayConversations = React.useMemo(() => {
     let filtered = searchTerm ? (searchResults || []) : conversations;
-
     if (selectedEmbudo) {
-      // Filtrar por embudo_id si existe en la conversación
-      // Nota: Necesitamos asegurarnos que el tipo Conversation tenga embudo_id
-      // Si no lo tiene en el tipo generado, TypeScript se quejará, pero funcionará en runtime si la columna existe
-      filtered = filtered.filter((conv: any) => conv.embudo_id === selectedEmbudo.id);
+      filtered = filtered.filter(conv => conv.lead_id && embudoLeadIds.includes(conv.lead_id));
+    } else if (selectedWorkspace) {
+      filtered = filtered.filter(conv => conv.lead_id && workspaceLeadIds.includes(conv.lead_id));
     }
-
     return filtered;
-  }, [searchTerm, searchResults, conversations, selectedEmbudo]);
+  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds]);
 
   // Seleccionar conversación automáticamente desde navegación de embudos
   useEffect(() => {
