@@ -158,7 +158,7 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
         nombre: formData.name,
         telefono: formData.phone,
         codigo_pais: selectedCountry.code.replace('+', ''),
-        rol: formData.rol
+        rol: formData.rol // Pasar el rol seleccionado
       };
       
       // Crear usuario en Supabase mediante el endpoint de registro
@@ -174,7 +174,12 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
         }, 1500);
         
       } else {
-        setError(result.error || 'Error al crear el usuario. Inténtalo de nuevo.');
+        // Mostrar error más específico
+        if (result.error?.includes('Invalid API key') || result.error?.includes('invalid api key')) {
+          setError('Error de configuración del servidor. El administrador debe configurar correctamente el service_role_key de Supabase para el proyecto pxvembsxhwvpotydtiqa.');
+        } else {
+          setError(result.error || 'Error al crear el usuario. Inténtalo de nuevo.');
+        }
       }
       
     } catch (error) {
