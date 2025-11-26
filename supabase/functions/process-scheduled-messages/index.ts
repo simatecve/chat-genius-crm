@@ -1,8 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 
-const KOONETXA_API_KEY = 'XAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOieyJ0e';
-const KOONETXA_API_URL = 'https://ws.koonetxa.cloud/api/sendText';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -11,9 +8,8 @@ const corsHeaders = {
 interface ScheduledMessage {
   id: string;
   user_id: string;
-  whatsapp_number: string;
+  phone_number: string;
   message_content: string;
-  instance_name: string;
   retry_count: number;
   scheduled_for: string;
 }
@@ -27,10 +23,10 @@ Deno.serve(async (req) => {
   console.log('🔄 Starting process-scheduled-messages function...');
 
   try {
-    // Crear cliente de Supabase con service_role para acceso completo
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
+    const wahaBaseUrl = Deno.env.get('WAHA_BASE_URL')!;
+    const wahaApiKey = Deno.env.get('WAHA_API_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // 1. Obtener mensajes pendientes que ya deben enviarse
@@ -65,7 +61,7 @@ Deno.serve(async (req) => {
 
     // 2. Procesar cada mensaje
     for (const message of pendingMessages as ScheduledMessage[]) {
-      console.log(`\n📤 Processing message ${message.id} for ${message.whatsapp_number}`);
+      console.log(`\n📤 Processing message ${message.id} for ${message.phone_number}`);
 
       try {
         // 2.1 Verificar si el contacto está bloqueado del bot
@@ -73,7 +69,7 @@ Deno.serve(async (req) => {
           .from('contacto_bloqueado_bot')
           .select('id')
           .eq('user_id', message.user_id)
-          .eq('numero', message.whatsapp_number)
+          .eq('numero', message.phone_number)
           .single();
 
         if (blockedContact) {
@@ -89,31 +85,36 @@ Deno.serve(async (req) => {
         }
 
         // 2.2 Formatear número al formato WhatsApp
-        let chatId = message.whatsapp_number;
-        if (!chatId.endsWith('@c.us')) {
-          // Limpiar el número (remover espacios, guiones, etc)
-          const cleanNumber = chatId.replace(/[^\d]/g, '');
-          chatId = `${cleanNumber}@c.us`;
-        }
+        const cleanNumber = message.phone_number.replace(/[^\d]/g, '');
+        const chatId = cleanNumber; // WAHA acepta número limpio como chatId
 
         console.log(`📱 Formatted chatId: ${chatId}`);
 
-        // 2.3 Enviar mensaje a la API de Koonetxa
+        const { data: connection } = await supabase
+          .from('whatsapp_connections')
+          .select('name, phone_number, status')
+          .eq('user_id', message.user_id)
+          .eq('status', 'WORKING')
+          .limit(1)
+          .maybeSingle();
+
+        const sessionName = connection?.name || connection?.phone_number || 'default';
+
         const payload = {
           chatId: chatId,
           text: message.message_content,
-          session: 'default',
+          session: sessionName,
           linkPreview: true,
           linkPreviewHighQuality: false,
           reply_to: null,
         };
 
-        console.log('🚀 Sending to Koonetxa API:', JSON.stringify(payload, null, 2));
+        console.log('🚀 Sending via WAHA API:', JSON.stringify(payload, null, 2));
 
-        const response = await fetch(KOONETXA_API_URL, {
+        const response = await fetch(`${wahaBaseUrl}/api/sendText`, {
           method: 'POST',
           headers: {
-            'X-Api-Key': KOONETXA_API_KEY,
+            'X-Api-Key': wahaApiKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
@@ -125,7 +126,7 @@ Deno.serve(async (req) => {
         // 2.4 Manejar respuesta
         if (response.ok) {
           // Éxito
-          console.log(`✅ Message sent successfully to ${message.whatsapp_number}`);
+          console.log(`✅ Message sent successfully to ${message.phone_number}`);
           
           await supabase
             .from('automated_message_logs')
@@ -134,6 +135,14 @@ Deno.serve(async (req) => {
               sent_at: new Date().toISOString(),
             })
             .eq('id', message.id);
+
+          // Actualizar campaña_sends 'queued' a 'sent' si existe para el usuario y número
+          await supabase
+            .from('campaign_sends')
+            .update({ status: 'sent', sent_at: new Date().toISOString() })
+            .eq('user_id', message.user_id)
+            .eq('phone_number', message.phone_number)
+            .eq('status', 'queued');
           
           successCount++;
         } else {
@@ -166,6 +175,14 @@ Deno.serve(async (req) => {
                 error_message: `Failed after 3 retries. Last error: ${response.status} - ${responseText}`,
               })
               .eq('id', message.id);
+
+            // Marcar en campaign_sends como 'failed' si estaba 'queued'
+            await supabase
+              .from('campaign_sends')
+              .update({ status: 'failed', error_message: `API Error ${response.status}: ${responseText}` })
+              .eq('user_id', message.user_id)
+              .eq('phone_number', message.phone_number)
+              .eq('status', 'queued');
             
             failureCount++;
           }
@@ -197,6 +214,12 @@ Deno.serve(async (req) => {
             })
             .eq('id', message.id);
           
+          await supabase
+            .from('campaign_sends')
+            .update({ status: 'failed', error_message: `Exception: ${errorMsg}` })
+            .eq('user_id', message.user_id)
+            .eq('phone_number', message.phone_number)
+            .eq('status', 'queued');
           failureCount++;
         }
       }

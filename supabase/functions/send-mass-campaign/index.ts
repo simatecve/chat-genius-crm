@@ -50,6 +50,17 @@ serve(async (req) => {
       aiAgent = agent;
     }
 
+    // Validar sesión de WhatsApp activa
+    const { data: activeConnection } = await supabase
+      .from('whatsapp_connections')
+      .select('name, phone_number, status')
+      .eq('user_id', campaign.user_id)
+      .eq('status', 'WORKING')
+      .limit(1)
+      .maybeSingle();
+
+    const sessionNameToUse = campaign.whatsapp_connection_name || activeConnection?.name || activeConnection?.phone_number || 'default';
+
     // Obtener contactos de la lista
     const { data: listMembers, error: membersError } = await supabase
       .from('contact_list_members')
@@ -80,9 +91,11 @@ serve(async (req) => {
 
     console.log(`Starting campaign ${campaign_id} with ${contacts.length} contacts`);
 
-    // Procesar cada contacto
-    let sentCount = 0;
-    let failedCount = 0;
+    // Encolar cada contacto para procesamiento en background
+    let enqueuedCount = 0;
+    let currentTime = Date.now();
+    const minDelayMs = (campaign.min_delay || 1) * 1000;
+    const maxDelayMs = (campaign.max_delay || 5) * 1000;
 
     for (const contact of contacts) {
       try {
@@ -128,65 +141,26 @@ serve(async (req) => {
           .replace(/\{nombre\}/gi, contact.name || '')
           .replace(/\{telefono\}/gi, contact.phone_number || '');
 
-        const sessionName = campaign.whatsapp_connection_name || 'default';
+        const sessionName = sessionNameToUse;
         const formattedPhone = contact.phone_number.replace(/\D/g, '');
-        const chatId = `${formattedPhone}@c.us`;
+        const chatId = formattedPhone; // WAHA acepta número limpio como chatId
 
-        // Enviar presencia "escribiendo"
-        await fetch(`${wahaBaseUrl}/api/sendPresence`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Api-Key': wahaApiKey,
-          },
-          body: JSON.stringify({
-            chatId: chatId,
-            presence: 'composing',
-            session: sessionName,
-          }),
-        });
+        const randomDelay = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
+        currentTime += randomDelay;
+        const scheduledFor = new Date(currentTime).toISOString();
 
-        // Calcular delay aleatorio entre min y max
-        const minDelay = (campaign.min_delay || 1) * 1000;
-        const maxDelay = (campaign.max_delay || 5) * 1000;
-        const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+        // Encolar para envío en background
+        await supabase
+          .from('automated_message_logs')
+          .insert({
+            user_id: campaign.user_id,
+            phone_number: chatId,
+            message_content: messageToSend,
+            scheduled_for: scheduledFor,
+            status: 'pending',
+          });
 
-        // Esperar el delay simulando escritura
-        await new Promise(resolve => setTimeout(resolve, randomDelay));
-
-        // Enviar el mensaje
-        const sendResponse = await fetch(`${wahaBaseUrl}/api/sendText`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Api-Key': wahaApiKey,
-          },
-          body: JSON.stringify({
-            chatId: chatId,
-            text: messageToSend,
-            session: sessionName,
-          }),
-        });
-
-        if (!sendResponse.ok) {
-          throw new Error(`Failed to send message: ${sendResponse.statusText}`);
-        }
-
-        // Detener presencia "escribiendo"
-        await fetch(`${wahaBaseUrl}/api/sendPresence`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Api-Key': wahaApiKey,
-          },
-          body: JSON.stringify({
-            chatId: chatId,
-            presence: 'paused',
-            session: sessionName,
-          }),
-        });
-
-        // Registrar envío exitoso
+        // Registrar estado 'queued' para la campaña
         await supabase
           .from('campaign_sends')
           .insert({
@@ -196,71 +170,33 @@ serve(async (req) => {
             contact_name: contact.name,
             message_sent: messageToSend,
             was_personalized: campaign.edit_with_ai,
-            status: 'sent',
-            sent_at: new Date().toISOString(),
+            status: 'queued',
             user_id: campaign.user_id,
           });
 
-        sentCount++;
-
-        // Actualizar progreso cada 5 mensajes
-        if (sentCount % 5 === 0) {
-          await supabase
-            .from('mass_campaigns')
-            .update({ sent_count: sentCount })
-            .eq('id', campaign_id);
-        }
-
-        console.log(`Sent to ${contact.name} (${sentCount}/${contacts.length})`);
+        enqueuedCount++;
 
       } catch (contactError) {
-        console.error(`Failed to send to ${contact.name}:`, contactError);
-        failedCount++;
-
-        const errorMessage = contactError instanceof Error ? contactError.message : 'Unknown error';
-
-        // Registrar envío fallido
-        await supabase
-          .from('campaign_sends')
-          .insert({
-            campaign_id: campaign_id,
-            contact_id: contact.id,
-            phone_number: contact.phone_number,
-            contact_name: contact.name,
-            message_sent: campaign.message,
-            was_personalized: false,
-            status: 'failed',
-            error_message: errorMessage,
-            user_id: campaign.user_id,
-          });
+        console.error(`Failed to enqueue for ${contact.name}:`, contactError);
       }
     }
 
-    // Actualizar estado final de la campaña
-    const successRate = (sentCount / contacts.length) * 100;
-    let finalStatus = 'sent';
-    
-    if (successRate === 0) {
-      finalStatus = 'failed';
-    } else if (successRate < 80) {
-      finalStatus = 'partial';
-    }
-
+    // Actualizar estado de la campaña a 'sending' y total encolado
     await supabase
       .from('mass_campaigns')
       .update({ 
-        status: finalStatus,
-        sent_count: sentCount,
+        status: 'sending',
+        total_count: contacts.length,
+        sent_count: 0,
       })
       .eq('id', campaign_id);
 
-    console.log(`Campaign ${campaign_id} completed: ${sentCount} sent, ${failedCount} failed`);
+    console.log(`Campaign ${campaign_id} enqueued: ${enqueuedCount}/${contacts.length}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        sent_count: sentCount,
-        failed_count: failedCount,
+        enqueued_count: enqueuedCount,
         total_count: contacts.length,
       }),
       {
