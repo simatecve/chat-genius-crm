@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ai_agents: {
         Row: {
+          channel_type: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -24,11 +25,15 @@ export type Database = {
           model: string | null
           name: string
           system_prompt: string
+          telegram_bot_id: string | null
           temperature: number | null
+          twilio_connection_id: string | null
           updated_at: string | null
           user_id: string
+          whatsapp_connection_id: string | null
         }
         Insert: {
+          channel_type?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -37,11 +42,15 @@ export type Database = {
           model?: string | null
           name: string
           system_prompt: string
+          telegram_bot_id?: string | null
           temperature?: number | null
+          twilio_connection_id?: string | null
           updated_at?: string | null
           user_id: string
+          whatsapp_connection_id?: string | null
         }
         Update: {
+          channel_type?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -50,11 +59,36 @@ export type Database = {
           model?: string | null
           name?: string
           system_prompt?: string
+          telegram_bot_id?: string | null
           temperature?: number | null
+          twilio_connection_id?: string | null
           updated_at?: string | null
           user_id?: string
+          whatsapp_connection_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_telegram_bot_id_fkey"
+            columns: ["telegram_bot_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agents_twilio_connection_id_fkey"
+            columns: ["twilio_connection_id"]
+            isOneToOne: false
+            referencedRelation: "twilio_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agents_whatsapp_connection_id_fkey"
+            columns: ["whatsapp_connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_api_keys: {
         Row: {
@@ -505,6 +539,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          channel_type: string | null
           contact_name: string | null
           created_at: string | null
           id: string
@@ -514,12 +549,15 @@ export type Database = {
           phone_number: string
           pushname: string | null
           status: string | null
+          telegram_bot_id: string | null
+          twilio_connection_id: string | null
           unread_count: number | null
           updated_at: string | null
           user_id: string
           whatsapp_number: string | null
         }
         Insert: {
+          channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
           id?: string
@@ -529,12 +567,15 @@ export type Database = {
           phone_number: string
           pushname?: string | null
           status?: string | null
+          telegram_bot_id?: string | null
+          twilio_connection_id?: string | null
           unread_count?: number | null
           updated_at?: string | null
           user_id: string
           whatsapp_number?: string | null
         }
         Update: {
+          channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
           id?: string
@@ -544,6 +585,8 @@ export type Database = {
           phone_number?: string
           pushname?: string | null
           status?: string | null
+          telegram_bot_id?: string | null
+          twilio_connection_id?: string | null
           unread_count?: number | null
           updated_at?: string | null
           user_id?: string
@@ -555,6 +598,20 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_telegram_bot_id_fkey"
+            columns: ["telegram_bot_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_twilio_connection_id_fkey"
+            columns: ["twilio_connection_id"]
+            isOneToOne: false
+            referencedRelation: "twilio_connections"
             referencedColumns: ["id"]
           },
         ]
@@ -724,6 +781,7 @@ export type Database = {
           attachment_names: string[] | null
           attachment_urls: string[] | null
           campaign_message: string | null
+          channel_type: string | null
           contact_list_id: string | null
           created_at: string | null
           description: string | null
@@ -736,7 +794,9 @@ export type Database = {
           scheduled_at: string | null
           sent_count: number | null
           status: string | null
+          telegram_bot_id: string | null
           total_count: number | null
+          twilio_connection_id: string | null
           updated_at: string | null
           user_id: string
           whatsapp_connection_id: string | null
@@ -746,6 +806,7 @@ export type Database = {
           attachment_names?: string[] | null
           attachment_urls?: string[] | null
           campaign_message?: string | null
+          channel_type?: string | null
           contact_list_id?: string | null
           created_at?: string | null
           description?: string | null
@@ -758,7 +819,9 @@ export type Database = {
           scheduled_at?: string | null
           sent_count?: number | null
           status?: string | null
+          telegram_bot_id?: string | null
           total_count?: number | null
+          twilio_connection_id?: string | null
           updated_at?: string | null
           user_id: string
           whatsapp_connection_id?: string | null
@@ -768,6 +831,7 @@ export type Database = {
           attachment_names?: string[] | null
           attachment_urls?: string[] | null
           campaign_message?: string | null
+          channel_type?: string | null
           contact_list_id?: string | null
           created_at?: string | null
           description?: string | null
@@ -780,7 +844,9 @@ export type Database = {
           scheduled_at?: string | null
           sent_count?: number | null
           status?: string | null
+          telegram_bot_id?: string | null
           total_count?: number | null
+          twilio_connection_id?: string | null
           updated_at?: string | null
           user_id?: string
           whatsapp_connection_id?: string | null
@@ -792,6 +858,20 @@ export type Database = {
             columns: ["contact_list_id"]
             isOneToOne: false
             referencedRelation: "contact_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mass_campaigns_telegram_bot_id_fkey"
+            columns: ["telegram_bot_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mass_campaigns_twilio_connection_id_fkey"
+            columns: ["twilio_connection_id"]
+            isOneToOne: false
+            referencedRelation: "twilio_connections"
             referencedColumns: ["id"]
           },
           {
@@ -1264,6 +1344,126 @@ export type Database = {
           titulo?: string
         }
         Relationships: []
+      }
+      telegram_bots: {
+        Row: {
+          bot_id: number | null
+          bot_name: string
+          bot_token: string
+          bot_username: string | null
+          created_at: string | null
+          default_column_id: string | null
+          id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          webhook_url: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          bot_id?: number | null
+          bot_name: string
+          bot_token: string
+          bot_username?: string | null
+          created_at?: string | null
+          default_column_id?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          webhook_url?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          bot_id?: number | null
+          bot_name?: string
+          bot_token?: string
+          bot_username?: string | null
+          created_at?: string | null
+          default_column_id?: string | null
+          id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          webhook_url?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_bots_default_column_id_fkey"
+            columns: ["default_column_id"]
+            isOneToOne: false
+            referencedRelation: "lead_columns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_bots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      twilio_connections: {
+        Row: {
+          account_sid: string
+          auth_token: string
+          connection_name: string
+          created_at: string | null
+          default_column_id: string | null
+          id: string
+          phone_number: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          webhook_url: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          account_sid: string
+          auth_token: string
+          connection_name: string
+          created_at?: string | null
+          default_column_id?: string | null
+          id?: string
+          phone_number: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          webhook_url?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          account_sid?: string
+          auth_token?: string
+          connection_name?: string
+          created_at?: string | null
+          default_column_id?: string | null
+          id?: string
+          phone_number?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          webhook_url?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twilio_connections_default_column_id_fkey"
+            columns: ["default_column_id"]
+            isOneToOne: false
+            referencedRelation: "lead_columns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "twilio_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       usage_tracking: {
         Row: {
