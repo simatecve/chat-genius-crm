@@ -844,6 +844,7 @@ const Leads = () => {
         onMoveLeadToColumn={handleMoveLeadToColumn}
         onConvertToContactList={openConvertDialog}
         onManageMessageTriggers={openMessageTriggersDialog}
+        onOpenConversation={handleLeadClick}
       />
 
       {/* Column Dialog */}

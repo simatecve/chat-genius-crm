@@ -40,6 +40,7 @@ interface KanbanBoardProps {
   onMoveLeadToColumn?: (leadId: string, targetColumnId: string) => void;
   onConvertToContactList?: (column: LeadColumn) => void;
   onManageMessageTriggers?: (column: LeadColumn) => void;
+  onOpenConversation?: (lead: LeadWithColumn) => void;
 }
 
 interface LeadCardProps {
@@ -47,9 +48,10 @@ interface LeadCardProps {
   index: number;
   onEdit?: (lead: Lead) => void;
   onDelete?: (leadId: string) => void;
+  onOpenConversation?: (lead: LeadWithColumn) => void;
 }
 
-const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) => {
+const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOpenConversation }) => {
   const navigate = useNavigate();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
     lead.phone || null,
@@ -60,6 +62,10 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete }) =>
   const conversation = hasConversation ? lead.conversations[0] : null;
 
   const handleOpenConversation = async () => {
+    if (onOpenConversation) {
+      onOpenConversation(lead);
+      return;
+    }
     if (lead.phone) {
       // Buscar conversación por número de teléfono
       const { data: conversations } = await supabase
@@ -257,7 +263,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onDeleteLead,
   onMoveLeadToColumn,
   onConvertToContactList,
-  onManageMessageTriggers
+  onManageMessageTriggers,
+  onOpenConversation
 }) => {
   const { user } = useAuth();
   
@@ -404,6 +411,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             index={index}
                             onEdit={onEditLead}
                             onDelete={onDeleteLead}
+                            onOpenConversation={onOpenConversation}
                           />
                         ))}
                         {provided.placeholder}
