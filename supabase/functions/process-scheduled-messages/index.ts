@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
           .single();
 
         if (blockedContact) {
-          console.log(`⏭️ Contact ${message.whatsapp_number} is blocked, skipping...`);
+          console.log(`⏭️ Contact ${message.phone_number} is blocked, skipping...`);
           
           await supabase
             .from('automated_message_logs')
