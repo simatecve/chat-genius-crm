@@ -193,6 +193,11 @@ serve(async (req) => {
 
     console.log(`Campaign ${campaign_id} enqueued: ${enqueuedCount}/${contacts.length}`);
 
+    try {
+      const triggerUrl = `${supabaseUrl}/functions/v1/process-scheduled-messages`;
+      await fetch(triggerUrl, { method: 'POST' });
+    } catch (_) {}
+
     return new Response(
       JSON.stringify({
         success: true,

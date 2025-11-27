@@ -20,6 +20,7 @@ export function MassCampaigns() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null);
+  const [progressMap, setProgressMap] = useState<Record<string, { queued: number; sent: number; failed: number }>>({});
 
   useEffect(() => {
     if (effectiveUserId) {
@@ -39,6 +40,7 @@ export function MassCampaigns() {
 
       if (error) throw error;
       setCampaigns(data || []);
+      await loadProgress(data || []);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       toast({
@@ -49,6 +51,20 @@ export function MassCampaigns() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadProgress = async (list: Campaign[]) => {
+    const entries = await Promise.all(list.map(async (c) => {
+      const { data } = await supabase
+        .from('campaign_sends')
+        .select('id, status')
+        .eq('campaign_id', c.id);
+      const queued = (data || []).filter(d => d.status === 'queued').length;
+      const sent = (data || []).filter(d => d.status === 'sent').length;
+      const failed = (data || []).filter(d => d.status === 'failed').length;
+      return [c.id, { queued, sent, failed }] as const;
+    }));
+    setProgressMap(Object.fromEntries(entries));
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
@@ -97,7 +113,7 @@ export function MassCampaigns() {
 
       toast({
         title: 'Éxito',
-        description: `Campaña iniciada: ${data.sent_count}/${data.total_count} mensajes enviados`,
+        description: `Campaña encolada: ${data.enqueued_count}/${data.total_count}`,
       });
 
       // Recargar campañas para obtener el estado actualizado
@@ -133,6 +149,15 @@ export function MassCampaigns() {
     campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     campaign.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    const hasSending = campaigns.some(c => c.status === 'sending');
+    if (!hasSending) return;
+    const interval = setInterval(() => {
+      fetchCampaigns();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [campaigns]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -248,14 +273,13 @@ export function MassCampaigns() {
                         <span className="text-xs text-primary">✨ Con IA</span>
                       </div>
                     )}
-                    {(campaign.sent_count || 0) > 0 && (
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">
-                          {campaign.sent_count}/{campaign.total_count} enviados
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {progressMap[campaign.id]?.sent || 0}/{campaign.total_count || progressMap[campaign.id]?.queued || 0} enviados
+                        {progressMap[campaign.id]?.failed ? ` • ${progressMap[campaign.id]?.failed} fallidos` : ''}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex gap-2">
