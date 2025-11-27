@@ -61,6 +61,12 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     password: 'Capibet1234',
   });
   const [showCasinoPassword, setShowCasinoPassword] = useState(true);
+  const [createPlayerResponse, setCreatePlayerResponse] = useState<any | null>(null);
+  const [createPlayerResponseRaw, setCreatePlayerResponseRaw] = useState<string | null>(null);
+  const [createDepositResponse, setCreateDepositResponse] = useState<any | null>(null);
+  const [createDepositResponseRaw, setCreateDepositResponseRaw] = useState<string | null>(null);
+  const [createWithdrawResponse, setCreateWithdrawResponse] = useState<any | null>(null);
+  const [createWithdrawResponseRaw, setCreateWithdrawResponseRaw] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     gender: '',
@@ -274,23 +280,61 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const response = await casinoApiService.doDeposit(
-        casinoPassword.username,
-        parseFloat(casinoTransaction.amount)
-      );
+      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userName: casinoPassword.username,
+          amount: parseFloat(casinoTransaction.amount),
+        }),
+      });
 
-      if (response.success) {
+      const contentType = apiResponse.headers.get('content-type') || '';
+      let parsed: any = null;
+      let rawText: string | null = null;
+      if (contentType.includes('application/json')) {
+        try {
+          parsed = await apiResponse.json();
+          rawText = JSON.stringify(parsed);
+        } catch {
+          parsed = null;
+          rawText = null;
+        }
+      } else {
+        try {
+          rawText = await apiResponse.text();
+          try {
+            parsed = JSON.parse(rawText);
+          } catch {
+            parsed = null;
+          }
+        } catch {
+          rawText = null;
+        }
+      }
+
+      setCreateDepositResponse(parsed ?? { status: apiResponse.status, ok: apiResponse.ok });
+      setCreateDepositResponseRaw(rawText);
+
+      if (apiResponse.ok) {
         toast({
-          title: 'Depósito exitoso',
-          description: `Se depositaron $${casinoTransaction.amount}`,
+          title: 'Webhook ejecutado',
+          description: 'La respuesta se muestra en el modal.',
         });
         setCasinoTransaction({ ...casinoTransaction, amount: '' });
-        await loadCasinoBalance(casinoPassword.username);
+      } else {
+        toast({
+          title: 'Error del webhook',
+          description: `Estado ${apiResponse.status}`,
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo realizar el depósito.',
+        description: 'No se pudo ejecutar el webhook de depósito.',
         variant: 'destructive',
       });
     } finally {
@@ -310,23 +354,61 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const response = await casinoApiService.doWithdraw(
-        casinoPassword.username,
-        parseFloat(casinoTransaction.amount)
-      );
+      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userName: casinoPassword.username,
+          amount: parseFloat(casinoTransaction.amount),
+        }),
+      });
 
-      if (response.success) {
+      const contentType = apiResponse.headers.get('content-type') || '';
+      let parsed: any = null;
+      let rawText: string | null = null;
+      if (contentType.includes('application/json')) {
+        try {
+          parsed = await apiResponse.json();
+          rawText = JSON.stringify(parsed);
+        } catch {
+          parsed = null;
+          rawText = null;
+        }
+      } else {
+        try {
+          rawText = await apiResponse.text();
+          try {
+            parsed = JSON.parse(rawText);
+          } catch {
+            parsed = null;
+          }
+        } catch {
+          rawText = null;
+        }
+      }
+
+      setCreateWithdrawResponse(parsed ?? { status: apiResponse.status, ok: apiResponse.ok });
+      setCreateWithdrawResponseRaw(rawText);
+
+      if (apiResponse.ok) {
         toast({
-          title: 'Retiro exitoso',
-          description: `Se retiraron $${casinoTransaction.amount}`,
+          title: 'Webhook ejecutado',
+          description: 'La respuesta se muestra en el modal.',
         });
         setCasinoTransaction({ ...casinoTransaction, amount: '' });
-        await loadCasinoBalance(casinoPassword.username);
+      } else {
+        toast({
+          title: 'Error del webhook',
+          description: `Estado ${apiResponse.status}`,
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo realizar el retiro.',
+        description: 'No se pudo ejecutar el webhook de retiro.',
         variant: 'destructive',
       });
     } finally {
@@ -346,22 +428,62 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const response = await casinoApiService.addPlayer(
-        casinoPassword.username,
-        casinoPassword.password
-      );
+      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userName: casinoPassword.username,
+          password: casinoPassword.password,
+          contactName,
+          phoneNumber,
+        }),
+      });
 
-      if (response.success) {
+      const contentType = apiResponse.headers.get('content-type') || '';
+      let parsed: any = null;
+      let rawText: string | null = null;
+      if (contentType.includes('application/json')) {
+        try {
+          parsed = await apiResponse.json();
+          rawText = JSON.stringify(parsed);
+        } catch {
+          parsed = null;
+          rawText = null;
+        }
+      } else {
+        try {
+          rawText = await apiResponse.text();
+          try {
+            parsed = JSON.parse(rawText);
+          } catch {
+            parsed = null;
+          }
+        } catch {
+          rawText = null;
+        }
+      }
+
+      setCreatePlayerResponse(parsed ?? { status: apiResponse.status, ok: apiResponse.ok });
+      setCreatePlayerResponseRaw(rawText);
+
+      if (apiResponse.ok) {
         toast({
-          title: 'Jugador creado',
-          description: `Usuario ${response.result.userName} creado exitosamente.`,
+          title: 'Webhook ejecutado',
+          description: 'La respuesta se muestra en el modal.',
         });
-        await loadCasinoBalance(casinoPassword.username);
+      } else {
+        toast({
+          title: 'Error del webhook',
+          description: `Estado ${apiResponse.status}`,
+          variant: 'destructive',
+        });
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'No se pudo crear el jugador.',
+        description: 'No se pudo ejecutar el webhook.',
         variant: 'destructive',
       });
     } finally {
@@ -695,13 +817,28 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                         </button>
                       </div>
                     </div>
-                    <Button
-                      onClick={handleCreateCasinoPlayer}
-                      disabled={casinoLoading}
-                      className="w-full"
-                    >
-                      {casinoLoading ? 'Creando...' : 'Crear Jugador'}
-                    </Button>
+                  <Button
+                    onClick={handleCreateCasinoPlayer}
+                    disabled={casinoLoading}
+                    className="w-full"
+                  >
+                    {casinoLoading ? 'Creando...' : 'Crear Jugador'}
+                  </Button>
+                  {(createPlayerResponse || createPlayerResponseRaw) && (
+                    <div className="p-3 bg-muted rounded border mt-2 space-y-2">
+                      <Label>Respuesta del Webhook</Label>
+                      {createPlayerResponse && (
+                        <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                          {JSON.stringify(createPlayerResponse, null, 2)}
+                        </pre>
+                      )}
+                      {createPlayerResponseRaw && (
+                        <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                          {createPlayerResponseRaw}
+                        </pre>
+                      )}
+                    </div>
+                  )}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -747,6 +884,21 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                     >
                       {casinoLoading ? 'Procesando...' : 'Confirmar Depósito'}
                     </Button>
+                    {(createDepositResponse || createDepositResponseRaw) && (
+                      <div className="p-3 bg-muted rounded border mt-2 space-y-2">
+                        <Label>Respuesta del Webhook</Label>
+                        {createDepositResponse && (
+                          <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                            {JSON.stringify(createDepositResponse, null, 2)}
+                          </pre>
+                        )}
+                        {createDepositResponseRaw && (
+                          <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                            {createDepositResponseRaw}
+                          </pre>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -793,6 +945,21 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                     >
                       {casinoLoading ? 'Procesando...' : 'Confirmar Retiro'}
                     </Button>
+                    {(createWithdrawResponse || createWithdrawResponseRaw) && (
+                      <div className="p-3 bg-muted rounded border mt-2 space-y-2">
+                        <Label>Respuesta del Webhook</Label>
+                        {createWithdrawResponse && (
+                          <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                            {JSON.stringify(createWithdrawResponse, null, 2)}
+                          </pre>
+                        )}
+                        {createWithdrawResponseRaw && (
+                          <pre className="mt-2 text-xs overflow-x-auto whitespace-pre-wrap">
+                            {createWithdrawResponseRaw}
+                          </pre>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </DialogContent>
               </Dialog>
