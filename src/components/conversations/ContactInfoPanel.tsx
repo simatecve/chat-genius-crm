@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Calendar, MapPin, Users, Filter, FileText, DollarSign, ChevronDown, ChevronUp, Plus, Edit2, Coins, TrendingUp, TrendingDown, UserPlus, Key, RefreshCw, Bot, BotOff } from 'lucide-react';
+import { User, Calendar, MapPin, Users, Filter, FileText, DollarSign, ChevronDown, ChevronUp, Plus, Edit2, Coins, TrendingUp, TrendingDown, UserPlus, Key, RefreshCw, Bot, BotOff, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -58,8 +58,9 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   });
   const [casinoPassword, setCasinoPassword] = useState({
     username: '',
-    password: '',
+    password: 'Capibet1234',
   });
+  const [showCasinoPassword, setShowCasinoPassword] = useState(true);
 
   const [formData, setFormData] = useState({
     gender: '',
@@ -672,12 +673,27 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                     </div>
                     <div>
                       <Label>Contraseña</Label>
-                      <Input
-                        type="password"
-                        value={casinoPassword.password}
-                        onChange={(e) => setCasinoPassword({ ...casinoPassword, password: e.target.value })}
-                        placeholder="Contraseña"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showCasinoPassword ? 'text' : 'password'}
+                          value={casinoPassword.password}
+                          onChange={(e) => setCasinoPassword({ ...casinoPassword, password: e.target.value })}
+                          placeholder="Contraseña"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCasinoPassword(!showCasinoPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8696a0] hover:text-[#e9edef]"
+                          aria-label={showCasinoPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        >
+                          {showCasinoPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <Button
                       onClick={handleCreateCasinoPlayer}
