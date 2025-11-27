@@ -182,14 +182,37 @@ serve(async (req) => {
           
           const { data: existingConv } = await supabase
             .from('conversations')
-            .select('id')
+            .select('id, whatsapp_number, contact_name')
             .eq('phone_number', cleanNumber)
             .eq('user_id', campaign.user_id)
             .maybeSingle();
 
           if (existingConv) {
             conversationId = existingConv.id;
+            
+            // Actualizar conversación existente con campos faltantes
+            const updateFields: Record<string, any> = {
+              last_message: messageToSend,
+              last_message_time: new Date().toISOString(),
+            };
+            
+            // Si whatsapp_number está vacío, actualizarlo
+            if (!existingConv.whatsapp_number) {
+              updateFields.whatsapp_number = whatsappNumber;
+            }
+            
+            // Si contact_name está vacío, actualizarlo
+            if (!existingConv.contact_name) {
+              updateFields.contact_name = contact.name || cleanNumber;
+            }
+            
+            await supabase
+              .from('conversations')
+              .update(updateFields)
+              .eq('id', conversationId);
+              
           } else {
+            // Crear nueva conversación
             const { data: newConv } = await supabase
               .from('conversations')
               .insert({
@@ -224,15 +247,6 @@ serve(async (req) => {
                 sent_via: 'mass_campaign'
               }
             });
-
-            // Actualizar conversación
-            await supabase
-              .from('conversations')
-              .update({
-                last_message: messageToSend,
-                last_message_time: new Date().toISOString(),
-              })
-              .eq('id', conversationId);
           }
 
           // Registrar en campaign_sends
