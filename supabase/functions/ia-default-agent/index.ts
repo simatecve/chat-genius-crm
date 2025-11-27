@@ -52,7 +52,7 @@ serve(async (req) => {
     }
 
     const isEnabled = !!settings?.is_enabled;
-    const cashierNumbersText: string = settings?.cashier_numbers || '';
+    const cashierNumbers: string[] = Array.isArray(settings?.cashier_numbers) ? settings!.cashier_numbers : [];
     const cbu: string = settings?.cbu || '';
 
     // Si la IA global está desactivada, no responde
@@ -96,7 +96,7 @@ serve(async (req) => {
       let respuesta = 'Por seguridad, te derivo con un asesor que te ayuda con eso 💸';
       // Si pide datos bancarios explícitos, incluir dinámicos
       if (bankInfoRequested) {
-        const cajas = cashierNumbersText?.trim() || '';
+        const cajas = cashierNumbers && cashierNumbers.length > 0 ? cashierNumbers.join(', ') : '';
         const datos = [
           cbu ? `CBU: ${cbu}` : '',
           cajas ? `Números de caja: ${cajas}` : ''
@@ -121,7 +121,7 @@ serve(async (req) => {
 
     // Caso conversación normal: usar Gemini 2.5 Flash vía Lovable
     let respuesta = '';
-    const systemPrompt = `🎯 Objetivo general\n\nSimular al asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.\nDebe atender, informar y acompañar al cliente. El registro es gratuito y juego responsable (18+).\n\nSi el usuario pide datos bancarios (CBU/alias/QR/numero de caja), respóndelos usando los siguientes valores dinámicos:\nCBU: ${cbu || '[no configurado]'}\nNúmeros de caja: ${cashierNumbersText ? cashierNumbersText : '[no configurados]'}\n\nSolo derivá automáticamente cuando haya intención real de transferir o envío de comprobante.\nPara preguntas generales (precios, bonos, cómo jugar, juegos), responde amable y breve.\n\nFormato de salida: NO devuelvas JSON, solo devuelve el texto de respuesta conversacional. El sistema lo envolverá en JSON.`;
+    const systemPrompt = `🎯 Objetivo general\n\nSimular al asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.\nDebe atender, informar y acompañar al cliente. El registro es gratuito y juego responsable (18+).\n\nSi el usuario pide datos bancarios (CBU/alias/QR/numero de caja), respóndelos usando los siguientes valores dinámicos:\nCBU: ${cbu || '[no configurado]'}\nNúmeros de caja: ${(cashierNumbers && cashierNumbers.length>0) ? cashierNumbers.join(', ') : '[no configurados]'}\n\nSolo derivá automáticamente cuando haya intención real de transferir o envío de comprobante.\nPara preguntas generales (precios, bonos, cómo jugar, juegos), responde amable y breve.\n\nFormato de salida: NO devuelvas JSON, solo devuelve el texto de respuesta conversacional. El sistema lo envolverá en JSON.`;
 
     const aiMessages = [
       { role: 'system', content: systemPrompt },

@@ -1693,7 +1693,7 @@ export type Database = {
         Row: {
           id: number
           is_enabled: boolean
-          cashier_numbers: string
+          cashier_numbers: string[]
           cbu: string
           created_at: string | null
           updated_at: string | null
@@ -1701,7 +1701,7 @@ export type Database = {
         Insert: {
           id?: number
           is_enabled?: boolean
-          cashier_numbers?: string
+          cashier_numbers?: string[]
           cbu?: string
           created_at?: string | null
           updated_at?: string | null
@@ -1709,7 +1709,7 @@ export type Database = {
         Update: {
           id?: number
           is_enabled?: boolean
-          cashier_numbers?: string
+          cashier_numbers?: string[]
           cbu?: string
           created_at?: string | null
           updated_at?: string | null
