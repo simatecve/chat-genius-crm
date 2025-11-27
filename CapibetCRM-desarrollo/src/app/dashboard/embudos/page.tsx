@@ -479,9 +479,9 @@ export default function EmbudosPage() {
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                   >
-                    <div className="flex flex-row gap-6 overflow-x-auto overflow-y-hidden h-full items-stretch pb-4 scrollbar-thin">
+                    <div className="flex flex-row gap-4 overflow-x-auto overflow-y-hidden h-full items-stretch pb-4 scrollbar-thin">
                     {embudosForzados.map((embudo, index) => (
-                      <div key={embudo.id} className="flex-shrink-0 w-110 h-full min-h-0">
+                      <div key={embudo.id} className="flex-shrink-0 w-80 h-full min-h-0">
                         <DraggableEmbudo
                           embudo={embudo}
                           index={index}

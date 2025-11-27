@@ -316,7 +316,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           return (
             <div 
               key={column.id} 
-              className="flex-shrink-0 w-80"
+              className="flex-shrink-0 w-64"
             >
               <Card 
                 className="h-full border-t-4 bg-card/50 backdrop-blur-sm"
