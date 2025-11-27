@@ -646,6 +646,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_default_settings: {
+        Row: {
+          cashier_numbers: string
+          cbu: string
+          created_at: string | null
+          id: number
+          is_enabled: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          cashier_numbers?: string
+          cbu?: string
+          created_at?: string | null
+          id?: number
+          is_enabled?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          cashier_numbers?: string
+          cbu?: string
+          created_at?: string | null
+          id?: number
+          is_enabled?: boolean
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       internal_messages: {
         Row: {
           content: string
@@ -1688,33 +1715,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      ia_default_settings: {
-        Row: {
-          id: number
-          is_enabled: boolean
-          cashier_numbers: string
-          cbu: string
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: number
-          is_enabled?: boolean
-          cashier_numbers?: string
-          cbu?: string
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: number
-          is_enabled?: boolean
-          cashier_numbers?: string
-          cbu?: string
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       workspaces: {
         Row: {

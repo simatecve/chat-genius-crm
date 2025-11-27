@@ -280,7 +280,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/cargar-saldo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -354,7 +354,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/retirar-saldo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -428,7 +428,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/crear-usuario', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

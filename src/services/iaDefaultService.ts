@@ -25,7 +25,7 @@ export const iaDefaultService = {
       console.error('Error fetching IA default settings:', error);
       throw error;
     }
-    return data as IADefaultSettings;
+    return data as unknown as IADefaultSettings;
   },
 
   async saveSettings(settings: Omit<IADefaultSettings, 'created_at' | 'updated_at'>): Promise<IADefaultSettings> {
@@ -46,7 +46,7 @@ export const iaDefaultService = {
       .single();
 
     if (!updateRes.error && updateRes.data) {
-      return updateRes.data as IADefaultSettings;
+      return updateRes.data as unknown as IADefaultSettings;
     }
 
     // If no row exists yet, perform regular upsert (RLS allows any authenticated user)
@@ -60,6 +60,6 @@ export const iaDefaultService = {
       console.error('Error saving IA default settings:', error);
       throw error;
     }
-    return data as IADefaultSettings;
+    return data as unknown as IADefaultSettings;
   }
 };
