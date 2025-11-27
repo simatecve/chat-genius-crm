@@ -105,9 +105,11 @@ export const useMessages = (conversationId: string | null) => {
   const { effectiveUserId } = useEffectiveUserId();
   const queryClient = useQueryClient();
 
+  console.log('[useMessages] conversationId:', conversationId, 'effectiveUserId:', effectiveUserId);
+
   // Query para obtener mensajes
   const messagesQuery = useQuery({
-    queryKey: ['messages', conversationId],
+    queryKey: ['messages', conversationId, effectiveUserId],
     queryFn: () => ConversationService.getMessages(conversationId || '', effectiveUserId || ''),
     enabled: !!conversationId && !!effectiveUserId,
     staleTime: 10000,
