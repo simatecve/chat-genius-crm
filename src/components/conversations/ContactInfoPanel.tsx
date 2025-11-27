@@ -16,6 +16,10 @@ import { casinoApiService } from '@/services/casinoApiService';
 import { supabase } from '@/integrations/supabase/client';
 import { useBotBlock } from '@/hooks/useBotBlock';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
+const N8N_DEPOSIT_URL = process.env.NEXT_PUBLIC_N8N_DEPOSIT_URL || 'https://n8n2025.nocodeveloper.site/webhook/cargar-saldo';
+const N8N_WITHDRAW_URL = process.env.NEXT_PUBLIC_N8N_WITHDRAW_URL || 'https://n8n2025.nocodeveloper.site/webhook/retirar-saldo';
+const N8N_CREATE_USER_URL = process.env.NEXT_PUBLIC_N8N_CREATE_USER_URL || 'https://n8n2025.nocodeveloper.site/webhook/crear-usuario';
+
 
 interface ContactInfoPanelProps {
   conversationId: string;
@@ -280,7 +284,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+      const apiResponse = await fetch(N8N_DEPOSIT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -354,7 +358,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+      const apiResponse = await fetch(N8N_WITHDRAW_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -428,7 +432,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
 
     setCasinoLoading(true);
     try {
-      const apiResponse = await fetch('https://n8n2025.nocodeveloper.site/webhook/c4fa4a20-3119-4404-a247-3a84a0e9c579', {
+      const apiResponse = await fetch(N8N_CREATE_USER_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
