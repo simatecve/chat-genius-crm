@@ -8,36 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 import { iaDefaultService, IADefaultSettings } from '@/services/iaDefaultService';
 import { X } from 'lucide-react';
 
-const Chip: React.FC<{ value: string; onRemove: () => void }> = ({ value, onRemove }) => (
-  <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-muted-foreground mr-2 mb-2 text-sm">
-    {value}
-    <button className="ml-1 hover:text-destructive" onClick={onRemove} aria-label="Eliminar">
-      <X className="h-3 w-3" />
-    </button>
-  </span>
-);
-
 const IADefaultTab: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
 
   const [isEnabled, setIsEnabled] = useState(false);
-  const [cashierInput, setCashierInput] = useState('');
-  const [cashierNumbers, setCashierNumbers] = useState<string[]>([]);
+  const [cashierNumbersText, setCashierNumbersText] = useState('');
   const [cbu, setCbu] = useState('');
 
-  const addCashierNumber = () => {
-    const cleaned = cashierInput.trim();
-    if (!cleaned) return;
-    if (!cashierNumbers.includes(cleaned)) {
-      setCashierNumbers(prev => [...prev, cleaned]);
-    }
-    setCashierInput('');
-  };
-
-  const removeCashierNumber = (num: string) => {
-    setCashierNumbers(prev => prev.filter(n => n !== num));
-  };
 
   useEffect(() => {
     const load = async () => {
@@ -45,7 +23,7 @@ const IADefaultTab: React.FC = () => {
         const settings = await iaDefaultService.getSettings();
         if (settings) {
           setIsEnabled(!!settings.is_enabled);
-          setCashierNumbers(settings.cashier_numbers || []);
+          setCashierNumbersText(settings.cashier_numbers || '');
           setCbu(settings.cbu || '');
         }
       } catch (error) {
@@ -67,7 +45,7 @@ const IADefaultTab: React.FC = () => {
       await iaDefaultService.saveSettings({
         id: 1,
         is_enabled: isEnabled,
-        cashier_numbers: cashierNumbers,
+        cashier_numbers: cashierNumbersText,
         cbu,
       });
       toast({ title: 'Guardado', description: 'Configuración actualizada correctamente.' });
@@ -77,12 +55,7 @@ const IADefaultTab: React.FC = () => {
     }
   };
 
-  const onCashierKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      addCashierNumber();
-    }
-  };
+  // ya no se usa chips; texto libre
 
   if (loading) {
     return (
@@ -118,26 +91,20 @@ const IADefaultTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Números de Cajeros */}
+      {/* Números de Cajeros (texto) */}
       <Card>
         <CardHeader>
           <CardTitle>Números de Cajeros</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-3">
-            Ingresa los números de teléfono de los cajeros. Presiona espacio o Enter para agregar cada número.
+            Ingresa uno o varios números de cajero en texto libre (por ejemplo, separados por coma).
           </p>
           <Input
-            placeholder="Ingresa un número de teléfono..."
-            value={cashierInput}
-            onChange={(e) => setCashierInput(e.target.value)}
-            onKeyDown={onCashierKeyDown}
+            placeholder="Ej: +54911..., +549351..."
+            value={cashierNumbersText}
+            onChange={(e) => setCashierNumbersText(e.target.value)}
           />
-          <div className="mt-3">
-            {cashierNumbers.map((num) => (
-              <Chip key={num} value={num} onRemove={() => removeCashierNumber(num)} />
-            ))}
-          </div>
         </CardContent>
       </Card>
 

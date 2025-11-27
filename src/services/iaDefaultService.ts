@@ -3,7 +3,7 @@ import { supabase, supabaseAdmin } from '@/integrations/supabase/client';
 export interface IADefaultSettings {
   id: number;
   is_enabled: boolean;
-  cashier_numbers: string[];
+  cashier_numbers: string; // ahora texto libre
   cbu: string;
   created_at?: string | null;
   updated_at?: string | null;
