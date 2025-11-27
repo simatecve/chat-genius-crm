@@ -599,31 +599,191 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           )}
         </Card>
 
-        {/* NOTAS */}
-        <Card className="p-3 bg-[#202c33] border-border/20">
+        {/* CASINO */}
+        <Card className="p-3 bg-[#202c33] border-[#00a884]">
           <button
-            onClick={() => toggleSection('notes')}
+            onClick={() => toggleSection('casino')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4 text-[#00a884]" />
-              <h3 className="font-medium text-sm text-[#e9edef]">NOTAS</h3>
+              <Coins className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#00a884]">CASINO / BALANCE</h3>
             </div>
-            {expandedSections.notes ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
+            {expandedSections.casino ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
-          {expandedSections.notes && (
-            <div className="mt-3">
-              {isEditing ? (
-                <Textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Añade notas sobre este contacto..."
-                  className="min-h-20"
+          {expandedSections.casino && (
+            <div className="mt-3 space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs">Usuario del Casino</Label>
+                <Input
+                  value={casinoPassword.username}
+                  onChange={(e) => setCasinoPassword({ ...casinoPassword, username: e.target.value })}
+                  placeholder="Ingrese username..."
+                  className="h-8"
                 />
-              ) : (
-                <p className="text-sm whitespace-pre-wrap">{formData.notes || 'Sin notas'}</p>
+              </div>
+
+              {casinoBalance !== null && (
+                <div className="text-center p-4 bg-[#22c55e]/10 border border-[#22c55e] rounded-lg">
+                  <Coins className="h-8 w-8 mx-auto mb-2 text-[#22c55e]" />
+                  <p className="text-2xl font-bold text-[#22c55e]">${casinoBalance.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">Balance actual</p>
+                  {casinoPlayer && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {casinoPlayer.userName} - {casinoPlayer.rolename}
+                    </p>
+                  )}
+                </div>
               )}
+
+              <Button
+                onClick={() => casinoPassword.username && loadCasinoBalance(casinoPassword.username)}
+                disabled={!casinoPassword.username || casinoLoading}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${casinoLoading ? 'animate-spin' : ''}`} />
+                Consultar Balance
+              </Button>
+
+              <Separator />
+
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Crear Jugador
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Crear Nuevo Jugador</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <Label>Username</Label>
+                      <Input
+                        value={casinoPassword.username}
+                        onChange={(e) => setCasinoPassword({ ...casinoPassword, username: e.target.value })}
+                        placeholder="Username del jugador"
+                      />
+                    </div>
+                    <div>
+                      <Label>Contraseña</Label>
+                      <Input
+                        type="password"
+                        value={casinoPassword.password}
+                        onChange={(e) => setCasinoPassword({ ...casinoPassword, password: e.target.value })}
+                        placeholder="Contraseña"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleCreateCasinoPlayer}
+                      disabled={casinoLoading}
+                      className="w-full"
+                    >
+                      {casinoLoading ? 'Creando...' : 'Crear Jugador'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-[#22c55e] hover:bg-[#16a34a]"
+                    disabled={!casinoPassword.username}
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Depositar
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Realizar Depósito</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <Label>Usuario</Label>
+                      <Input
+                        value={casinoPassword.username}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                    <div>
+                      <Label>Monto a Depositar</Label>
+                      <Input
+                        type="number"
+                        value={casinoTransaction.amount}
+                        onChange={(e) => setCasinoTransaction({ ...casinoTransaction, amount: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleCasinoDeposit}
+                      disabled={casinoLoading || !casinoTransaction.amount}
+                      className="w-full bg-[#22c55e] hover:bg-[#16a34a]"
+                    >
+                      {casinoLoading ? 'Procesando...' : 'Confirmar Depósito'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                    disabled={!casinoPassword.username}
+                  >
+                    <TrendingDown className="h-4 w-4 mr-2" />
+                    Retirar
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Realizar Retiro</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <Label>Usuario</Label>
+                      <Input
+                        value={casinoPassword.username}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                    <div>
+                      <Label>Monto a Retirar</Label>
+                      <Input
+                        type="number"
+                        value={casinoTransaction.amount}
+                        onChange={(e) => setCasinoTransaction({ ...casinoTransaction, amount: e.target.value })}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleCasinoWithdraw}
+                      disabled={casinoLoading || !casinoTransaction.amount}
+                      variant="destructive"
+                      className="w-full"
+                    >
+                      {casinoLoading ? 'Procesando...' : 'Confirmar Retiro'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <p className="text-xs text-center text-muted-foreground">
+                Gestiona depósitos y retiros del casino
+              </p>
             </div>
           )}
         </Card>
@@ -713,197 +873,31 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           )}
         </Card>
 
-        {/* CASINO */}
-        <Card className="p-3 bg-[#202c33] border-[#00a884]">
+        {/* NOTAS */}
+        <Card className="p-3 bg-[#202c33] border-border/20">
           <button
-            onClick={() => toggleSection('casino')}
+            onClick={() => toggleSection('notes')}
             className="flex items-center justify-between w-full text-left"
           >
             <div className="flex items-center space-x-2">
-              <Coins className="h-4 w-4 text-[#00a884]" />
-              <h3 className="font-medium text-sm text-[#00a884]">CASINO / BALANCE</h3>
+              <FileText className="h-4 w-4 text-[#00a884]" />
+              <h3 className="font-medium text-sm text-[#e9edef]">NOTAS</h3>
             </div>
-            {expandedSections.casino ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
+            {expandedSections.notes ? <ChevronUp className="h-4 w-4 text-[#8696a0]" /> : <ChevronDown className="h-4 w-4 text-[#8696a0]" />}
           </button>
 
-          {expandedSections.casino && (
-            <div className="mt-3 space-y-3">
-              {/* Usuario del Casino */}
-              <div className="space-y-2">
-                <Label className="text-xs">Usuario del Casino</Label>
-                <Input
-                  value={casinoPassword.username}
-                  onChange={(e) => setCasinoPassword({ ...casinoPassword, username: e.target.value })}
-                  placeholder="Ingrese username..."
-                  className="h-8"
+          {expandedSections.notes && (
+            <div className="mt-3">
+              {isEditing ? (
+                <Textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Añade notas sobre este contacto..."
+                  className="min-h-20"
                 />
-              </div>
-
-              {/* Balance */}
-              {casinoBalance !== null && (
-                <div className="text-center p-4 bg-[#22c55e]/10 border border-[#22c55e] rounded-lg">
-                  <Coins className="h-8 w-8 mx-auto mb-2 text-[#22c55e]" />
-                  <p className="text-2xl font-bold text-[#22c55e]">${casinoBalance.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">Balance actual</p>
-                  {casinoPlayer && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {casinoPlayer.userName} - {casinoPlayer.rolename}
-                    </p>
-                  )}
-                </div>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{formData.notes || 'Sin notas'}</p>
               )}
-
-              {/* Botón consultar balance */}
-              <Button
-                onClick={() => casinoPassword.username && loadCasinoBalance(casinoPassword.username)}
-                disabled={!casinoPassword.username || casinoLoading}
-                variant="outline"
-                size="sm"
-                className="w-full"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${casinoLoading ? 'animate-spin' : ''}`} />
-                Consultar Balance
-              </Button>
-
-              <Separator />
-
-              {/* Crear Jugador */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Crear Jugador
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Crear Nuevo Jugador</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div>
-                      <Label>Username</Label>
-                      <Input
-                        value={casinoPassword.username}
-                        onChange={(e) => setCasinoPassword({ ...casinoPassword, username: e.target.value })}
-                        placeholder="Username del jugador"
-                      />
-                    </div>
-                    <div>
-                      <Label>Contraseña</Label>
-                      <Input
-                        type="password"
-                        value={casinoPassword.password}
-                        onChange={(e) => setCasinoPassword({ ...casinoPassword, password: e.target.value })}
-                        placeholder="Contraseña"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleCreateCasinoPlayer}
-                      disabled={casinoLoading}
-                      className="w-full"
-                    >
-                      {casinoLoading ? 'Creando...' : 'Crear Jugador'}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              {/* Depósito */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-[#22c55e] hover:bg-[#16a34a]"
-                    disabled={!casinoPassword.username}
-                  >
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Depositar
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Realizar Depósito</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div>
-                      <Label>Usuario</Label>
-                      <Input
-                        value={casinoPassword.username}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div>
-                      <Label>Monto a Depositar</Label>
-                      <Input
-                        type="number"
-                        value={casinoTransaction.amount}
-                        onChange={(e) => setCasinoTransaction({ ...casinoTransaction, amount: e.target.value })}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleCasinoDeposit}
-                      disabled={casinoLoading || !casinoTransaction.amount}
-                      className="w-full bg-[#22c55e] hover:bg-[#16a34a]"
-                    >
-                      {casinoLoading ? 'Procesando...' : 'Confirmar Depósito'}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              {/* Retiro */}
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full"
-                    disabled={!casinoPassword.username}
-                  >
-                    <TrendingDown className="h-4 w-4 mr-2" />
-                    Retirar
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Realizar Retiro</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div>
-                      <Label>Usuario</Label>
-                      <Input
-                        value={casinoPassword.username}
-                        disabled
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div>
-                      <Label>Monto a Retirar</Label>
-                      <Input
-                        type="number"
-                        value={casinoTransaction.amount}
-                        onChange={(e) => setCasinoTransaction({ ...casinoTransaction, amount: e.target.value })}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleCasinoWithdraw}
-                      disabled={casinoLoading || !casinoTransaction.amount}
-                      variant="destructive"
-                      className="w-full"
-                    >
-                      {casinoLoading ? 'Procesando...' : 'Confirmar Retiro'}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              <p className="text-xs text-center text-muted-foreground">
-                Gestiona depósitos y retiros del casino
-              </p>
             </div>
           )}
         </Card>
