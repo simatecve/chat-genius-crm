@@ -321,8 +321,12 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
       return;
     }
 
-    const phoneNumber = normalizePhoneNumber(messageData.from);
+    // Usar remoteJidAlt si está disponible (contiene el número correcto), sino usar from
+    const rawPhoneNumber = messageData._data?.key?.remoteJidAlt || messageData.from;
+    const phoneNumber = normalizePhoneNumber(rawPhoneNumber);
     const pushName = messageData._data?.pushName || null;
+    
+    console.log(`Using phone number from remoteJidAlt: ${rawPhoneNumber} -> normalized: ${phoneNumber}`);
     let messageContent = messageData.body || '';
     const timestamp = messageData.timestamp;
     const fromMe = messageData.fromMe;
