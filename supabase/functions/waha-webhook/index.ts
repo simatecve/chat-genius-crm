@@ -438,6 +438,55 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
         } else {
           console.log('AI agent response:', aiResult);
         }
+
+        // Fallback: si no hay agente activo, usar el agente por defecto si está habilitado
+        const shouldFallback = !aiResult?.processed;
+        if (shouldFallback) {
+          console.log('No active AI agent processed the message. Checking ia_default_settings...');
+          const { data: defaultSettings, error: defaultSettingsError } = await supabase
+            .from('ia_default_settings')
+            .select('is_enabled')
+            .eq('id', 1)
+            .single();
+
+          if (defaultSettingsError) {
+            console.error('Error fetching ia_default_settings:', defaultSettingsError);
+          }
+
+          if (defaultSettings?.is_enabled) {
+            console.log('Default IA agent is enabled. Invoking ia-default-agent...');
+            const { data: defaultResult, error: defaultError } = await supabase.functions.invoke('ia-default-agent', {
+              body: {
+                userId: userId,
+                messageContent: messageContent
+              }
+            });
+
+            if (defaultError) {
+              console.error('Error calling ia-default-agent:', defaultError);
+            } else if (defaultResult && defaultResult.respuesta) {
+              console.log('Sending default IA agent response...');
+              const { data: sendResult, error: sendError } = await supabase.functions.invoke('waha-send-message', {
+                body: {
+                  sessionName: session,
+                  phoneNumber: conversation.phone_number,
+                  message: defaultResult.respuesta,
+                  userId: userId,
+                  conversationId: conversation.id,
+                  isBot: true
+                }
+              });
+
+              if (sendError) {
+                console.error('Error sending default IA message:', sendError);
+              } else {
+                console.log('Default IA response sent:', sendResult);
+              }
+            }
+          } else {
+            console.log('Default IA agent is disabled. No automated response will be sent.');
+          }
+        }
       } catch (aiError) {
         console.error('Exception calling AI agent:', aiError);
       }

@@ -1689,6 +1689,33 @@ export type Database = {
           },
         ]
       }
+      ia_default_settings: {
+        Row: {
+          id: number
+          is_enabled: boolean
+          cashier_numbers: string[]
+          cbu: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: number
+          is_enabled?: boolean
+          cashier_numbers?: string[]
+          cbu?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: number
+          is_enabled?: boolean
+          cashier_numbers?: string[]
+          cbu?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       workspaces: {
         Row: {
           created_at: string | null

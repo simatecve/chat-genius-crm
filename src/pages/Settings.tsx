@@ -16,10 +16,11 @@ import WorkspaceManagement from '@/components/WorkspaceManagement';
 import WhatsAppConnections from '@/pages/WhatsAppConnections';
 import QuickReplies from '@/components/QuickReplies';
 import UserManagement from '@/components/UserManagement';
-import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon, Tag } from 'lucide-react';
+import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon, Tag, Brain } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 import TagsTab from '@/components/settings/TagsTab';
+import IADefaultTab from '@/components/settings/IADefaultTab';
 
 interface UserProfile {
   first_name: string | null;
@@ -223,6 +224,10 @@ const Settings = () => {
           <TabsTrigger value="integrations" className="flex items-center space-x-2 flex-shrink-0">
             <Key className="h-4 w-4" />
             <span>Integraciones</span>
+          </TabsTrigger>
+          <TabsTrigger value="ia-default" className="flex items-center space-x-2 flex-shrink-0">
+            <Brain className="h-4 w-4" />
+            <span>Inteligencia artificial</span>
           </TabsTrigger>
           <TabsTrigger value="tags" className="flex items-center space-x-2 flex-shrink-0">
             <Tag className="h-4 w-4" />
@@ -505,6 +510,10 @@ const Settings = () => {
 
         <TabsContent value="integrations" className="mt-6">
           <Integrations />
+        </TabsContent>
+
+        <TabsContent value="ia-default" className="mt-6">
+          <IADefaultTab />
         </TabsContent>
       </Tabs>
     </div>
