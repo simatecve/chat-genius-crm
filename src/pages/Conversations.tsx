@@ -36,6 +36,12 @@ const Conversations = () => {
   const { data: searchResults } = useSearchConversations(searchTerm);
   const { messages, sendMessage, isSending } = useMessages(selectedConversation?.id || null);
 
+  console.log('[Conversations] Current state:', {
+    selectedConversationId: selectedConversation?.id,
+    messagesCount: messages.length,
+    messagesPreview: messages.slice(0, 3).map(m => ({ id: m.id, content: m.content?.substring(0, 20), direction: m.direction }))
+  });
+
   // Cargar workspaces
   useEffect(() => {
     const loadWorkspaces = async () => {

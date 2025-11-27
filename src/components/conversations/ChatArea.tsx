@@ -172,6 +172,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     return groups;
   };
 
+  console.log('[ChatArea] Rendering with:', {
+    hasConversation: !!conversation,
+    messagesCount: messages.length,
+    messages: messages.map(m => ({ id: m.id, content: m.content.substring(0, 20), direction: m.direction }))
+  });
+
   if (!conversation) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -189,6 +195,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }
 
   const messageGroups = groupMessagesByDate(messages);
+  console.log('[ChatArea] Message groups:', Object.keys(messageGroups));
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-[#0d1418]">
