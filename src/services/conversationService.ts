@@ -99,11 +99,12 @@ export class ConversationService {
    */
   static async getMessages(conversationId: string, userId: string, limit: number = 50, offset: number = 0): Promise<Message[]> {
     try {
+      console.log('[ConversationService] Fetching messages for conversationId:', conversationId);
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -112,6 +113,7 @@ export class ConversationService {
         throw error;
       }
 
+      console.log('[ConversationService] Found messages:', data?.length || 0);
       // Retornar en orden cronológico (más antiguos primero)
       return (data || []).reverse();
     } catch (error) {
