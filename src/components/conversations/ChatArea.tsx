@@ -196,6 +196,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
   const messageGroups = groupMessagesByDate(messages);
   console.log('[ChatArea] Message groups:', Object.keys(messageGroups));
+  console.log('[ChatArea] Messages per group:', Object.entries(messageGroups).map(([date, msgs]) => ({
+    date,
+    count: msgs.length,
+    messages: msgs.map(m => ({ id: m.id, content: m.content?.substring(0, 30), created_at: m.created_at }))
+  })));
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-[#0d1418]">
