@@ -7,10 +7,10 @@ import { getSupabaseHeaders } from '@/utils/supabaseHeaders';
 // GET /api/chats/[id] - Obtener un chat específico por ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const { id } = params;
     
     if (!id) {
       return NextResponse.json({
@@ -60,17 +60,24 @@ export async function GET(
 // PATCH /api/chats/[id] - Actualizar un chat específico por ID
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const { id } = params;
     const chatData = await request.json();
-    
+
     if (!id) {
       return NextResponse.json({
         success: false,
         error: 'ID del chat inválido'
       }, { status: 400 });
+    }
+
+    // Validar formato de UUID simple (opcional)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      // No bloquear si el sistema usa otro formato, pero avisar
+      console.warn('Formato de ID de chat no UUID estándar:', id);
     }
 
     const response = await fetch(`${supabaseConfig.restUrl}/chats?id=eq.${id}`, {
@@ -89,18 +96,20 @@ export async function PATCH(
     }
 
     const data = await handleResponse(response);
-    
+
     return NextResponse.json({
       success: true,
-      data: data as unknown as ChatResponse
+      data: Array.isArray(data) ? (data[0] as ChatResponse) : (data as ChatResponse)
     });
   } catch (error) {
+    console.error('Error updating chat:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Error al actualizar chat'
     }, { status: 500 });
   }
 }
+
 
 // DELETE /api/chats/[id] - Eliminar un chat específico por ID
 export async function DELETE(
