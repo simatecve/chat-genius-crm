@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Función de delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -22,7 +25,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const wahaBaseUrl = Deno.env.get('WAHA_BASE_URL')!;
     const wahaApiKey = Deno.env.get('WAHA_API_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -37,7 +40,7 @@ serve(async (req) => {
       throw new Error('Campaign not found');
     }
 
-    // Obtener el agente de IA del usuario si edit_with_ai está activo
+    // Obtener el agente de IA si edit_with_ai está activo
     let aiAgent = null;
     if (campaign.edit_with_ai) {
       const { data: agent } = await supabase
@@ -46,11 +49,10 @@ serve(async (req) => {
         .eq('user_id', campaign.user_id)
         .eq('is_active', true)
         .single();
-      
       aiAgent = agent;
     }
 
-    // Validar sesión de WhatsApp activa
+    // Obtener sesión de WhatsApp activa
     const { data: activeConnection } = await supabase
       .from('whatsapp_connections')
       .select('name, phone_number, status')
@@ -59,7 +61,12 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    const sessionNameToUse = campaign.whatsapp_connection_name || activeConnection?.name || activeConnection?.phone_number || 'default';
+    if (!activeConnection) {
+      throw new Error('No active WhatsApp connection found');
+    }
+
+    const sessionName = campaign.whatsapp_connection_name || activeConnection.name || activeConnection.phone_number || 'default';
+    const whatsappNumber = activeConnection.phone_number;
 
     // Obtener contactos de la lista
     const { data: listMembers, error: membersError } = await supabase
@@ -73,11 +80,7 @@ serve(async (req) => {
 
     const contacts = listMembers
       .map((m: any) => m.contacts)
-      .filter((c: any) => c) as Array<{
-        id: string;
-        name: string;
-        phone_number: string;
-      }>;
+      .filter((c: any) => c && c.phone_number);
 
     // Actualizar campaña a estado 'sending'
     await supabase
@@ -91,19 +94,22 @@ serve(async (req) => {
 
     console.log(`Starting campaign ${campaign_id} with ${contacts.length} contacts`);
 
-    // Encolar cada contacto para procesamiento en background
-    let enqueuedCount = 0;
-    let currentTime = Date.now();
-    const minDelayMs = (campaign.min_delay || 1) * 1000;
-    const maxDelayMs = (campaign.max_delay || 5) * 1000;
+    const minDelayMs = (campaign.min_delay || 3) * 1000;
+    const maxDelayMs = (campaign.max_delay || 8) * 1000;
+    let sentCount = 0;
+    let failedCount = 0;
 
-    for (const contact of contacts) {
+    // Procesar cada contacto
+    for (let i = 0; i < contacts.length; i++) {
+      const contact = contacts[i];
+      
       try {
         let messageToSend = campaign.message;
 
         // Personalizar mensaje con IA si está habilitado
-        if (campaign.edit_with_ai && aiAgent && lovableApiKey) {
+        if (campaign.edit_with_ai && lovableApiKey) {
           try {
+            console.log(`Personalizing message for ${contact.name} with AI...`);
             const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -111,25 +117,29 @@ serve(async (req) => {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: aiAgent.model || 'google/gemini-2.5-flash',
+                model: aiAgent?.model || 'google/gemini-2.5-flash',
                 messages: [
                   {
                     role: 'system',
-                    content: 'Eres un asistente que personaliza mensajes de WhatsApp. Reescribe el mensaje de forma natural y ligeramente diferente, manteniendo el mismo significado y tono. No agregues saludos o despedidas adicionales si no están en el mensaje original.'
+                    content: 'Eres un asistente que personaliza mensajes de WhatsApp. Tu tarea es reescribir el mensaje dado de forma ligeramente diferente pero manteniendo EXACTAMENTE el mismo significado, tono y longitud aproximada. Responde ÚNICAMENTE con el mensaje reescrito. NO incluyas explicaciones, opciones alternativas, ni texto adicional.'
                   },
                   {
                     role: 'user',
-                    content: `Reescribe este mensaje de forma única y natural para ${contact.name}:\n\n${campaign.message}`
+                    content: `Reescribe este mensaje para ${contact.name || 'el destinatario'}:\n\n${campaign.message}`
                   }
                 ],
-                temperature: aiAgent.temperature || 0.7,
-                max_tokens: aiAgent.max_tokens || 500,
+                temperature: aiAgent?.temperature || 0.7,
+                max_tokens: aiAgent?.max_tokens || 300,
               }),
             });
 
             if (aiResponse.ok) {
               const aiData = await aiResponse.json();
-              messageToSend = aiData.choices[0].message.content;
+              const aiContent = aiData.choices?.[0]?.message?.content;
+              if (aiContent && aiContent.length < campaign.message.length * 3) {
+                messageToSend = aiContent.trim();
+                console.log(`AI personalized message: ${messageToSend.substring(0, 50)}...`);
+              }
             }
           } catch (aiError) {
             console.error('AI personalization failed, using original message:', aiError);
@@ -141,88 +151,172 @@ serve(async (req) => {
           .replace(/\{nombre\}/gi, contact.name || '')
           .replace(/\{telefono\}/gi, contact.phone_number || '');
 
-        const sessionName = sessionNameToUse;
-        const formattedPhone = contact.phone_number.replace(/\D/g, '');
-        const chatId = formattedPhone; // WAHA acepta número limpio como chatId
+        // Formatear número para WAHA
+        const cleanNumber = contact.phone_number.replace(/\D/g, '');
+        const chatId = `${cleanNumber}@c.us`;
 
-        const randomDelay = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
-        currentTime += randomDelay;
-        const scheduledFor = new Date(currentTime).toISOString();
+        console.log(`Sending message ${i + 1}/${contacts.length} to ${chatId}`);
 
-        // Encolar para envío en background
-        await supabase
-          .from('automated_message_logs')
-          .insert({
-            user_id: campaign.user_id,
-            phone_number: chatId,
-            message_content: messageToSend,
-            scheduled_for: scheduledFor,
-            status: 'pending',
-          });
+        // Enviar via WAHA
+        const wahaResponse = await fetch(`${wahaBaseUrl}/api/sendText`, {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': wahaApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chatId: chatId,
+            text: messageToSend,
+            session: sessionName,
+            linkPreview: true,
+          }),
+        });
 
-        // Registrar estado 'queued' para la campaña
-        await supabase
-          .from('campaign_sends')
-          .insert({
+        const wahaResult = await wahaResponse.json();
+
+        if (wahaResponse.ok) {
+          console.log(`✅ Message sent to ${contact.name}`);
+
+          // Buscar o crear conversación
+          let conversationId: string | null = null;
+          
+          const { data: existingConv } = await supabase
+            .from('conversations')
+            .select('id')
+            .eq('phone_number', cleanNumber)
+            .eq('user_id', campaign.user_id)
+            .maybeSingle();
+
+          if (existingConv) {
+            conversationId = existingConv.id;
+          } else {
+            const { data: newConv } = await supabase
+              .from('conversations')
+              .insert({
+                phone_number: cleanNumber,
+                contact_name: contact.name || cleanNumber,
+                user_id: campaign.user_id,
+                whatsapp_number: whatsappNumber,
+                last_message: messageToSend,
+                last_message_time: new Date().toISOString(),
+              })
+              .select('id')
+              .single();
+            
+            if (newConv) {
+              conversationId = newConv.id;
+            }
+          }
+
+          // Guardar mensaje en la tabla messages
+          if (conversationId) {
+            await supabase.from('messages').insert({
+              conversation_id: conversationId,
+              user_id: campaign.user_id,
+              content: messageToSend,
+              direction: 'outbound',
+              status: 'sent',
+              message_type: 'text',
+              is_bot: false,
+              metadata: {
+                waha_id: wahaResult.id,
+                campaign_id: campaign_id,
+                sent_via: 'mass_campaign'
+              }
+            });
+
+            // Actualizar conversación
+            await supabase
+              .from('conversations')
+              .update({
+                last_message: messageToSend,
+                last_message_time: new Date().toISOString(),
+              })
+              .eq('id', conversationId);
+          }
+
+          // Registrar en campaign_sends
+          await supabase.from('campaign_sends').insert({
             campaign_id: campaign_id,
             contact_id: contact.id,
             phone_number: contact.phone_number,
             contact_name: contact.name,
             message_sent: messageToSend,
             was_personalized: campaign.edit_with_ai,
-            status: 'queued',
+            status: 'sent',
+            sent_at: new Date().toISOString(),
             user_id: campaign.user_id,
           });
 
-        enqueuedCount++;
+          sentCount++;
+          
+          // Actualizar progreso de la campaña
+          await supabase
+            .from('mass_campaigns')
+            .update({ sent_count: sentCount })
+            .eq('id', campaign_id);
+
+        } else {
+          console.error(`❌ Failed to send to ${contact.name}:`, wahaResult);
+          
+          await supabase.from('campaign_sends').insert({
+            campaign_id: campaign_id,
+            contact_id: contact.id,
+            phone_number: contact.phone_number,
+            contact_name: contact.name,
+            message_sent: messageToSend,
+            was_personalized: campaign.edit_with_ai,
+            status: 'failed',
+            error_message: JSON.stringify(wahaResult),
+            user_id: campaign.user_id,
+          });
+          
+          failedCount++;
+        }
+
+        // Delay antes del siguiente mensaje (excepto el último)
+        if (i < contacts.length - 1) {
+          const randomDelay = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
+          console.log(`Waiting ${randomDelay}ms before next message...`);
+          await delay(randomDelay);
+        }
 
       } catch (contactError) {
-        console.error(`Failed to enqueue for ${contact.name}:`, contactError);
+        console.error(`Error processing contact ${contact.name}:`, contactError);
+        failedCount++;
       }
     }
 
-    // Actualizar estado de la campaña a 'sending' y total encolado
+    // Marcar campaña como completada
     await supabase
       .from('mass_campaigns')
       .update({ 
-        status: 'sending',
-        total_count: contacts.length,
-        sent_count: 0,
+        status: 'completed',
+        sent_count: sentCount,
       })
       .eq('id', campaign_id);
 
-    console.log(`Campaign ${campaign_id} enqueued: ${enqueuedCount}/${contacts.length}`);
-
-    try {
-      const triggerUrl = `${supabaseUrl}/functions/v1/process-scheduled-messages`;
-      await fetch(triggerUrl, { method: 'POST' });
-    } catch (_) {}
+    console.log(`Campaign ${campaign_id} completed: ${sentCount} sent, ${failedCount} failed`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        enqueued_count: enqueuedCount,
+        sent_count: sentCount,
+        failed_count: failedCount,
         total_count: contacts.length,
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('Error in send-mass-campaign:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
     return new Response(
       JSON.stringify({
         success: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : 'Unknown error',
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
