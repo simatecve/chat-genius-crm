@@ -61,8 +61,8 @@ const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteP
   }
 
   // Redirect regular clients to main panel if trying to access admin routes
-  if (isClient && location.pathname.startsWith('/admin')) {
-    console.log('Regular client trying to access admin, redirecting to main panel');
+  if ((isClient || profile?.profile_type === 'cajero') && location.pathname.startsWith('/admin')) {
+    console.log('Regular client or cajero trying to access admin, redirecting to main panel');
     return <Navigate to="/" replace />;
   }
 

@@ -22,7 +22,8 @@ const Login = () => {
       // Redirect based on profile_type
       if (profile.profile_type === 'superadmin') {
         navigate('/admin');
-      } else {
+      } else if (profile.profile_type === 'client' || profile.profile_type === 'cajero') {
+        // Both client admins and cajeros go to main dashboard
         navigate('/');
       }
     }
