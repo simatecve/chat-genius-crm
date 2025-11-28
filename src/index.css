@@ -113,6 +113,11 @@
     --sidebar-border: 215 11% 23%;
     --sidebar-ring: 35 89% 54%;
   }
+
+  .bg-white {
+    --tw-bg-opacity: 1;
+    /* background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1)); */
+  }
 }
 
 @layer base {
