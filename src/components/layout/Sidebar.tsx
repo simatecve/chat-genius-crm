@@ -99,7 +99,7 @@ export const Sidebar = () => {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
             {!isCollapsed && <div className="flex items-center space-x-3">
-                <img src={resolvedTheme === 'dark' ? logoDark : logoLight} alt="CAPIBET" className="h-12 w-auto" />
+                <img src={resolvedTheme === 'dark' ? logoLight : logoDark} alt="CAPIBET" className="h-12 w-auto" />
               </div>}
             <button onClick={() => setIsCollapsed(!isCollapsed)} className="hidden md:flex p-2 hover:bg-sidebar-accent rounded-lg transition-colors">
               {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
