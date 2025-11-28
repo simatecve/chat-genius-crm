@@ -3,9 +3,6 @@ project_id = "pxvembsxhwvpotydtiqa"
 [functions.ai-agent-response]
 verify_jwt = false
 
-[functions.create-user]
-verify_jwt = true
-
 [functions.mercadopago-webhook]
 verify_jwt = false
 
