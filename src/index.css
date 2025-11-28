@@ -6,103 +6,112 @@
 
 @layer base {
   :root {
-    /* Base colors - CapibetCRM Dark Theme */
-    --background: 215 18% 11%;
-    /* #1a1d23 */
-    --foreground: 0 0% 100%;
-    /* #FFFFFF */
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
 
-    /* Card system */
-    --card: 216 12% 16%;
-    /* #2a2d35 */
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
 
-    /* Popover system */
-    --popover: 216 12% 16%;
-    /* #2a2d35 */
-    --popover-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
 
-    /* Primary - CapibetCRM Orange */
     --primary: 35 89% 54%;
-    /* #F29A1F */
     --primary-foreground: 0 0% 100%;
     --primary-hover: 35 89% 48%;
 
-    /* Secondary - Dark gray */
-    --secondary: 215 11% 23%;
-    /* #3a3d45 */
-    --secondary-foreground: 210 11% 91%;
-    /* #E5E7EB */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-    /* Muted colors */
-    --muted: 215 11% 23%;
-    /* #3a3d45 */
-    --muted-foreground: 218 11% 65%;
-    /* #9CA3AF */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16.7% 46.9%;
 
-    /* Accent - CapibetCRM Orange */
     --accent: 35 89% 54%;
-    /* #F29A1F */
     --accent-foreground: 0 0% 100%;
 
-    /* Success - Green */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
 
-    /* Warning - Orange */
     --warning: 35 89% 54%;
-    /* #F29A1F */
     --warning-foreground: 0 0% 100%;
 
-    /* Destructive - Red */
-    --destructive: 0 84% 60%;
+    --destructive: 0 72.2% 50.6%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Border and input */
-    --border: 215 11% 23%;
-    /* #3a3d45 */
-    --input: 216 12% 16%;
-    /* #2a2d35 */
+    --border: 214 31% 91%;
+    --input: 0 0% 100%;
     --ring: 35 89% 54%;
-    /* #F29A1F */
 
-    /* Simplified gradients for dark theme */
     --gradient-primary: linear-gradient(135deg, hsl(35 89% 54%), hsl(35 89% 48%));
-    --gradient-secondary: linear-gradient(135deg, hsl(216 12% 16%), hsl(215 18% 11%));
+    --gradient-secondary: linear-gradient(135deg, hsl(0 0% 100%), hsl(210 40% 96.1%));
     --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 46%));
     --gradient-hero: linear-gradient(135deg, hsl(35 89% 54%) 0%, hsl(35 89% 48%) 100%);
 
-    /* Shadows - Dark theme */
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
-    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.4);
-    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.5), 0 4px 6px -4px hsl(0 0% 0% / 0.5);
-    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.6), 0 8px 10px -6px hsl(0 0% 0% / 0.6);
-    --shadow-glow: 0 0 40px hsl(35 89% 54% / 0.3);
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.1);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.15), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.18), 0 4px 6px -4px hsl(0 0% 0% / 0.12);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.2), 0 8px 10px -6px hsl(0 0% 0% / 0.14);
+    --shadow-glow: 0 0 40px hsl(35 89% 54% / 0.25);
 
-    /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.5rem;
 
-    /* Sidebar - Dark theme */
-    --sidebar-background: 215 18% 11%;
-    /* #1a1d23 */
-    --sidebar-foreground: 0 0% 100%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
     --sidebar-primary: 35 89% 54%;
-    /* #F29A1F */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 216 12% 16%;
-    /* #2a2d35 */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 215 11% 23%;
-    /* #3a3d45 */
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214 31% 91%;
     --sidebar-ring: 35 89% 54%;
   }
 
   .dark {
-    /* Dark mode uses same colors as light mode for CapibetCRM theme */
-    /* All colors remain the same as root */
+    --background: 215 18% 11%;
+    --foreground: 0 0% 100%;
+    --card: 216 12% 16%;
+    --card-foreground: 0 0% 100%;
+    --popover: 216 12% 16%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 35 89% 54%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 35 89% 48%;
+    --secondary: 215 11% 23%;
+    --secondary-foreground: 210 11% 91%;
+    --muted: 215 11% 23%;
+    --muted-foreground: 218 11% 65%;
+    --accent: 35 89% 54%;
+    --accent-foreground: 0 0% 100%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 89% 54%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 11% 23%;
+    --input: 216 12% 16%;
+    --ring: 35 89% 54%;
+    --gradient-primary: linear-gradient(135deg, hsl(35 89% 54%), hsl(35 89% 48%));
+    --gradient-secondary: linear-gradient(135deg, hsl(216 12% 16%), hsl(215 18% 11%));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 46%));
+    --gradient-hero: linear-gradient(135deg, hsl(35 89% 54%) 0%, hsl(35 89% 48%) 100%);
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.4);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.5), 0 4px 6px -4px hsl(0 0% 0% / 0.5);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.6), 0 8px 10px -6px hsl(0 0% 0% / 0.6);
+    --shadow-glow: 0 0 40px hsl(35 89% 54% / 0.3);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --radius: 0.5rem;
+    --sidebar-background: 215 18% 11%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 35 89% 54%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 216 12% 16%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 11% 23%;
+    --sidebar-ring: 35 89% 54%;
   }
 }
 

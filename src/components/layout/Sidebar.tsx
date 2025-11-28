@@ -3,7 +3,9 @@ import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
-import logo from '@/assets/supercrm-logo.jpg';
+import { useTheme } from 'next-themes';
+import logoLight from '@/assets/logocapi.png';
+import logoDark from '@/assets/logocapinegro.png';
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{
@@ -25,6 +27,7 @@ export const Sidebar = () => {
   const {
     unreadCount
   } = useConversations();
+  const { resolvedTheme } = useTheme();
 
   // Crear grupos de sidebar dinámicamente con el contador de conversaciones
   const sidebarGroups: SidebarGroup[] = [{
@@ -96,7 +99,7 @@ export const Sidebar = () => {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
             {!isCollapsed && <div className="flex items-center space-x-3">
-                <img src={logo} alt="SUPERCRM" className="h-12 w-auto" />
+                <img src={resolvedTheme === 'dark' ? logoDark : logoLight} alt="CAPIBET" className="h-12 w-auto" />
               </div>}
             <button onClick={() => setIsCollapsed(!isCollapsed)} className="hidden md:flex p-2 hover:bg-sidebar-accent rounded-lg transition-colors">
               {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
