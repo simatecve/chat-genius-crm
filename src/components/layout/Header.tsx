@@ -19,6 +19,9 @@ export const Header = () => {
   const [activeConversations, setActiveConversations] = React.useState<ActiveConversation[]>([]);
   const unreadCount = React.useMemo(() => activeConversations.reduce((sum, c) => sum + (c.unread_count || 0), 0), [activeConversations]);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
+  const clearAlerts = React.useCallback(() => {
+    setActiveConversations([]);
+  }, []);
   const fetchActive = React.useCallback(async () => {
     if (!user?.id) return;
     const list = await dashboardService.getActiveConversations(user.id, 5);
@@ -99,6 +102,13 @@ export const Header = () => {
                   ))}
                 </div>
               </ScrollArea>}
+              <DropdownMenuSeparator />
+              <div className="flex items-center justify-end px-2 py-1.5">
+                <Button variant="ghost" size="sm" onClick={clearAlerts} className="gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Limpiar
+                </Button>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
 
