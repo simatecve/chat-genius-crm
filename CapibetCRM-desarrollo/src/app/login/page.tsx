@@ -69,14 +69,16 @@ export default function LoginPage() {
         }
         
         // Guardar información del usuario
+        const normalizedRole = (data.rol === 'super_admin') ? 'ADMINITRADOR' : data.rol;
         const userData = {
           id: data.id,
           nombre: data.nombre,
           correo_electronico: data.correo_electronico,
           organizacion_id: data.organizacion_id,
           telefono: data.telefono,
-          rol: data.rol,
-          codigo_pais: data.codigo_pais
+          rol: normalizedRole,
+          codigo_pais: data.codigo_pais,
+          permisos: Array.isArray((data as any).permisos) ? (data as any).permisos : []
         };
         localStorage.setItem('userData', JSON.stringify(userData));
         

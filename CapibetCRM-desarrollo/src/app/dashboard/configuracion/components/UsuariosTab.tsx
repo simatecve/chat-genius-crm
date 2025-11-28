@@ -151,21 +151,21 @@ export default function UsuariosTab() {
   };
 
   const getRoleBadge = (rol: string) => {
-    if (rol === 'admin') {
+    if (rol === 'ADMINITRADOR' || rol === 'super_admin') {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-          👑 {rol}
+          👑 ADMINITRADOR
         </span>
       );
-    } else if (rol === 'Cliente') {
+    } else if (rol === 'cajero') {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
           👤 {rol}
         </span>
       );
-    } else if (rol === 'Comercial') {
+    } else if (rol === 'usuario') {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
           👤 {rol}
         </span>
       );

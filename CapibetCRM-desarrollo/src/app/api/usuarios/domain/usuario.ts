@@ -20,6 +20,7 @@ export interface UsuarioData {
   telefono?: string;
   codigo_pais?: string;
   rol?: string;
+  permisos?: string[];
   activo?: boolean;
   organizacion_id?: string; // UUID de la organización
   organizacion?: OrganizacionData; // Datos completos de la organización
@@ -58,6 +59,7 @@ export interface UsuarioResponse {
   telefono?: string;
   codigo_pais?: string;
   rol: string;
+  permisos?: string[];
   activo: boolean;
   organizacion_id: string;
   organizacion?: OrganizacionData;

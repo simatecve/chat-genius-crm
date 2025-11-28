@@ -11,6 +11,7 @@ const EtiquetasTab = lazy(() => import('./components/EtiquetasTab'));
 const RespuestasRapidasTab = lazy(() => import('./components/RespuestasRapidasTab'));
 const SesionesTab = lazy(() => import('./components/SesionesTab'));
 const NotificacionesTab = lazy(() => import('./components/NotificacionesTab'));
+const RolesPermisosTab = lazy(() => import('./components/RolesPermisosTab'));
 import { isUserAuthenticated, getUserData } from '@/utils/auth';
 
 // Tipos para las pestañas
@@ -34,6 +35,7 @@ export default function ConfiguracionPage() {
     { id: 'sesiones', label: 'Sesiones', icon: <Link className="w-4 h-4" />, component: SesionesTab },
     { id: 'etiquetas', label: 'Etiquetas', icon: <Tag className="w-4 h-4" />, component: EtiquetasTab },
     { id: 'usuarios', label: 'Usuarios', icon: <Users className="w-4 h-4" />, component: UsuariosTab },
+    { id: 'roles-permisos', label: 'Roles y permisos', icon: <Users className="w-4 h-4" />, component: RolesPermisosTab },
     { id: 'respuestas-rapidas', label: 'Respuestas rápidas', icon: <MessageCircle className="w-4 h-4" />, component: RespuestasRapidasTab },
     { id: 'notificaciones', label: 'Notificaciones', icon: <Bell className="w-4 h-4" />, component: NotificacionesTab },
   ];

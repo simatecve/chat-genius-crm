@@ -13,6 +13,7 @@ export interface UserData {
   telefono?: string;
   rol: string;
   codigo_pais?: string;
+  permisos?: string[];
 }
 
 export interface OrganizationData {
@@ -161,6 +162,14 @@ export function getUserRole(): string | null {
 }
 
 /**
+ * Obtiene los permisos del usuario
+ */
+export function getUserPermissions(): string[] {
+  const userData = getUserData();
+  return Array.isArray(userData?.permisos) ? userData!.permisos! : [];
+}
+
+/**
  * Obtiene el email del usuario
  */
 export function getUserEmail(): string | null {
@@ -196,7 +205,16 @@ export function hasRole(role: string): boolean {
  * Verifica si el usuario es admin
  */
 export function isAdmin(): boolean {
-  return hasRole('admin');
+  return hasRole('ADMINITRADOR') || hasRole('super_admin');
+}
+
+/**
+ * Verifica si el usuario tiene un permiso específico
+ */
+export function hasPermission(permiso: string): boolean {
+  if (isAdmin()) return true;
+  const permisos = getUserPermissions();
+  return permisos.includes(permiso);
 }
 
 /**

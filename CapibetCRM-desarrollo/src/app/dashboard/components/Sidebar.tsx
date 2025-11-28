@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Home, Funnel, MessageCircle, MessageSquare, Mail, Calendar, Users, ShoppingCart, Send, Settings, GraduationCap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { isAdmin as isAdminUser } from '@/utils/auth';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -16,20 +17,21 @@ interface MenuItem {
   label: string;
   active: boolean;
   requiredRoles?: string[]; // Roles que pueden ver este item
+  requiredPermissions?: string[]; // Permisos necesarios para ver este item
 }
 
 const menuItems: MenuItem[] = [
   { id: 'dashboard', icon: <Home className="w-5 h-5" />, label: 'Dashboard', active: true },
-  { id: 'funnels', icon: <Funnel className="w-5 h-5" />, label: 'Embudos', active: false },
-  { id: 'chats', icon: <MessageCircle className="w-5 h-5" />, label: 'Chats', active: false },
-  { id: 'internal-chat', icon: <MessageSquare className="w-5 h-5" />, label: 'Chat Interno', active: false },
-  { id: 'emails', icon: <Mail className="w-5 h-5" />, label: 'Emails', active: false },
-  { id: 'calendar', icon: <Calendar className="w-5 h-5" />, label: 'Calendario', active: false },
-  { id: 'contacts', icon: <Users className="w-5 h-5" />, label: 'Contactos', active: false, requiredRoles: ['admin'] },
-  { id: 'sales', icon: <ShoppingCart className="w-5 h-5" />, label: 'Ventas', active: false },
-  { id: 'bulk-sends', icon: <Send className="w-5 h-5" />, label: 'Envíos masivos', active: false },
-  { id: 'config', icon: <Settings className="w-5 h-5" />, label: 'Configuración', active: false },
-  { id: 'academy', icon: <GraduationCap className="w-5 h-5" />, label: 'CAPIBET Academy', active: false, requiredRoles: ['admin'] },
+  { id: 'funnels', icon: <Funnel className="w-5 h-5" />, label: 'Embudos', active: false, requiredPermissions: ['ver_embudos'] },
+  { id: 'chats', icon: <MessageCircle className="w-5 h-5" />, label: 'Chats', active: false, requiredPermissions: ['chatear'] },
+  { id: 'internal-chat', icon: <MessageSquare className="w-5 h-5" />, label: 'Chat Interno', active: false, requiredPermissions: ['ver_chat_interno'] },
+  { id: 'emails', icon: <Mail className="w-5 h-5" />, label: 'Emails', active: false, requiredPermissions: ['ver_emails'] },
+  { id: 'calendar', icon: <Calendar className="w-5 h-5" />, label: 'Calendario', active: false, requiredPermissions: ['ver_calendario'] },
+  { id: 'contacts', icon: <Users className="w-5 h-5" />, label: 'Contactos', active: false, requiredRoles: ['ADMINITRADOR'], requiredPermissions: ['ver_contactos'] },
+  { id: 'sales', icon: <ShoppingCart className="w-5 h-5" />, label: 'Ventas', active: false, requiredPermissions: ['ver_ventas'] },
+  { id: 'bulk-sends', icon: <Send className="w-5 h-5" />, label: 'Envíos masivos', active: false, requiredPermissions: ['enviar_campañas'] },
+  { id: 'config', icon: <Settings className="w-5 h-5" />, label: 'Configuración', active: false, requiredRoles: ['ADMINITRADOR'], requiredPermissions: ['ver_configuracion'] },
+  { id: 'academy', icon: <GraduationCap className="w-5 h-5" />, label: 'CAPIBET Academy', active: false, requiredRoles: ['ADMINITRADOR'], requiredPermissions: ['ver_academia'] },
 ];
 
 export default function Sidebar({ isOpen }: SidebarProps) {
@@ -40,18 +42,26 @@ export default function Sidebar({ isOpen }: SidebarProps) {
 
   // Función para verificar si el usuario tiene permisos para ver un item
   const hasPermission = (item: MenuItem): boolean => {
-    // Si no hay requiredRoles definido, todos pueden ver el item
-    if (!item.requiredRoles || item.requiredRoles.length === 0) {
-      return true;
-    }
+    if (isAdminUser()) return true;
 
     // Si no hay usuario logueado, no mostrar items restringidos
     if (!user) {
       return false;
     }
 
-    // Verificar si el rol del usuario está en la lista de roles permitidos
-    return item.requiredRoles.includes(user.rol);
+    // Si el ítem requiere roles y el rol del usuario está permitido
+    if (item.requiredRoles && item.requiredRoles.length > 0) {
+      if (item.requiredRoles.includes(user.rol)) return true;
+    }
+
+    // Si el ítem requiere permisos específicos, verificarlos
+    if (item.requiredPermissions && item.requiredPermissions.length > 0) {
+      const permisosUsuario = Array.isArray(user.permisos) ? user.permisos : [];
+      return item.requiredPermissions.every(p => permisosUsuario.includes(p));
+    }
+
+    // Si no requiere nada específico, visible
+    return !item.requiredRoles && !item.requiredPermissions;
   };
 
   // Filtrar items del menú basándose en permisos

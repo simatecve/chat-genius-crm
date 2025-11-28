@@ -111,6 +111,41 @@ export async function POST(request: NextRequest) {
     const usuarioCreado = await usuarioResponse.json();
     const userData = Array.isArray(usuarioCreado) ? usuarioCreado[0] : usuarioCreado;
 
+    const adminRoles = ['ADMINITRADOR', 'admin', 'super_admin'];
+    const isAdmin = adminRoles.includes(body.rol);
+    const defaultPerms: Record<string, boolean> = {};
+    const allKeys = [
+      'puede_ver_dashboard','puede_ver_contactos','puede_crear_contactos','puede_editar_contactos','puede_eliminar_contactos','puede_importar_contactos',
+      'puede_ver_chats','puede_enviar_mensajes','puede_ver_mensajes_otros','puede_eliminar_mensajes',
+      'puede_ver_embudos','puede_crear_embudos','puede_editar_embudos','puede_eliminar_embudos','puede_mover_contactos_embudos',
+      'puede_ver_ventas','puede_crear_ventas','puede_editar_ventas','puede_eliminar_ventas',
+      'puede_ver_tareas','puede_crear_tareas','puede_asignar_tareas','puede_eliminar_tareas',
+      'puede_ver_reportes','puede_exportar_datos','puede_ver_analytics',
+      'puede_gestionar_usuarios','puede_ver_configuracion','puede_editar_configuracion','puede_gestionar_plantillas','puede_gestionar_respuestas_rapidas',
+      'puede_gestionar_whatsapp','puede_gestionar_instagram','puede_gestionar_facebook','puede_gestionar_telegram'
+    ];
+    allKeys.forEach(k => { defaultPerms[k] = isAdmin; });
+    if (!isAdmin) {
+      defaultPerms['puede_ver_dashboard'] = true;
+      defaultPerms['puede_ver_chats'] = true;
+      defaultPerms['puede_enviar_mensajes'] = true;
+      defaultPerms['puede_ver_embudos'] = true;
+      defaultPerms['puede_mover_contactos_embudos'] = true;
+      defaultPerms['puede_ver_tareas'] = true;
+      defaultPerms['puede_ver_contactos'] = true;
+    }
+
+    await fetch(`${supabaseConfig.restUrl}/user_permissions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseConfig.anonKey || '',
+        'Authorization': `Bearer ${supabaseConfig.serviceRoleKey}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ usuario_id: user.id, ...defaultPerms })
+    });
+
     return NextResponse.json({
       success: true,
       data: {

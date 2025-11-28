@@ -19,7 +19,7 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
     phone: '',
     password: '',
     confirmPassword: '',
-    rol: 'admin'
+    rol: 'usuario'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -34,6 +34,29 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const AVAILABLE_PERMISSIONS = [
+    { key: 'ver_configuracion', label: 'Ver Configuración' },
+    { key: 'gestionar_usuarios', label: 'Gestionar Usuarios' },
+    { key: 'ver_conversaciones', label: 'Ver Conversaciones' },
+    { key: 'chatear', label: 'Chatear' },
+    { key: 'ver_leads', label: 'Ver Leads' },
+    { key: 'gestionar_leads', label: 'Gestionar Leads' },
+    { key: 'ver_embudos', label: 'Ver Embudos' },
+    { key: 'ver_contactos', label: 'Ver Contactos' },
+    { key: 'ver_ventas', label: 'Ver Ventas' },
+    { key: 'enviar_campañas', label: 'Enviar Campañas' },
+    { key: 'ver_emails', label: 'Ver Emails' },
+    { key: 'ver_calendario', label: 'Ver Calendario' },
+    { key: 'ver_chat_interno', label: 'Ver Chat Interno' },
+    { key: 'ver_academia', label: 'Ver Academy' },
+  ];
+
+  const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
+    ADMINITRADOR: AVAILABLE_PERMISSIONS.map(p => p.key),
+    cajero: ['ver_conversaciones', 'chatear', 'ver_leads', 'ver_embudos', 'ver_calendario'],
+    usuario: ['ver_conversaciones', 'chatear']
+  };
 
   // Países de América del Norte y del Sur (mismo que en registro)
   const americanCountries = [
@@ -76,7 +99,7 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
         phone: '',
         password: '',
         confirmPassword: '',
-        rol: 'admin'
+        rol: 'usuario'
       });
       setError('');
       setSuccess('');
@@ -100,10 +123,19 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      if (name === 'rol') {
+        return {
+          ...prev,
+          rol: value,
+          permisos: DEFAULT_ROLE_PERMISSIONS[value] || []
+        };
+      }
+      return {
+        ...prev,
+        [name]: value
+      };
+    });
   };
 
 
@@ -158,7 +190,8 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
         nombre: formData.name,
         telefono: formData.phone,
         codigo_pais: selectedCountry.code.replace('+', ''),
-        rol: formData.rol // Pasar el rol seleccionado
+        rol: formData.rol,
+        permisos: formData.rol === 'ADMINITRADOR' ? AVAILABLE_PERMISSIONS.map(p => p.key) : formData.permisos
       };
       
       // Crear usuario en Supabase mediante el endpoint de registro
@@ -340,15 +373,39 @@ export default function NuevoUsuarioModal({ isOpen, onClose, onUserCreated }: Nu
                     className="w-full pl-10 pr-4 py-3 bg-[#2a2d35] border border-[#3a3d45] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#F29A1F] focus:border-[#F29A1F] text-sm appearance-none cursor-pointer"
                     required
                   >
-                    <option value="Admin">Admin</option>
-                    <option value="Comercial">Comercial</option>
-                    <option value="Cliente">Cliente</option>
+                    <option value="ADMINITRADOR">ADMINITRADOR</option>
+                    <option value="cajero">cajero</option>
+                    <option value="usuario">usuario</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                     <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-300 text-sm mb-2">Permisos</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {AVAILABLE_PERMISSIONS.map(({ key, label }) => (
+                    <label key={key} className="flex items-center space-x-2 text-sm text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={formData.permisos.includes(key) || formData.rol === 'ADMINITRADOR'}
+                        onChange={() => {
+                          const has = formData.permisos.includes(key);
+                          setFormData(prev => ({
+                            ...prev,
+                            permisos: prev.rol === 'ADMINITRADOR' ? prev.permisos : (has ? prev.permisos.filter(p => p !== key) : [...prev.permisos, key])
+                          }));
+                        }}
+                        disabled={formData.rol === 'ADMINITRADOR'}
+                        className="form-checkbox h-4 w-4 rounded border-[#3a3d45] bg-[#2a2d35]"
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
