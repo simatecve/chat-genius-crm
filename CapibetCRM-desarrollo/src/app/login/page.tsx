@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import logoDark from '@/assets/logocapinegro.png';
+const LOGO_LIGHT_URL = 'http://nocodeveloper.site/capibet/logocapinegro.png';
+const LOGO_DARK_URL = 'https://nocodeveloper.site/capibet/logocapi.png';
 import { userServices } from '@/services/userServices';
 import { LoginCredentials } from '@/app/api/usuarios/domain/usuario';
 
@@ -125,9 +126,9 @@ export default function LoginPage() {
       {/* Mobile Logo - Only visible on small screens */}
       <div className="lg:hidden flex justify-center py-8 px-4">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden bg-black">
             <img 
-              src={logoDark}
+              src={LOGO_LIGHT_URL}
               alt="CAPIBET Logo"
               className="w-full h-full object-contain"
             />
@@ -227,10 +228,10 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-[#F29A1F] via-[#F29A1F] to-[#1e2b2c] relative overflow-hidden">
         <div className="text-center z-10">
           <div className="mb-8">
-            {/* Logo Desktop sin fondo */}
-            <div className="w-32 h-32 mx-auto">
+            {/* Logo Desktop con círculo negro */}
+            <div className="w-32 h-32 mx-auto rounded-full overflow-hidden bg-black">
               <img 
-                src={logoDark}
+                src={LOGO_LIGHT_URL}
                 alt="CAPIBET Logo"
                 className="w-full h-full object-contain"
               />

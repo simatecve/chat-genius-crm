@@ -4,8 +4,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
 import { useTheme } from 'next-themes';
-import logoLight from '../../assets/logocapi.png';
-import logoDark from '../../assets/logocapinegro.png';
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{
@@ -28,6 +26,8 @@ export const Sidebar = () => {
     unreadCount
   } = useConversations();
   const { resolvedTheme } = useTheme();
+  const logoLightUrl = 'http://nocodeveloper.site/capibet/logocapinegro.png';
+  const logoDarkUrl = 'https://nocodeveloper.site/capibet/logocapi.png';
 
   // Crear grupos de sidebar dinámicamente con el contador de conversaciones
   const sidebarGroups: SidebarGroup[] = [{
@@ -99,7 +99,7 @@ export const Sidebar = () => {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
             {!isCollapsed && <div className="flex items-center space-x-3">
-                <img src={resolvedTheme === 'dark' ? logoLight : logoDark} alt="CAPIBET" className="h-12 w-auto" />
+                <img src={resolvedTheme === 'dark' ? logoDarkUrl : logoLightUrl} alt="CAPIBET" className="h-12 w-auto" />
               </div>}
             <button onClick={() => setIsCollapsed(!isCollapsed)} className="hidden md:flex p-2 hover:bg-sidebar-accent rounded-lg transition-colors">
               {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
