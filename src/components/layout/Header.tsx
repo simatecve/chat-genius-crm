@@ -1,9 +1,12 @@
 import React from 'react';
-import { Bell, LogOut } from 'lucide-react';
+import { Bell, LogOut, AlertTriangle, MessageSquare, UserPlus, Trash2, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
 export const Header = () => {
   const {
     signOut,
@@ -12,6 +15,106 @@ export const Header = () => {
   const {
     toast
   } = useToast();
+  type NotificationItem = {
+    id: string;
+    type: 'sistema' | 'mensaje' | 'lead';
+    title: string;
+    description?: string;
+    timestamp: number;
+    read: boolean;
+  };
+  const [notifications, setNotifications] = React.useState<NotificationItem[]>(() => {
+    const raw = localStorage.getItem('app-notifications');
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+  const unreadCount = React.useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
+  const [alertsOpen, setAlertsOpen] = React.useState(false);
+  const saveNotifications = React.useCallback((list: NotificationItem[]) => {
+    setNotifications(list);
+    localStorage.setItem('app-notifications', JSON.stringify(list));
+  }, []);
+  const markAllAsRead = React.useCallback(() => {
+    if (unreadCount === 0) return;
+    const list = notifications.map(n => ({ ...n, read: true }));
+    saveNotifications(list);
+  }, [notifications, unreadCount, saveNotifications]);
+  const clearRead = React.useCallback(() => {
+    const list = notifications.filter(n => !n.read);
+    saveNotifications(list);
+  }, [notifications, saveNotifications]);
+  const clearAll = React.useCallback(() => {
+    saveNotifications([]);
+  }, [saveNotifications]);
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<Partial<NotificationItem>>;
+      const d = ce.detail || {};
+      const item: NotificationItem = {
+        id: crypto.randomUUID(),
+        type: (d.type as NotificationItem['type']) || 'sistema',
+        title: d.title || 'Notificación',
+        description: d.description || '',
+        timestamp: d.timestamp || Date.now(),
+        read: false,
+      };
+      const list = [item, ...notifications].slice(0, 200);
+      saveNotifications(list);
+    };
+    window.addEventListener('app:notify', handler as EventListener);
+    return () => window.removeEventListener('app:notify', handler as EventListener);
+  }, [notifications, saveNotifications]);
+  React.useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`realtime-alerts-${user.id}`)
+      .on('postgres_changes', {
+        schema: 'public',
+        table: 'messages',
+        event: 'INSERT',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload: any) => {
+        const m = payload.new || {};
+        const isInbound = m.direction && m.direction.toLowerCase().includes('in');
+        const title = isInbound ? 'Mensaje recibido' : 'Mensaje enviado';
+        const description = (m.content || m.message || '').toString();
+        window.dispatchEvent(new CustomEvent('app:notify', {
+          detail: {
+            type: 'mensaje',
+            title,
+            description,
+            timestamp: Date.now(),
+          }
+        }));
+      })
+      .on('postgres_changes', {
+        schema: 'public',
+        table: 'leads',
+        event: 'INSERT',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload: any) => {
+        const l = payload.new || {};
+        const name = l.name || l.phone || 'Lead creado';
+        window.dispatchEvent(new CustomEvent('app:notify', {
+          detail: {
+            type: 'lead',
+            title: 'Lead creado',
+            description: name,
+            timestamp: Date.now(),
+          }
+        }));
+      })
+      .subscribe();
+    return () => {
+      try { supabase.removeChannel(channel); } catch {}
+    };
+  }, [user?.id]);
   const handleSignOut = async () => {
     await signOut();
     toast({
@@ -24,13 +127,62 @@ export const Header = () => {
         {/* Right section - Actions */}
         <div className="flex items-center space-x-3 ml-auto">
 
-          {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs w-5 h-5 rounded-full flex items-center justify-center">
-              3
-            </span>
-          </Button>
+          <DropdownMenu open={alertsOpen} onOpenChange={setAlertsOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="relative" onClick={() => setAlertsOpen((o) => !o)}>
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
+                  {unreadCount}
+                </span>}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-96" align="end">
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Alertas</span>
+                <span className="text-xs text-muted-foreground">{unreadCount} nuevas</span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {notifications.length === 0 && <DropdownMenuItem className="text-muted-foreground">No hay alertas</DropdownMenuItem>}
+              {notifications.length > 0 && <ScrollArea className="h-64">
+                <div className="space-y-1">
+                  {notifications.sort((a,b)=>b.timestamp-a.timestamp).map(n => (
+                    <div key={n.id} className="px-2 py-2 rounded-md hover:bg-muted/50">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3">
+                          {n.type === 'sistema' && <AlertTriangle className={"h-4 w-4 " + (n.read ? 'text-muted-foreground' : 'text-amber-500')} />}
+                          {n.type === 'mensaje' && <MessageSquare className={"h-4 w-4 " + (n.read ? 'text-muted-foreground' : 'text-blue-500')} />}
+                          {n.type === 'lead' && <UserPlus className={"h-4 w-4 " + (n.read ? 'text-muted-foreground' : 'text-green-500')} />}
+                          <div>
+                            <div className="text-sm font-medium">{n.title}</div>
+                            {n.description && <div className="text-xs text-muted-foreground">{n.description}</div>}
+                            <div className="text-xs text-muted-foreground">{new Date(n.timestamp).toLocaleString()}</div>
+                          </div>
+                        </div>
+                        {!n.read && <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">Nuevo</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>}
+              <DropdownMenuSeparator />
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <Button variant="ghost" size="sm" disabled={unreadCount===0} onClick={markAllAsRead} className="gap-2">
+                  <CheckCheck className="h-4 w-4" />
+                  Marcar vistas
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={clearRead} className="gap-2" disabled={notifications.every(n=>!n.read)}>
+                    <Trash2 className="h-4 w-4" />
+                    Limpiar vistas
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={clearAll} className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Limpiar todas
+                  </Button>
+                </div>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Theme toggle */}
           <ThemeToggle />
