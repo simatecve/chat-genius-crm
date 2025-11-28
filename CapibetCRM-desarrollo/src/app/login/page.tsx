@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import logoDark from '@/assets/logocapinegro.png';
 import { userServices } from '@/services/userServices';
 import { LoginCredentials } from '@/app/api/usuarios/domain/usuario';
 
@@ -124,11 +125,11 @@ export default function LoginPage() {
       {/* Mobile Logo - Only visible on small screens */}
       <div className="lg:hidden flex justify-center py-8 px-4">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center shadow-lg mb-4 overflow-hidden">
+          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden shadow-lg mb-4">
             <img 
-              src="https://pbs.twimg.com/profile_images/1118644090420322304/5SFmHCl-_400x400.jpg" 
+              src={logoDark}
               alt="CAPIBET Logo"
-              className="w-full h-full object-cover rounded-full"
+              className="w-full h-full object-cover"
             />
           </div>
           <h1 className="text-white text-2xl font-bold">CAPIBET</h1>
