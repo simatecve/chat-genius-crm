@@ -63,7 +63,7 @@ export const usersService = {
   },
 
   /**
-   * Create a new user (cajero) for the current client admin
+   * Create a new user (cajero) for the current client admin using Edge Function
    */
   async createUser(
     email: string,
@@ -73,78 +73,28 @@ export const usersService = {
     role: AppRole = 'user',
     permissions?: Record<string, boolean>
   ) {
-    if (!supabaseAdmin) {
-      throw new Error('No se puede crear usuario: falta configuración de admin');
-    }
-
-    // Get current user
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (!currentUser) throw new Error('No autenticado');
-
-    // Create user in auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName
+    // Call the create-user edge function
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        email,
+        password,
+        firstName,
+        lastName,
+        role,
+        permissions
       }
     });
 
-    if (authError) {
-      console.error('Error creating auth user:', authError);
-      throw new Error(authError.message);
+    if (error) {
+      console.error('Error creating user:', error);
+      throw new Error(error.message || 'Error al crear usuario');
     }
 
-    // Update profile with parent_user_id and set as cajero
-    const { error: profileUpdateError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        parent_user_id: currentUser.id,
-        profile_type: 'cajero'
-      })
-      .eq('id', authData.user.id);
-
-    if (profileUpdateError) {
-      console.error('Error updating profile:', profileUpdateError);
+    if (!data.success) {
+      throw new Error(data.error || 'Error al crear usuario');
     }
 
-    // Assign role in user_roles table
-    const { error: roleError } = await supabaseAdmin
-      .from('user_roles')
-      .insert({
-        user_id: authData.user.id,
-        role: role === 'admin' ? 'admin' : 'user'
-      });
-
-    if (roleError) {
-      console.error('Error assigning role:', roleError);
-    }
-
-    // Create default permissions
-    const defaultPermissions = permissions || {
-      puede_ver_dashboard: true,
-      puede_ver_contactos: true,
-      puede_ver_chats: true,
-      puede_enviar_mensajes: true,
-      puede_ver_embudos: true,
-      puede_mover_contactos_embudos: true,
-      puede_ver_tareas: true
-    };
-
-    const { error: permissionsError } = await supabaseAdmin
-      .from('user_permissions')
-      .insert({
-        user_id: authData.user.id,
-        ...defaultPermissions
-      });
-
-    if (permissionsError) {
-      console.error('Error creating permissions:', permissionsError);
-    }
-
-    return authData.user;
+    return data.user;
   },
 
   /**
