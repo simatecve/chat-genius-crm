@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import {
   Table,
@@ -28,32 +28,65 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserPlus, Trash2, Shield, Settings, Users } from 'lucide-react';
-import {
-  fetchAllUsers,
-  fetchAllPermissions,
-  fetchRolePermissions,
-  createUser,
-  updateUserRole,
-  updateRolePermissions,
-  deleteUser,
-  type UserWithRole,
-  type Permission,
-  type AppRole,
-} from '@/services/userRolesService';
+import { UserPlus, Trash2, Settings } from 'lucide-react';
+import { usersService } from '@/services/usersService';
+import { userPermissionsService, UserPermissions } from '@/services/userPermissionsService';
+import { useAccountUsers } from '@/hooks/useAccountUsers';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+type PermissionField = {
+  key: keyof UserPermissions;
+  label: string;
+  group: string;
+};
+
+const PERMISSION_FIELDS: PermissionField[] = [
+  { key: 'puede_ver_dashboard', label: 'Ver Dashboard', group: 'General' },
+  { key: 'puede_ver_contactos', label: 'Ver Contactos', group: 'Contactos' },
+  { key: 'puede_crear_contactos', label: 'Crear Contactos', group: 'Contactos' },
+  { key: 'puede_editar_contactos', label: 'Editar Contactos', group: 'Contactos' },
+  { key: 'puede_eliminar_contactos', label: 'Eliminar Contactos', group: 'Contactos' },
+  { key: 'puede_importar_contactos', label: 'Importar Contactos', group: 'Contactos' },
+  { key: 'puede_ver_chats', label: 'Ver Chats', group: 'Chats' },
+  { key: 'puede_enviar_mensajes', label: 'Enviar Mensajes', group: 'Chats' },
+  { key: 'puede_ver_mensajes_otros', label: 'Ver Mensajes de Otros', group: 'Chats' },
+  { key: 'puede_eliminar_mensajes', label: 'Eliminar Mensajes', group: 'Chats' },
+  { key: 'puede_ver_embudos', label: 'Ver Embudos', group: 'Embudos' },
+  { key: 'puede_crear_embudos', label: 'Crear Embudos', group: 'Embudos' },
+  { key: 'puede_editar_embudos', label: 'Editar Embudos', group: 'Embudos' },
+  { key: 'puede_eliminar_embudos', label: 'Eliminar Embudos', group: 'Embudos' },
+  { key: 'puede_mover_contactos_embudos', label: 'Mover Contactos en Embudos', group: 'Embudos' },
+  { key: 'puede_ver_ventas', label: 'Ver Ventas', group: 'Ventas' },
+  { key: 'puede_crear_ventas', label: 'Crear Ventas', group: 'Ventas' },
+  { key: 'puede_editar_ventas', label: 'Editar Ventas', group: 'Ventas' },
+  { key: 'puede_eliminar_ventas', label: 'Eliminar Ventas', group: 'Ventas' },
+  { key: 'puede_ver_tareas', label: 'Ver Tareas', group: 'Tareas' },
+  { key: 'puede_crear_tareas', label: 'Crear Tareas', group: 'Tareas' },
+  { key: 'puede_asignar_tareas', label: 'Asignar Tareas', group: 'Tareas' },
+  { key: 'puede_eliminar_tareas', label: 'Eliminar Tareas', group: 'Tareas' },
+  { key: 'puede_ver_reportes', label: 'Ver Reportes', group: 'Reportes' },
+  { key: 'puede_exportar_datos', label: 'Exportar Datos', group: 'Reportes' },
+  { key: 'puede_ver_analytics', label: 'Ver Analytics', group: 'Reportes' },
+  { key: 'puede_gestionar_usuarios', label: 'Gestionar Usuarios', group: 'Configuración' },
+  { key: 'puede_ver_configuracion', label: 'Ver Configuración', group: 'Configuración' },
+  { key: 'puede_editar_configuracion', label: 'Editar Configuración', group: 'Configuración' },
+  { key: 'puede_gestionar_plantillas', label: 'Gestionar Plantillas', group: 'Configuración' },
+  { key: 'puede_gestionar_respuestas_rapidas', label: 'Gestionar Respuestas Rápidas', group: 'Configuración' },
+  { key: 'puede_gestionar_whatsapp', label: 'Gestionar WhatsApp', group: 'Canales' },
+  { key: 'puede_gestionar_instagram', label: 'Gestionar Instagram', group: 'Canales' },
+  { key: 'puede_gestionar_facebook', label: 'Gestionar Facebook', group: 'Canales' },
+  { key: 'puede_gestionar_telegram', label: 'Gestionar Telegram', group: 'Canales' },
+];
 
 const UserManagement = () => {
-  const [users, setUsers] = useState<UserWithRole[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { users, loading, refetch } = useAccountUsers();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showEditRoleDialog, setShowEditRoleDialog] = useState(false);
-  const [showPermissionsDialog, setShowPermissionsDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
-  const [selectedRole, setSelectedRole] = useState<AppRole | null>(null);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [showEditPermissionsDialog, setShowEditPermissionsDialog] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserPermissions, setSelectedUserPermissions] = useState<Partial<UserPermissions>>({});
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [savingPermissions, setSavingPermissions] = useState(false);
   const { toast } = useToast();
 
   const [newUser, setNewUser] = useState({
@@ -61,42 +94,38 @@ const UserManagement = () => {
     password: '',
     firstName: '',
     lastName: '',
-    role: 'user' as AppRole
+    role: 'user' as 'admin' | 'cashier' | 'user'
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [usersData, permsData] = await Promise.all([
-        fetchAllUsers(),
-        fetchAllPermissions()
-      ]);
-      setUsers(usersData);
-      setPermissions(permsData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar la información',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [newUserPermissions, setNewUserPermissions] = useState<Record<string, boolean>>({
+    puede_ver_dashboard: true,
+    puede_ver_contactos: true,
+    puede_ver_chats: true,
+    puede_enviar_mensajes: true,
+    puede_ver_embudos: true,
+    puede_mover_contactos_embudos: true,
+    puede_ver_tareas: true
+  });
 
   const handleCreateUser = async () => {
+    if (!newUser.email || !newUser.password || !newUser.firstName || !newUser.lastName) {
+      toast({
+        title: 'Error',
+        description: 'Completa todos los campos obligatorios',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setCreatingUser(true);
     try {
-      await createUser(
+      await usersService.createUser(
         newUser.email,
         newUser.password,
         newUser.firstName,
         newUser.lastName,
-        newUser.role
+        newUser.role,
+        newUserPermissions
       );
       
       toast({
@@ -112,7 +141,16 @@ const UserManagement = () => {
         lastName: '',
         role: 'user'
       });
-      loadData();
+      setNewUserPermissions({
+        puede_ver_dashboard: true,
+        puede_ver_contactos: true,
+        puede_ver_chats: true,
+        puede_enviar_mensajes: true,
+        puede_ver_embudos: true,
+        puede_mover_contactos_embudos: true,
+        puede_ver_tareas: true
+      });
+      refetch();
     } catch (error: any) {
       console.error('Error creating user:', error);
       toast({
@@ -120,28 +158,8 @@ const UserManagement = () => {
         description: error.message || 'No se pudo crear el usuario',
         variant: 'destructive'
       });
-    }
-  };
-
-  const handleUpdateUserRole = async () => {
-    if (!selectedUser || !selectedRole) return;
-
-    try {
-      await updateUserRole(selectedUser.id, selectedRole);
-      toast({
-        title: 'Éxito',
-        description: 'Rol actualizado correctamente'
-      });
-      setShowEditRoleDialog(false);
-      setSelectedUser(null);
-      loadData();
-    } catch (error: any) {
-      console.error('Error updating role:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar el rol',
-        variant: 'destructive'
-      });
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -149,12 +167,12 @@ const UserManagement = () => {
     if (!confirm('¿Estás seguro de que quieres eliminar este usuario?')) return;
 
     try {
-      await deleteUser(userId);
+      await usersService.deleteUser(userId);
       toast({
         title: 'Éxito',
         description: 'Usuario eliminado correctamente'
       });
-      loadData();
+      refetch();
     } catch (error: any) {
       console.error('Error deleting user:', error);
       toast({
@@ -165,14 +183,14 @@ const UserManagement = () => {
     }
   };
 
-  const handleEditRolePermissions = async (role: AppRole) => {
+  const handleEditPermissions = async (userId: string) => {
     try {
-      const rolePerms = await fetchRolePermissions(role);
-      setSelectedRole(role);
-      setSelectedPermissions(rolePerms);
-      setShowPermissionsDialog(true);
+      const perms = await userPermissionsService.getByUserId(userId);
+      setSelectedUserId(userId);
+      setSelectedUserPermissions(perms || {});
+      setShowEditPermissionsDialog(true);
     } catch (error) {
-      console.error('Error loading role permissions:', error);
+      console.error('Error loading permissions:', error);
       toast({
         title: 'Error',
         description: 'No se pudieron cargar los permisos',
@@ -181,16 +199,21 @@ const UserManagement = () => {
     }
   };
 
-  const handleSaveRolePermissions = async () => {
-    if (!selectedRole) return;
+  const handleSavePermissions = async () => {
+    if (!selectedUserId) return;
 
+    setSavingPermissions(true);
     try {
-      await updateRolePermissions(selectedRole, selectedPermissions);
+      await userPermissionsService.upsert({
+        user_id: selectedUserId,
+        ...selectedUserPermissions
+      } as any);
+      
       toast({
         title: 'Éxito',
         description: 'Permisos actualizados correctamente'
       });
-      setShowPermissionsDialog(false);
+      setShowEditPermissionsDialog(false);
     } catch (error) {
       console.error('Error updating permissions:', error);
       toast({
@@ -198,36 +221,50 @@ const UserManagement = () => {
         description: 'No se pudieron actualizar los permisos',
         variant: 'destructive'
       });
+    } finally {
+      setSavingPermissions(false);
     }
   };
 
-  const getRoleBadgeVariant = (role: AppRole | null) => {
-    switch (role) {
-      case 'superadmin': return 'destructive';
-      case 'admin': return 'default';
-      case 'cashier': return 'secondary';
-      case 'user': return 'outline';
-      default: return 'outline';
-    }
+  const getRoleLabel = (parentUserId: string | null) => {
+    return parentUserId === null ? 'Administrador' : 'Cajero';
   };
 
-  const getRoleLabel = (role: AppRole | null) => {
-    switch (role) {
-      case 'superadmin': return 'Super Admin';
-      case 'admin': return 'Administrador';
-      case 'cashier': return 'Cajero';
-      case 'user': return 'Usuario';
-      default: return 'Sin rol';
-    }
+  const toggleNewUserPermission = (key: string) => {
+    setNewUserPermissions(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
   };
 
-  const permissionsByCategory = permissions.reduce((acc, perm) => {
-    if (!acc[perm.category]) {
-      acc[perm.category] = [];
-    }
-    acc[perm.category].push(perm);
+  const toggleEditPermission = (key: keyof UserPermissions) => {
+    setSelectedUserPermissions(prev => ({
+      ...prev,
+      [key]: !(prev[key] as boolean)
+    }));
+  };
+
+  const setAllNewUserPermissions = (value: boolean) => {
+    const allPerms: Record<string, boolean> = {};
+    PERMISSION_FIELDS.forEach(field => {
+      allPerms[field.key] = value;
+    });
+    setNewUserPermissions(allPerms);
+  };
+
+  const setAllEditPermissions = (value: boolean) => {
+    const allPerms: Partial<UserPermissions> = { ...selectedUserPermissions };
+    PERMISSION_FIELDS.forEach(field => {
+      (allPerms as any)[field.key] = value;
+    });
+    setSelectedUserPermissions(allPerms);
+  };
+
+  const groupedFields = PERMISSION_FIELDS.reduce((acc, field) => {
+    if (!acc[field.group]) acc[field.group] = [];
+    acc[field.group].push(field);
     return acc;
-  }, {} as Record<string, Permission[]>);
+  }, {} as Record<string, PermissionField[]>);
 
   if (loading) {
     return (
@@ -241,285 +278,264 @@ const UserManagement = () => {
   }
 
   return (
-    <Tabs defaultValue="users" className="space-y-6">
-      <TabsList>
-        <TabsTrigger value="users" className="flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Usuarios
-        </TabsTrigger>
-        <TabsTrigger value="roles" className="flex items-center gap-2">
-          <Shield className="h-4 w-4" />
-          Roles y Permisos
-        </TabsTrigger>
-      </TabsList>
-
-      {/* Usuarios Tab */}
-      <TabsContent value="users" className="space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
-            <p className="text-muted-foreground">Administra los usuarios y sus roles</p>
-          </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Crear Usuario
-          </Button>
-        </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Fecha de Registro</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.first_name || user.last_name
-                        ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                        : 'Sin nombre'}
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={getRoleBadgeVariant(user.role)}>
-                        {getRoleLabel(user.role)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(user.created_at).toLocaleDateString('es-ES')}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setSelectedRole(user.role || 'user');
-                          setShowEditRoleDialog(true);
-                        }}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      {/* Roles Tab */}
-      <TabsContent value="roles" className="space-y-4">
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Roles y Permisos</h2>
-          <p className="text-muted-foreground">Configura los permisos para cada rol</p>
+          <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
+          <p className="text-muted-foreground">Administra los usuarios y sus permisos</p>
         </div>
+        <Button onClick={() => setShowCreateDialog(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Crear Usuario
+        </Button>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {['superadmin', 'admin', 'cashier', 'user'].map((role) => (
-            <Card key={role}>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{getRoleLabel(role as AppRole)}</span>
-                  <Badge variant={getRoleBadgeVariant(role as AppRole)}>
-                    {role}
-                  </Badge>
-                </CardTitle>
-                <CardDescription>
-                  {role === 'superadmin' && 'Acceso completo al sistema'}
-                  {role === 'admin' && 'Gestión general sin crear usuarios'}
-                  {role === 'cashier' && 'Operaciones y atención al cliente'}
-                  {role === 'user' && 'Acceso básico de solo lectura'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => handleEditRolePermissions(role as AppRole)}
-                >
-                  <Shield className="h-4 w-4 mr-2" />
-                  Editar Permisos
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </TabsContent>
+      <Card>
+        <CardContent className="pt-6">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Fecha de Registro</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">
+                    {user.first_name || user.last_name
+                      ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                      : 'Sin nombre'}
+                  </TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Badge variant={user.parent_user_id === null ? 'default' : 'secondary'}>
+                      {getRoleLabel(user.parent_user_id)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(user.created_at).toLocaleDateString('es-ES')}
+                  </TableCell>
+                  <TableCell className="text-right space-x-2">
+                    {user.parent_user_id !== null && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditPermissions(user.id)}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Create User Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Crear Nuevo Usuario</DialogTitle>
             <DialogDescription>
-              Completa los datos del nuevo usuario
+              Completa los datos del nuevo usuario y selecciona sus permisos
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">Nombre</Label>
-                <Input
-                  id="firstName"
-                  value={newUser.firstName}
-                  onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
-                />
+          <ScrollArea className="max-h-[calc(90vh-200px)]">
+            <div className="space-y-6 pr-4">
+              {/* Basic Info */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium">Información Básica</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">Nombre *</Label>
+                    <Input
+                      id="firstName"
+                      value={newUser.firstName}
+                      onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Apellido *</Label>
+                    <Input
+                      id="lastName"
+                      value={newUser.lastName}
+                      onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Rol</Label>
+                  <Select
+                    value={newUser.role}
+                    onValueChange={(value) => setNewUser({ ...newUser, role: value as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">Cajero</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Apellido</Label>
-                <Input
-                  id="lastName"
-                  value={newUser.lastName}
-                  onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                value={newUser.password}
-                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Rol</Label>
-              <Select
-                value={newUser.role}
-                onValueChange={(value) => setNewUser({ ...newUser, role: value as AppRole })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Usuario</SelectItem>
-                  <SelectItem value="cashier">Cajero</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="superadmin">Super Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCreateUser}>Crear Usuario</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Edit Role Dialog */}
-      <Dialog open={showEditRoleDialog} onOpenChange={setShowEditRoleDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cambiar Rol de Usuario</DialogTitle>
-            <DialogDescription>
-              Selecciona el nuevo rol para {selectedUser?.email}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="newRole">Nuevo Rol</Label>
-              <Select
-                value={selectedRole || 'user'}
-                onValueChange={(value) => setSelectedRole(value as AppRole)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Usuario</SelectItem>
-                  <SelectItem value="cashier">Cajero</SelectItem>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="superadmin">Super Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditRoleDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleUpdateUserRole}>Guardar Cambios</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Permissions Dialog */}
-      <Dialog open={showPermissionsDialog} onOpenChange={setShowPermissionsDialog}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Configurar Permisos - {getRoleLabel(selectedRole)}</DialogTitle>
-            <DialogDescription>
-              Selecciona los permisos que tendrá este rol
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6">
-            {Object.entries(permissionsByCategory).map(([category, perms]) => (
-              <div key={category} className="space-y-3">
-                <h3 className="font-semibold text-sm">{category}</h3>
-                <div className="space-y-2 ml-4">
-                  {perms.map((perm) => (
-                    <div key={perm.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={perm.id}
-                        checked={selectedPermissions.includes(perm.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedPermissions([...selectedPermissions, perm.id]);
-                          } else {
-                            setSelectedPermissions(
-                              selectedPermissions.filter((id) => id !== perm.id)
-                            );
-                          }
-                        }}
-                      />
-                      <Label htmlFor={perm.id} className="text-sm cursor-pointer">
-                        <span className="font-medium">{perm.description}</span>
-                        <span className="text-muted-foreground ml-2">({perm.name})</span>
-                      </Label>
+              {/* Permissions */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Permisos</h3>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAllNewUserPermissions(true)}
+                    >
+                      Seleccionar Todos
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAllNewUserPermissions(false)}
+                    >
+                      Deseleccionar Todos
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(groupedFields).map(([groupName, fields]) => (
+                    <div key={groupName} className="space-y-2">
+                      <div className="text-sm font-medium text-foreground">{groupName}</div>
+                      <div className="space-y-1.5">
+                        {fields.map(field => (
+                          <label
+                            key={String(field.key)}
+                            className="flex items-center gap-2 text-sm cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={Boolean(newUserPermissions[field.key])}
+                              onCheckedChange={() => toggleNewUserPermission(field.key)}
+                            />
+                            <span className="text-muted-foreground">{field.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          </ScrollArea>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPermissionsDialog(false)}>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveRolePermissions}>Guardar Permisos</Button>
+            <Button onClick={handleCreateUser} disabled={creatingUser}>
+              {creatingUser ? 'Creando...' : 'Crear Usuario'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Tabs>
+
+      {/* Edit Permissions Dialog */}
+      <Dialog open={showEditPermissionsDialog} onOpenChange={setShowEditPermissionsDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Editar Permisos</DialogTitle>
+            <DialogDescription>
+              Configura los permisos para este usuario
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-200px)]">
+            <div className="space-y-4 pr-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Permisos</h3>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAllEditPermissions(true)}
+                  >
+                    Seleccionar Todos
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAllEditPermissions(false)}
+                  >
+                    Deseleccionar Todos
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(groupedFields).map(([groupName, fields]) => (
+                  <div key={groupName} className="space-y-2">
+                    <div className="text-sm font-medium text-foreground">{groupName}</div>
+                    <div className="space-y-1.5">
+                      {fields.map(field => (
+                        <label
+                          key={String(field.key)}
+                          className="flex items-center gap-2 text-sm cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={Boolean(selectedUserPermissions[field.key])}
+                            onCheckedChange={() => toggleEditPermission(field.key)}
+                          />
+                          <span className="text-muted-foreground">{field.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditPermissionsDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePermissions} disabled={savingPermissions}>
+              {savingPermissions ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
