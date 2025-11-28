@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
 import { useTheme } from 'next-themes';
-import logoLight from '@/assets/logocapi.png';
-import logoDark from '@/assets/logocapinegro.png';
+import logoLight from '../../assets/logocapi.png';
+import logoDark from '../../assets/logocapinegro.png';
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{
