@@ -34,6 +34,7 @@ import { userPermissionsService, UserPermissions } from '@/services/userPermissi
 import { useAccountUsers } from '@/hooks/useAccountUsers';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { z } from 'zod';
 
 type PermissionField = {
   key: keyof UserPermissions;
@@ -108,22 +109,47 @@ const UserManagement = () => {
   });
 
   const handleCreateUser = async () => {
-    if (!newUser.email || !newUser.password || !newUser.firstName || !newUser.lastName) {
-      toast({
-        title: 'Error',
-        description: 'Completa todos los campos obligatorios',
-        variant: 'destructive'
-      });
-      return;
+    // Validate input using zod schema
+    const userSchema = z.object({
+      email: z.string()
+        .trim()
+        .email({ message: "Email inválido" })
+        .max(255, { message: "Email demasiado largo" }),
+      password: z.string()
+        .min(6, { message: "La contraseña debe tener al menos 6 caracteres" })
+        .max(72, { message: "Contraseña demasiado larga" }),
+      firstName: z.string()
+        .trim()
+        .min(1, { message: "El nombre es requerido" })
+        .max(100, { message: "Nombre demasiado largo" }),
+      lastName: z.string()
+        .trim()
+        .min(1, { message: "El apellido es requerido" })
+        .max(100, { message: "Apellido demasiado largo" }),
+      role: z.enum(['admin', 'user'])
+    });
+
+    try {
+      // Validate form data
+      userSchema.parse(newUser);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: 'Error de validación',
+          description: error.issues[0].message,
+          variant: 'destructive'
+        });
+        return;
+      }
     }
 
     setCreatingUser(true);
     try {
       await usersService.createUser(
-        newUser.email,
+        newUser.email.trim(),
         newUser.password,
-        newUser.firstName,
-        newUser.lastName,
+        newUser.firstName.trim(),
+        newUser.lastName.trim(),
         newUser.role,
         newUserPermissions
       );
@@ -153,9 +179,19 @@ const UserManagement = () => {
       refetch();
     } catch (error: any) {
       console.error('Error creating user:', error);
+      
+      // Show specific error message
+      let errorMessage = 'No se pudo crear el usuario';
+      if (error.message?.includes('email address has already been registered') || 
+          error.message?.includes('ya está registrado')) {
+        errorMessage = 'Este email ya está registrado. Por favor usa otro email.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo crear el usuario',
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {
