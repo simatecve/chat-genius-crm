@@ -111,12 +111,12 @@ Deno.serve(async (req) => {
 
     console.log('[create-user] Auth user created:', authData.user.id);
 
-    // Update profile with parent_user_id (link to admin)
+    // Update profile with parent_user_id (link to admin) and set as cajero
     const { error: profileUpdateError } = await supabaseAdmin
       .from('profiles')
       .update({
         parent_user_id: currentUser.id, // Link to the admin creating this user
-        profile_type: 'client' // Keep as client type but with parent relationship
+        profile_type: 'cajero' // Mark as cajero (subordinate user)
       })
       .eq('id', authData.user.id);
 
