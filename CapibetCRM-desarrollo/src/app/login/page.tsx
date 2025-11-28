@@ -227,12 +227,12 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-[#F29A1F] via-[#F29A1F] to-[#1e2b2c] relative overflow-hidden">
         <div className="text-center z-10">
           <div className="mb-8">
-            {/* Beast Logo Circle */}
-            <div className="w-32 h-32 mx-auto rounded-full flex items-center justify-centershadow-2xl overflow-hidden">
+            {/* Logo Circle Desktop */}
+            <div className="w-32 h-32 mx-auto rounded-full flex items-center justify-center shadow-2xl overflow-hidden bg-black">
               <img 
-                src="https://pbs.twimg.com/profile_images/1118644090420322304/5SFmHCl-_400x400.jpg" 
+                src={logoDark}
                 alt="CAPIBET Logo"
-                className="w-full h-full object-cover rounded-full"
+                className="w-full h-full object-cover"
               />
             </div>
           </div>
