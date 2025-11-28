@@ -125,7 +125,7 @@ export default function LoginPage() {
       {/* Mobile Logo - Only visible on small screens */}
       <div className="lg:hidden flex justify-center py-8 px-4">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden shadow-lg mb-4">
+          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden shadow-lg mb-4 bg-black">
             <img 
               src={logoDark}
               alt="CAPIBET Logo"
