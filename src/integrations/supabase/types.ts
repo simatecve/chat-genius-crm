@@ -1549,6 +1549,132 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          created_at: string | null
+          id: string
+          puede_asignar_tareas: boolean | null
+          puede_crear_contactos: boolean | null
+          puede_crear_embudos: boolean | null
+          puede_crear_tareas: boolean | null
+          puede_crear_ventas: boolean | null
+          puede_editar_configuracion: boolean | null
+          puede_editar_contactos: boolean | null
+          puede_editar_embudos: boolean | null
+          puede_editar_ventas: boolean | null
+          puede_eliminar_contactos: boolean | null
+          puede_eliminar_embudos: boolean | null
+          puede_eliminar_mensajes: boolean | null
+          puede_eliminar_tareas: boolean | null
+          puede_eliminar_ventas: boolean | null
+          puede_enviar_mensajes: boolean | null
+          puede_exportar_datos: boolean | null
+          puede_gestionar_facebook: boolean | null
+          puede_gestionar_instagram: boolean | null
+          puede_gestionar_plantillas: boolean | null
+          puede_gestionar_respuestas_rapidas: boolean | null
+          puede_gestionar_telegram: boolean | null
+          puede_gestionar_usuarios: boolean | null
+          puede_gestionar_whatsapp: boolean | null
+          puede_importar_contactos: boolean | null
+          puede_mover_contactos_embudos: boolean | null
+          puede_ver_analytics: boolean | null
+          puede_ver_chats: boolean | null
+          puede_ver_configuracion: boolean | null
+          puede_ver_contactos: boolean | null
+          puede_ver_dashboard: boolean | null
+          puede_ver_embudos: boolean | null
+          puede_ver_mensajes_otros: boolean | null
+          puede_ver_reportes: boolean | null
+          puede_ver_tareas: boolean | null
+          puede_ver_ventas: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          puede_asignar_tareas?: boolean | null
+          puede_crear_contactos?: boolean | null
+          puede_crear_embudos?: boolean | null
+          puede_crear_tareas?: boolean | null
+          puede_crear_ventas?: boolean | null
+          puede_editar_configuracion?: boolean | null
+          puede_editar_contactos?: boolean | null
+          puede_editar_embudos?: boolean | null
+          puede_editar_ventas?: boolean | null
+          puede_eliminar_contactos?: boolean | null
+          puede_eliminar_embudos?: boolean | null
+          puede_eliminar_mensajes?: boolean | null
+          puede_eliminar_tareas?: boolean | null
+          puede_eliminar_ventas?: boolean | null
+          puede_enviar_mensajes?: boolean | null
+          puede_exportar_datos?: boolean | null
+          puede_gestionar_facebook?: boolean | null
+          puede_gestionar_instagram?: boolean | null
+          puede_gestionar_plantillas?: boolean | null
+          puede_gestionar_respuestas_rapidas?: boolean | null
+          puede_gestionar_telegram?: boolean | null
+          puede_gestionar_usuarios?: boolean | null
+          puede_gestionar_whatsapp?: boolean | null
+          puede_importar_contactos?: boolean | null
+          puede_mover_contactos_embudos?: boolean | null
+          puede_ver_analytics?: boolean | null
+          puede_ver_chats?: boolean | null
+          puede_ver_configuracion?: boolean | null
+          puede_ver_contactos?: boolean | null
+          puede_ver_dashboard?: boolean | null
+          puede_ver_embudos?: boolean | null
+          puede_ver_mensajes_otros?: boolean | null
+          puede_ver_reportes?: boolean | null
+          puede_ver_tareas?: boolean | null
+          puede_ver_ventas?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          puede_asignar_tareas?: boolean | null
+          puede_crear_contactos?: boolean | null
+          puede_crear_embudos?: boolean | null
+          puede_crear_tareas?: boolean | null
+          puede_crear_ventas?: boolean | null
+          puede_editar_configuracion?: boolean | null
+          puede_editar_contactos?: boolean | null
+          puede_editar_embudos?: boolean | null
+          puede_editar_ventas?: boolean | null
+          puede_eliminar_contactos?: boolean | null
+          puede_eliminar_embudos?: boolean | null
+          puede_eliminar_mensajes?: boolean | null
+          puede_eliminar_tareas?: boolean | null
+          puede_eliminar_ventas?: boolean | null
+          puede_enviar_mensajes?: boolean | null
+          puede_exportar_datos?: boolean | null
+          puede_gestionar_facebook?: boolean | null
+          puede_gestionar_instagram?: boolean | null
+          puede_gestionar_plantillas?: boolean | null
+          puede_gestionar_respuestas_rapidas?: boolean | null
+          puede_gestionar_telegram?: boolean | null
+          puede_gestionar_usuarios?: boolean | null
+          puede_gestionar_whatsapp?: boolean | null
+          puede_importar_contactos?: boolean | null
+          puede_mover_contactos_embudos?: boolean | null
+          puede_ver_analytics?: boolean | null
+          puede_ver_chats?: boolean | null
+          puede_ver_configuracion?: boolean | null
+          puede_ver_contactos?: boolean | null
+          puede_ver_dashboard?: boolean | null
+          puede_ver_embudos?: boolean | null
+          puede_ver_mensajes_otros?: boolean | null
+          puede_ver_reportes?: boolean | null
+          puede_ver_tareas?: boolean | null
+          puede_ver_ventas?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

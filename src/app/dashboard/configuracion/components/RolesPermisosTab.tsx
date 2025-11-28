@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { userServices } from '@/services/userServices';
-import { userPermissionsServices } from '@/services/userPermissionsServices';
-import { UsuarioResponse } from '@/app/api/usuarios/domain/usuario';
+import { usersService, UserProfile } from '@/services/usersService';
+import { userPermissionsService, UserPermissions } from '@/services/userPermissionsService';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 type PermissionField = {
-  key: keyof import('@/app/api/user_permissions/domain/user_permissions').UserPermissionsData;
+  key: keyof UserPermissions;
   label: string;
   group: string;
 };
@@ -49,14 +50,14 @@ const PERMISSION_FIELDS: PermissionField[] = [
   { key: 'puede_gestionar_telegram', label: 'Gestionar Telegram', group: 'Canales' },
 ];
 
-type GroupKey = 'admin' | 'cajero';
+type RoleTab = 'admin' | 'cajero';
 
 export default function RolesPermisosTab() {
-  const [activeGroup, setActiveGroup] = useState<GroupKey>('admin');
-  const [usuarios, setUsuarios] = useState<UsuarioResponse[]>([]);
+  const [activeTab, setActiveTab] = useState<RoleTab>('admin');
+  const [usuarios, setUsuarios] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [permsByUser, setPermsByUser] = useState<Record<string, Partial<any>>>({});
+  const [permsByUser, setPermsByUser] = useState<Record<string, Partial<UserPermissions>>>({});
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
   const groupedFields = useMemo(() => {
@@ -68,90 +69,107 @@ export default function RolesPermisosTab() {
     return map;
   }, []);
 
-  const isAdminRole = (rol: string) => rol === 'admin' || rol === 'super_admin' || rol === 'ADMINITRADOR';
-  const isCajeroRole = (rol: string) => rol === 'agente' || rol === 'cajero';
+  const isAdminRole = (role: string | null, profileType: string | null) => {
+    return profileType === 'client' || profileType === 'superadmin' || role === 'admin';
+  };
+
+  const isCajeroRole = (role: string | null, profileType: string | null) => {
+    return role === 'user' && profileType !== 'superadmin';
+  };
 
   const filteredUsuarios = useMemo(() => {
-    if (activeGroup === 'admin') {
-      return usuarios.filter(u => isAdminRole(u.rol));
+    if (activeTab === 'admin') {
+      return usuarios.filter(u => isAdminRole(u.role, u.profile_type));
     }
-    return usuarios.filter(u => isCajeroRole(u.rol));
-  }, [usuarios, activeGroup]);
+    return usuarios.filter(u => isCajeroRole(u.role, u.profile_type));
+  }, [usuarios, activeTab]);
 
-  const defaultPermsForRole = (rol: string): Partial<any> => {
-    if (isAdminRole(rol)) {
-      const allTrue: Partial<any> = {};
-      PERMISSION_FIELDS.forEach(f => { allTrue[f.key] = true; });
+  const defaultPermsForRole = (role: string | null, profileType: string | null): Partial<UserPermissions> => {
+    if (isAdminRole(role, profileType)) {
+      const allTrue: Partial<UserPermissions> = {};
+      PERMISSION_FIELDS.forEach(f => {
+        (allTrue as any)[f.key] = true;
+      });
       return allTrue;
     }
-    const p: Partial<any> = {};
-    PERMISSION_FIELDS.forEach(f => { p[f.key] = false; });
-    p.puede_ver_dashboard = true;
-    p.puede_ver_chats = true;
-    p.puede_enviar_mensajes = true;
-    p.puede_ver_embudos = true;
-    p.puede_mover_contactos_embudos = true;
-    p.puede_ver_tareas = true;
-    p.puede_ver_contactos = true;
-    return p;
+    
+    // Default permissions for cajero
+    return {
+      puede_ver_dashboard: true,
+      puede_ver_chats: true,
+      puede_enviar_mensajes: true,
+      puede_ver_embudos: true,
+      puede_mover_contactos_embudos: true,
+      puede_ver_tareas: true,
+      puede_ver_contactos: true
+    };
   };
 
   const loadUsuarios = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await userServices.getAllUsuarios();
-      if (result.success && Array.isArray(result.data)) {
-        setUsuarios(result.data);
-        const ids = result.data.map(u => u.id);
-        const promises = ids.map(id => userPermissionsServices.getByUsuario(id));
-        const res = await Promise.all(promises);
-        const map: Record<string, Partial<any>> = {};
-        result.data.forEach((u, i) => {
-          const d = res[i].data;
-          map[u.id] = d || defaultPermsForRole(u.rol);
-        });
-        setPermsByUser(map);
-      } else {
-        setError(result.error || 'Error al cargar usuarios');
-      }
-    } catch (e) {
-      setError('Error de conexión al cargar usuarios');
+      const users = await usersService.getAllUsers();
+      setUsuarios(users);
+      
+      // Load permissions for each user
+      const permsMap: Record<string, Partial<UserPermissions>> = {};
+      await Promise.all(
+        users.map(async (user) => {
+          try {
+            const perms = await userPermissionsService.getByUserId(user.id);
+            permsMap[user.id] = perms || defaultPermsForRole(user.role, user.profile_type);
+          } catch (e) {
+            permsMap[user.id] = defaultPermsForRole(user.role, user.profile_type);
+          }
+        })
+      );
+      setPermsByUser(permsMap);
+    } catch (e: any) {
+      console.error('Error loading users:', e);
+      setError(e.message || 'Error al cargar usuarios');
+      toast.error('Error al cargar usuarios');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadUsuarios(); }, []);
+  useEffect(() => {
+    loadUsuarios();
+  }, []);
 
-  const toggleField = (userId: string, field: PermissionField['key']) => {
+  const toggleField = (userId: string, field: keyof UserPermissions) => {
     setPermsByUser(prev => ({
       ...prev,
-      [userId]: { ...prev[userId], [field]: !prev[userId]?.[field] }
+      [userId]: {
+        ...prev[userId],
+        [field]: !(prev[userId]?.[field] as boolean)
+      }
     }));
   };
 
   const setAllForUser = (userId: string, value: boolean) => {
-    const next: Partial<any> = { ...permsByUser[userId] };
-    PERMISSION_FIELDS.forEach(f => { next[f.key] = value; });
+    const next: Partial<UserPermissions> = { ...permsByUser[userId] };
+    PERMISSION_FIELDS.forEach(f => {
+      (next as any)[f.key] = value;
+    });
     setPermsByUser(prev => ({ ...prev, [userId]: next }));
   };
 
-  const saveUserPerms = async (user: UsuarioResponse) => {
+  const saveUserPerms = async (user: UserProfile) => {
     setSavingUserId(user.id);
     try {
       const current = permsByUser[user.id];
-      const exists = await userPermissionsServices.getByUsuario(user.id);
-      if (exists.data) {
-        const result = await userPermissionsServices.update(user.id, current);
-        if (!result.success) throw new Error(result.error || 'Error al actualizar');
-      } else {
-        const payload = { usuario_id: user.id, ...current } as any;
-        const result = await userPermissionsServices.create(payload);
-        if (!result.success) throw new Error(result.error || 'Error al crear');
-      }
-    } catch (e) {
-      setError('Error al guardar permisos');
+      await userPermissionsService.upsert({
+        user_id: user.id,
+        ...current
+      } as any);
+      
+      toast.success('Permisos guardados correctamente');
+    } catch (e: any) {
+      console.error('Error saving permissions:', e);
+      setError(e.message || 'Error al guardar permisos');
+      toast.error('Error al guardar permisos');
     } finally {
       setSavingUserId(null);
     }
@@ -161,69 +179,84 @@ export default function RolesPermisosTab() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex space-x-2">
-          <button
-            onClick={() => setActiveGroup('admin')}
-            className={`px-4 py-2 rounded-lg text-sm ${activeGroup === 'admin' ? 'bg-[#F29A1F] text-white' : 'bg-[#2a2d35] text-gray-300'}`}
+          <Button
+            onClick={() => setActiveTab('admin')}
+            variant={activeTab === 'admin' ? 'default' : 'outline'}
+            className="px-4 py-2 rounded-lg text-sm"
           >
-            ADMIN
-          </button>
-          <button
-            onClick={() => setActiveGroup('cajero')}
-            className={`px-4 py-2 rounded-lg text-sm ${activeGroup === 'cajero' ? 'bg-[#F29A1F] text-white' : 'bg-[#2a2d35] text-gray-300'}`}
+            Admin
+          </Button>
+          <Button
+            onClick={() => setActiveTab('cajero')}
+            variant={activeTab === 'cajero' ? 'default' : 'outline'}
+            className="px-4 py-2 rounded-lg text-sm"
           >
-            cajero
-          </button>
+            Cajero
+          </Button>
         </div>
         <div>
-          {loading && <span className="text-gray-400 text-sm">Cargando...</span>}
+          {loading && <span className="text-muted-foreground text-sm">Cargando...</span>}
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-red-400 text-sm">{error}</div>
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-destructive text-sm">
+          {error}
+        </div>
       )}
 
       <div className="space-y-4">
         {filteredUsuarios.map(user => (
-          <div key={user.id} className="bg-[#1a1d23] border border-[#3a3d45] rounded-lg">
+          <div key={user.id} className="bg-card border border-border rounded-lg">
             <div className="flex items-center justify-between p-4">
               <div>
-                <div className="text-white font-medium">{user.nombre}</div>
-                <div className="text-gray-400 text-xs">Rol: {user.rol}</div>
+                <div className="text-foreground font-medium">
+                  {user.first_name} {user.last_name}
+                </div>
+                <div className="text-muted-foreground text-xs">
+                  {user.email} • Rol: {user.role || 'Sin rol'}
+                </div>
               </div>
               <div className="flex items-center space-x-2">
-                <button
+                <Button
                   onClick={() => setAllForUser(user.id, true)}
-                  className="px-3 py-1 bg-[#2a2d35] text-white rounded"
+                  variant="outline"
+                  size="sm"
                 >
                   Seleccionar todo
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setAllForUser(user.id, false)}
-                  className="px-3 py-1 bg-[#2a2d35] text-white rounded"
+                  variant="outline"
+                  size="sm"
                 >
                   Quitar todo
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => saveUserPerms(user)}
-                  className="px-4 py-2 bg-[#F29A1F] text-white rounded-lg"
                   disabled={savingUserId === user.id}
+                  size="sm"
                 >
                   {savingUserId === user.id ? 'Guardando...' : 'Guardar'}
-                </button>
+                </Button>
               </div>
             </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
               {Object.entries(groupedFields).map(([groupName, fields]) => (
-                <div key={groupName} className="bg-[#2a2d35] rounded-lg p-4">
-                  <div className="text-white text-sm font-medium mb-2">{groupName}</div>
+                <div key={groupName} className="bg-muted/50 rounded-lg p-4">
+                  <div className="text-foreground text-sm font-medium mb-2">{groupName}</div>
                   <div className="space-y-2">
                     {fields.map(field => (
-                      <label key={String(field.key)} className="flex items-center space-x-2 text-sm text-gray-300">
+                      <label 
+                        key={String(field.key)} 
+                        className="flex items-center space-x-2 text-sm text-foreground cursor-pointer"
+                      >
                         <input
                           type="checkbox"
                           checked={Boolean(permsByUser[user.id]?.[field.key])}
                           onChange={() => toggleField(user.id, field.key)}
+                          className="rounded border-input"
                         />
                         <span>{field.label}</span>
                       </label>
@@ -234,8 +267,11 @@ export default function RolesPermisosTab() {
             </div>
           </div>
         ))}
-        {filteredUsuarios.length === 0 && (
-          <div className="text-gray-400 text-sm">Sin usuarios para este rol</div>
+        
+        {filteredUsuarios.length === 0 && !loading && (
+          <div className="text-muted-foreground text-sm text-center py-8">
+            No hay usuarios con este rol
+          </div>
         )}
       </div>
     </div>
