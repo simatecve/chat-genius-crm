@@ -126,13 +126,11 @@ export default function LoginPage() {
       {/* Mobile Logo - Only visible on small screens */}
       <div className="lg:hidden flex justify-center py-8 px-4">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden bg-black">
-            <img 
-              src={LOGO_LIGHT_URL}
-              alt="CAPIBET Logo"
-              className="w-full h-full object-contain"
-            />
-          </div>
+          <img 
+            src={LOGO_LIGHT_URL}
+            alt="CAPIBET Logo"
+            className="h-16 mx-auto mb-4 object-contain"
+          />
           <h1 className="text-white text-2xl font-bold">CAPIBET</h1>
           <div className="flex items-center justify-center gap-2 mt-1">
             <div className="h-0.5 w-8 bg-[#F29A1F]"></div>
@@ -228,14 +226,11 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-[#F29A1F] via-[#F29A1F] to-[#1e2b2c] relative overflow-hidden">
         <div className="text-center z-10">
           <div className="mb-8">
-            {/* Logo Desktop con círculo negro */}
-            <div className="w-32 h-32 mx-auto rounded-full overflow-hidden bg-black">
-              <img 
-                src={LOGO_LIGHT_URL}
-                alt="CAPIBET Logo"
-                className="w-full h-full object-contain"
-              />
-            </div>
+            <img 
+              src={LOGO_LIGHT_URL}
+              alt="CAPIBET Logo"
+              className="h-32 mx-auto object-contain"
+            />
           </div>
           <h1 className="text-white text-6xl font-bold mb-2">CAPIBET</h1>
           <div className="flex items-center justify-center gap-4">
