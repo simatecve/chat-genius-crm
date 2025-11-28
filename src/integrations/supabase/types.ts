@@ -1115,6 +1115,7 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
+          parent_user_id: string | null
           phone: string | null
           plan_id: string | null
           plan_type: string | null
@@ -1128,6 +1129,7 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
+          parent_user_id?: string | null
           phone?: string | null
           plan_id?: string | null
           plan_type?: string | null
@@ -1141,6 +1143,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          parent_user_id?: string | null
           phone?: string | null
           plan_id?: string | null
           plan_type?: string | null
@@ -1148,6 +1151,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_parent_user_id_fkey"
+            columns: ["parent_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_plan_id_fkey"
             columns: ["plan_id"]
@@ -1874,6 +1884,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_account_owner_id: { Args: { user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

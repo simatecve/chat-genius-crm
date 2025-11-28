@@ -46,9 +46,24 @@ export const useEffectiveUserId = () => {
             setIsImpersonating(false);
           }
         } else {
-          // No impersonation, use authenticated user ID
-          setEffectiveUserId(user.id);
-          setIsImpersonating(false);
+          // Get user's profile to check for parent_user_id
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, parent_user_id')
+            .eq('id', user.id)
+            .single();
+
+          // If user has a parent (is a cashier), use parent's ID for data queries
+          // This allows cashiers to see the same data as their admin
+          if (profile?.parent_user_id) {
+            console.log('[useEffectiveUserId] User is cashier, using parent ID:', profile.parent_user_id);
+            setEffectiveUserId(profile.parent_user_id);
+            setIsImpersonating(false); // Not impersonation, just data sharing
+          } else {
+            // User is admin or superadmin, use their own ID
+            setEffectiveUserId(user.id);
+            setIsImpersonating(false);
+          }
         }
       } catch (error) {
         console.error('Error determining effective user ID:', error);
