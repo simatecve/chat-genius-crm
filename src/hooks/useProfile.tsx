@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from './useEffectiveUserId';
+import { useAuth } from './useAuth';
 import { Database } from '@/integrations/supabase/types';
 
 type ProfileType = Database['public']['Enums']['profile_type'];
@@ -21,10 +22,13 @@ export const useProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { effectiveUserId, isImpersonating, loading: userIdLoading } = useEffectiveUserId();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!effectiveUserId || userIdLoading) {
+      // Use user.id directly for profile loading, not effectiveUserId
+      // effectiveUserId is for data sharing, but profile should always be the logged-in user's
+      if (!user?.id || userIdLoading) {
         setLoading(userIdLoading);
         return;
       }
@@ -36,7 +40,7 @@ export const useProfile = () => {
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', effectiveUserId)
+          .eq('id', user.id) // Always load the logged-in user's profile
           .single();
 
         if (error) {
@@ -53,10 +57,11 @@ export const useProfile = () => {
     };
 
     fetchProfile();
-  }, [effectiveUserId, userIdLoading]);
+  }, [user?.id, userIdLoading]);
 
   const isSuperAdmin = profile?.profile_type === 'superadmin';
   const isClient = profile?.profile_type === 'client';
+  const isCajero = profile?.profile_type === 'cajero';
 
   return {
     profile,
@@ -64,10 +69,11 @@ export const useProfile = () => {
     error,
     isSuperAdmin,
     isClient,
+    isCajero,
     isImpersonating,
     effectiveUserId,
     refetchProfile: () => {
-      if (effectiveUserId) {
+      if (user?.id) {
         setLoading(true);
         // Re-trigger the effect
         setProfile(null);
