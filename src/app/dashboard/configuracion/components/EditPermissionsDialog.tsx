@@ -8,13 +8,13 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { usersService, UserProfile } from '@/services/usersService';
 import { userPermissionsService, UserPermissions } from '@/services/userPermissionsService';
+import { useAccountUsers } from '@/hooks/useAccountUsers';
 
 interface EditPermissionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  roleType: 'superadmin' | 'admin' | 'cashier' | 'user';
+  roleType: 'admin' | 'cashier';
   roleName: string;
 }
 
@@ -68,10 +68,22 @@ export default function EditPermissionsDialog({
   roleType,
   roleName
 }: EditPermissionsDialogProps) {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const { users: accountUsers, loading: loadingUsers, refetch } = useAccountUsers();
   const [permsByUser, setPermsByUser] = useState<Record<string, Partial<UserPermissions>>>({});
   const [loading, setLoading] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+
+  // Filter users based on role type
+  const users = accountUsers.filter(user => {
+    if (roleType === 'admin') {
+      // Show only admin users (users without parent_user_id)
+      return user.parent_user_id === null;
+    } else if (roleType === 'cashier') {
+      // Show only cashier users (users with parent_user_id)
+      return user.parent_user_id !== null;
+    }
+    return false;
+  });
 
   const groupedFields = PERMISSION_FIELDS.reduce((acc, field) => {
     if (!acc[field.group]) acc[field.group] = [];
@@ -79,32 +91,14 @@ export default function EditPermissionsDialog({
     return acc;
   }, {} as Record<string, PermissionField[]>);
 
-  const filterUsersByRole = (allUsers: UserProfile[]) => {
-    return allUsers.filter(user => {
-      switch (roleType) {
-        case 'superadmin':
-          return user.profile_type === 'superadmin';
-        case 'admin':
-          return user.profile_type === 'client' || user.role === 'admin';
-        case 'cashier':
-        case 'user':
-          return user.role === 'user' && user.profile_type !== 'superadmin';
-        default:
-          return false;
-      }
-    });
-  };
-
-  const loadUsers = async () => {
+  const loadPermissions = async () => {
+    if (users.length === 0) return;
+    
     setLoading(true);
     try {
-      const allUsers = await usersService.getAllUsers();
-      const filteredUsers = filterUsersByRole(allUsers);
-      setUsers(filteredUsers);
-
       const permsMap: Record<string, Partial<UserPermissions>> = {};
       await Promise.all(
-        filteredUsers.map(async (user) => {
+        users.map(async (user) => {
           try {
             const perms = await userPermissionsService.getByUserId(user.id);
             permsMap[user.id] = perms || {};
@@ -115,18 +109,18 @@ export default function EditPermissionsDialog({
       );
       setPermsByUser(permsMap);
     } catch (e: any) {
-      console.error('Error loading users:', e);
-      toast.error('Error al cargar usuarios');
+      console.error('Error loading permissions:', e);
+      toast.error('Error al cargar permisos');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (open) {
-      loadUsers();
+    if (open && users.length > 0) {
+      loadPermissions();
     }
-  }, [open, roleType]);
+  }, [open, users.length]);
 
   const toggleField = (userId: string, field: keyof UserPermissions) => {
     setPermsByUser(prev => ({
@@ -146,12 +140,12 @@ export default function EditPermissionsDialog({
     setPermsByUser(prev => ({ ...prev, [userId]: next }));
   };
 
-  const saveUserPerms = async (user: UserProfile) => {
-    setSavingUserId(user.id);
+  const saveUserPerms = async (userId: string) => {
+    setSavingUserId(userId);
     try {
-      const current = permsByUser[user.id];
+      const current = permsByUser[userId];
       await userPermissionsService.upsert({
-        user_id: user.id,
+        user_id: userId,
         ...current
       } as any);
       
@@ -174,7 +168,7 @@ export default function EditPermissionsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
+        {loading || loadingUsers ? (
           <div className="text-center py-8 text-muted-foreground">Cargando usuarios...</div>
         ) : users.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
@@ -207,7 +201,7 @@ export default function EditPermissionsDialog({
                       Ninguno
                     </Button>
                     <Button
-                      onClick={() => saveUserPerms(user)}
+                      onClick={() => saveUserPerms(user.id)}
                       disabled={savingUserId === user.id}
                       size="sm"
                     >

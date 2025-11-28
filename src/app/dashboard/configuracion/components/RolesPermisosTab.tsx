@@ -4,7 +4,7 @@ import { useState } from 'react';
 import RoleCard from './RoleCard';
 import EditPermissionsDialog from './EditPermissionsDialog';
 
-type RoleType = 'superadmin' | 'admin' | 'cashier' | 'user';
+type RoleType = 'admin' | 'cashier';
 
 export default function RolesPermisosTab() {
   const [selectedRole, setSelectedRole] = useState<RoleType | null>(null);
@@ -12,36 +12,20 @@ export default function RolesPermisosTab() {
 
   const roles = [
     {
-      type: 'superadmin' as RoleType,
-      title: 'Super Admin',
-      description: 'Acceso completo al sistema',
-      badge: 'superadmin',
-      badgeColor: '#dc2626',
-      icon: 'superadmin' as const
-    },
-    {
       type: 'admin' as RoleType,
       title: 'Administrador',
-      description: 'Gestión general sin crear usuarios',
+      description: 'Dueño de la empresa, acceso completo a su cuenta',
       badge: 'admin',
-      badgeColor: '#f59e0b',
+      badgeColor: '#2563eb',
       icon: 'admin' as const
     },
     {
       type: 'cashier' as RoleType,
       title: 'Cajero',
-      description: 'Operaciones y atención al cliente',
+      description: 'Usuario operativo con permisos configurables',
       badge: 'cashier',
-      badgeColor: '#3b82f6',
+      badgeColor: '#16a34a',
       icon: 'cashier' as const
-    },
-    {
-      type: 'user' as RoleType,
-      title: 'Usuario',
-      description: 'Acceso básico de solo lectura',
-      badge: 'user',
-      badgeColor: '#6b7280',
-      icon: 'user' as const
     }
   ];
 

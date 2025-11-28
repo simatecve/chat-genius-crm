@@ -19,9 +19,26 @@ export const usersService = {
    * Get all users belonging to the current client admin's account
    */
   async getAllUsers(): Promise<UserProfile[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Get current user's profile to check if they're admin or have parent
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('id, parent_user_id, profile_type')
+      .eq('id', user.id)
+      .single();
+
+    if (!currentProfile) throw new Error('Profile not found');
+
+    // Determine the account owner ID
+    const accountOwnerId = currentProfile.parent_user_id || currentProfile.id;
+
+    // Get all profiles in this account (users with this parent_user_id + the admin itself)
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, email, first_name, last_name, profile_type, created_at')
+      .select('id, email, first_name, last_name, profile_type, parent_user_id, created_at')
+      .or(`id.eq.${accountOwnerId},parent_user_id.eq.${accountOwnerId}`)
       .order('created_at', { ascending: false });
 
     if (profilesError) throw profilesError;
@@ -46,59 +63,38 @@ export const usersService = {
   },
 
   /**
-   * Create a new user (cajero) for the current client admin
+   * Create a new user (cajero) for the current client admin using Edge Function
    */
   async createUser(
     email: string,
     password: string,
     firstName: string,
     lastName: string,
-    role: AppRole = 'user'
+    role: AppRole = 'user',
+    permissions?: Record<string, boolean>
   ) {
-    if (!supabaseAdmin) {
-      throw new Error('No se puede crear usuario: falta configuración de admin');
-    }
-
-    // Create user in auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName
+    // Call the create-user edge function
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        email,
+        password,
+        firstName,
+        lastName,
+        role,
+        permissions
       }
     });
 
-    if (authError) throw authError;
-
-    // Assign role
-    const { error: roleError } = await supabaseAdmin
-      .from('user_roles')
-      .insert({
-        user_id: authData.user.id,
-        role
-      });
-
-    if (roleError) throw roleError;
-
-    // Create default permissions for cajero role
-    if (role === 'user') {
-      await supabaseAdmin
-        .from('user_permissions')
-        .insert({
-          user_id: authData.user.id,
-          puede_ver_dashboard: true,
-          puede_ver_chats: true,
-          puede_enviar_mensajes: true,
-          puede_ver_embudos: true,
-          puede_mover_contactos_embudos: true,
-          puede_ver_tareas: true,
-          puede_ver_contactos: true
-        });
+    if (error) {
+      console.error('Error creating user:', error);
+      throw new Error(error.message || 'Error al crear usuario');
     }
 
-    return authData.user;
+    if (!data.success) {
+      throw new Error(data.error || 'Error al crear usuario');
+    }
+
+    return data.user;
   },
 
   /**
