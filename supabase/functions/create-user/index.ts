@@ -103,8 +103,18 @@ Deno.serve(async (req) => {
 
     if (authError) {
       console.error('[create-user] Error creating auth user:', authError);
+      
+      // Provide user-friendly error messages
+      let errorMessage = authError.message;
+      if (authError.message?.includes('email address has already been registered')) {
+        errorMessage = 'Este email ya está registrado';
+      }
+      
       return new Response(
-        JSON.stringify({ error: authError.message }),
+        JSON.stringify({ 
+          success: false,
+          error: errorMessage 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
