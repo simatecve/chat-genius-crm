@@ -17,20 +17,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBotBlock } from '@/hooks/useBotBlock';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
 import { useProfile } from '@/hooks/useProfile';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ContactInfoPanelProps {
   conversationId: string;
   contactName: string;
   phoneNumber: string;
+  whatsappNumber?: string | null;
 }
 
 export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   conversationId,
   contactName,
   phoneNumber,
+  whatsappNumber,
 }) => {
   const { effectiveUserId } = useEffectiveUserId();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(phoneNumber, contactName);
   const { isCajero } = useProfile();
   
@@ -437,15 +441,43 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
       
       if (convError) {
         console.error('Error updating conversation contact_name:', convError);
+        throw convError;
       }
+      
+      console.log('Conversation contact_name updated to:', newName);
 
-      // 2. Buscar y actualizar el contacto por número de teléfono
+      // 2. Buscar contacto por número de teléfono (múltiples estrategias)
       const cleanPhone = phoneNumber.replace(/\D/g, '');
-      const { data: contacts, error: searchError } = await supabase
+      
+      // Estrategia 1: Búsqueda exacta con phoneNumber original
+      let { data: contacts, error: searchError } = await supabase
         .from('contacts')
         .select('id')
-        .or(`phone_number.eq.${cleanPhone},phone_number.like.%${cleanPhone.slice(-10)}%`)
+        .eq('phone_number', phoneNumber)
         .limit(1);
+      
+      // Estrategia 2: Búsqueda por número limpio
+      if ((!contacts || contacts.length === 0) && cleanPhone) {
+        const result = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('phone_number', cleanPhone)
+          .limit(1);
+        contacts = result.data;
+        searchError = result.error;
+      }
+      
+      // Estrategia 3: Búsqueda por últimos 10 dígitos (más flexible)
+      if ((!contacts || contacts.length === 0) && cleanPhone.length >= 10) {
+        const last10 = cleanPhone.slice(-10);
+        const result = await supabase
+          .from('contacts')
+          .select('id')
+          .like('phone_number', `%${last10}%`)
+          .limit(1);
+        contacts = result.data;
+        searchError = result.error;
+      }
       
       if (!searchError && contacts && contacts.length > 0) {
         const { error: contactError } = await supabase
@@ -459,10 +491,12 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         
         if (contactError) {
           console.error('Error updating contact name:', contactError);
+        } else {
+          console.log('Contact name updated to:', newName);
         }
+      } else {
+        console.log('No matching contact found for phone:', phoneNumber);
       }
-
-      console.log('Contact name updated to:', newName);
     } catch (error) {
       console.error('Error in updateContactName:', error);
     }
@@ -472,7 +506,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     try {
       const webhookUrl = 'https://n8n2025.nocodeveloper.site/webhook/usuarios-casino';
       
-      await fetch(webhookUrl, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -483,10 +517,15 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           username,
           password,
           phoneNumber,
+          whatsappNumber: whatsappNumber || null,
           originalContactName: contactName,
           conversationId,
         }),
       });
+      
+      if (!response.ok) {
+        console.error('Webhook response not OK:', response.status);
+      }
       
       console.log('Casino user webhook sent successfully');
     } catch (error) {
@@ -563,6 +602,10 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           title: 'Contacto actualizado',
           description: `Nombre actualizado a: ${casinoPassword.username}`,
         });
+        
+        // Invalidar queries para refrescar la UI
+        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
       } else {
         toast({
           title: 'Error del webhook',

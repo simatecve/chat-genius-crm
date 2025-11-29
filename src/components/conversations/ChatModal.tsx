@@ -77,6 +77,7 @@ export default function ChatModal({
                             conversationId={conversation.id}
                             contactName={conversation.contact_name || conversation.pushname || 'Contacto'}
                             phoneNumber={conversation.phone_number}
+                            whatsappNumber={conversation.whatsapp_number}
                         />
                     </div>
                 </div>

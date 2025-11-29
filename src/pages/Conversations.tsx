@@ -228,6 +228,7 @@ const Conversations = () => {
                 conversationId={selectedConversation.id}
                 contactName={selectedConversation.contact_name || selectedConversation.pushname || 'Contacto'}
                 phoneNumber={selectedConversation.phone_number}
+                whatsappNumber={selectedConversation.whatsapp_number}
               />
             </ResizablePanel>
           </>
