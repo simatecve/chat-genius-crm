@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { User, Mail, Phone, MapPin, Globe, FileText, Calendar, Link as LinkIcon, Lock } from 'lucide-react';
+import { webhookService } from '@/services/webhookService';
 
 interface Contact {
   id: string;
@@ -141,11 +142,33 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
           description: 'El contacto se actualizó correctamente',
         });
       } else {
-        const { error } = await supabase
+        const { data: newContact, error } = await supabase
           .from('contacts')
-          .insert(contactData);
+          .insert(contactData)
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Enviar datos completos al webhook (asíncrono, no bloqueante)
+        webhookService.sendFullContactCreated({
+          id: newContact.id,
+          first_name: newContact.first_name,
+          last_name: newContact.last_name,
+          name: newContact.name,
+          phone_number: newContact.phone_number,
+          email: newContact.email,
+          address: newContact.address,
+          website: newContact.website,
+          notes: newContact.notes,
+          gender: newContact.gender,
+          birth_date: newContact.birth_date,
+          origin: newContact.origin,
+          is_blocked: newContact.is_blocked,
+          user_id: newContact.user_id,
+          created_at: newContact.created_at,
+          updated_at: newContact.updated_at,
+        }).catch(err => console.error('Error sending to webhook:', err));
 
         toast({
           title: 'Contacto creado',
