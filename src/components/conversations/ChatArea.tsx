@@ -17,6 +17,7 @@ import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuickReplies } from '@/hooks/useQuickReplies';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useProfile } from '@/hooks/useProfile';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -52,6 +53,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     conversation?.pushname || null
   );
   const { autoStopEnabled } = useBotAutoStop();
+  const { isCajero } = useProfile();
+
+  // Función para enmascarar números de teléfono
+  const maskPhoneNumber = (phone: string | null) => {
+    if (!phone) return '';
+    return '****' + phone.slice(-4);
+  };
 
   // Auto-scroll al final cuando llegan nuevos mensajes
   useEffect(() => {
@@ -215,10 +223,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           
           <div className="flex-1">
             <h2 className="font-medium">
-              {conversation.pushname || conversation.whatsapp_number}
+              {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {conversation.whatsapp_number}
+              {isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number}
             </p>
           </div>
           
