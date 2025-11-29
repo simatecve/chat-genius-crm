@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import EmbudosFilter from './EmbudosFilter';
 import { EmbudoResponse } from '@/services/embudoServices';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useProfile } from '@/hooks/useProfile';
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 interface Workspace {
   id: string;
@@ -49,6 +50,14 @@ const ConversationList: React.FC<ConversationListProps> = ({
   selectedEmbudo = null,
   onEmbudoSelect = () => {}
 }) => {
+  const { isCajero } = useProfile();
+
+  // Función para enmascarar números de teléfono
+  const maskPhoneNumber = (phone: string | null) => {
+    if (!phone) return 'Contacto';
+    return '****' + phone.slice(-4);
+  };
+  
   // Formatear tiempo
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -124,7 +133,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
           </div> : conversations.length === 0 ? <div className="p-4 text-center text-muted-foreground">
             {searchTerm ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
           </div> : <div className="divide-y divide-border">
-            {conversations.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} isSelected={selectedConversation?.id === conversation.id} onSelect={() => onSelectConversation(conversation)} formatTime={formatTime} getInitials={getInitials} />)}
+            {conversations.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} isSelected={selectedConversation?.id === conversation.id} onSelect={() => onSelectConversation(conversation)} formatTime={formatTime} getInitials={getInitials} isCajero={isCajero} maskPhoneNumber={maskPhoneNumber} />)}
           </div>}
       </ScrollArea>
     </div>;
@@ -137,13 +146,17 @@ interface ConversationItemProps {
   onSelect: () => void;
   formatTime: (dateString: string) => string;
   getInitials: (name: string | null) => string;
+  isCajero: boolean;
+  maskPhoneNumber: (phone: string | null) => string;
 }
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
   isSelected,
   onSelect,
   formatTime,
-  getInitials
+  getInitials,
+  isCajero,
+  maskPhoneNumber
 }) => {
   return <div onClick={onSelect} className={cn("p-4 cursor-pointer hover:bg-muted/50 transition-colors", isSelected && "bg-muted")}>
       <div className="flex items-center gap-3">
@@ -156,7 +169,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-medium truncate">
-              {conversation.pushname || conversation.whatsapp_number}
+              {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
             </h3>
             <span className="text-xs text-muted-foreground">
               {conversation.last_message_time && formatTime(conversation.last_message_time)}

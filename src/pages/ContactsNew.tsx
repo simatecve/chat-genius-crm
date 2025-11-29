@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
+import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +50,7 @@ interface Contact {
 export default function ContactsNew() {
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
+  const { isCajero } = useProfile();
   const { toast } = useToast();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,12 @@ export default function ContactsNew() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
+
+  // Función para enmascarar números de teléfono
+  const maskPhoneNumber = (phone: string) => {
+    if (!phone) return '';
+    return '****' + phone.slice(-4);
+  };
 
   useEffect(() => {
     if (effectiveUserId) {
@@ -147,7 +155,7 @@ export default function ContactsNew() {
       ...contacts.map(c => [
         c.first_name || '',
         c.last_name || '',
-        c.phone_number,
+        isCajero ? maskPhoneNumber(c.phone_number) : c.phone_number,
         c.email || '',
         c.address || '',
         c.website || '',
@@ -267,7 +275,9 @@ export default function ContactsNew() {
                   </TableCell>
                   <TableCell className="font-medium">{contact.name}</TableCell>
                   <TableCell>{contact.address || '-'}</TableCell>
-                  <TableCell>{contact.phone_number}</TableCell>
+                  <TableCell>
+                    {isCajero ? maskPhoneNumber(contact.phone_number) : contact.phone_number}
+                  </TableCell>
                   <TableCell>{contact.email || '-'}</TableCell>
                   <TableCell>{contact.gender || '-'}</TableCell>
                   <TableCell>{contact.origin || '-'}</TableCell>
