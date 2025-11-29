@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
+import { webhookService } from '@/services/webhookService';
 
 type ContactList = Tables<'contact_lists'>;
 
@@ -113,6 +114,17 @@ const CreateContact: React.FC<CreateContactProps> = ({
       if (contactError) {
         throw contactError;
       }
+
+      // Enviar datos al webhook de n8n (asíncrono, no bloqueante)
+      webhookService.sendContactCreated({
+        id: newContact.id,
+        name: newContact.name,
+        phone_number: newContact.phone_number,
+        email: newContact.email,
+        user_id: newContact.user_id,
+        contact_list_id: formData.contact_list_id || null,
+        created_at: newContact.created_at,
+      }).catch(err => console.error('Error sending to webhook:', err));
 
       // Add to contact list if specified
       if (formData.contact_list_id) {

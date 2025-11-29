@@ -7,6 +7,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const WEBHOOK_URL = 'https://n8n2025.nocodeveloper.site/webhook/guardar_contacto';
+
+// Función helper para enviar datos al webhook externo
+async function sendToExternalWebhook(data: any) {
+  try {
+    console.log('Sending to external webhook:', WEBHOOK_URL);
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+      console.error('Webhook response not OK:', response.status);
+    } else {
+      console.log('Webhook sent successfully');
+    }
+  } catch (error) {
+    console.error('Error sending to webhook:', error);
+    // No lanzamos el error para que no bloquee el procesamiento del mensaje
+  }
+}
+
 // Normalizar número de teléfono removiendo sufijos de WhatsApp
 function normalizePhoneNumber(phone: string): string {
   if (!phone) return '';
@@ -235,7 +258,7 @@ async function getOrCreateLead(
 
   if (error && error.code !== 'PGRST116') {
     console.error('Error searching lead:', error);
-    return null;
+    return { lead: null, isNew: false };
   }
 
   if (!lead) {
@@ -243,7 +266,7 @@ async function getOrCreateLead(
     const defaultColumnId = await getDefaultColumn(supabase, userId, sessionName);
     if (!defaultColumnId) {
       console.error('No default column found for user');
-      return null;
+      return { lead: null, isNew: false };
     }
 
     // Obtener siguiente posición
@@ -268,15 +291,15 @@ async function getOrCreateLead(
 
     if (createError) {
       console.error('Error creating lead:', createError);
-      return null;
+      return { lead: null, isNew: false };
     }
 
     console.log('New lead created:', created.id);
-    return created;
+    return { lead: created, isNew: true };
   }
 
   console.log('Lead already exists:', lead.id);
-  return lead;
+  return { lead, isNew: false };
 }
 
 // Vincular conversación con lead
@@ -300,7 +323,7 @@ async function linkConversationToLead(
 }
 
 // Procesar evento de mensaje
-async function processMessageEvent(supabase: any, payload: any, session: string) {
+async function processMessageEvent(supabase: any, payload: any, session: string, rawPayload?: any) {
   try {
     console.log('Processing message event...');
 
@@ -390,16 +413,116 @@ async function processMessageEvent(supabase: any, payload: any, session: string)
       return;
     }
 
+    // Si es una nueva conversación (creada en esta llamada), enviar al webhook
+    const isNewConversation = !conversation.lead_id && conversation.unread_count === 1;
+    if (isNewConversation && !fromMe) {
+      console.log('New conversation detected, sending to webhook...');
+      
+      // Preparar datos completos para el webhook
+      const webhookPayload = {
+        type: 'conversation',
+        source: 'whatsapp_incoming',
+        timestamp: new Date().toISOString(),
+        session_name: session,
+        
+        waha_raw_data: rawPayload || messageData,
+        
+        conversation: {
+          id: conversation.id,
+          phone_number: conversation.phone_number,
+          pushname: conversation.pushname,
+          user_id: conversation.user_id,
+          status: conversation.status,
+          lead_id: conversation.lead_id,
+          last_message: conversation.last_message,
+          last_message_time: conversation.last_message_time,
+          unread_count: conversation.unread_count,
+          channel_type: conversation.channel_type,
+          whatsapp_number: conversation.whatsapp_number,
+          created_at: conversation.created_at,
+        },
+        
+        extracted_fields: {
+          phone_number_normalized: phoneNumber,
+          phone_number_raw: messageData.from,
+          remote_jid_alt: messageData._data?.key?.remoteJidAlt,
+          pushname: pushName,
+          is_lid: messageData.from?.includes('@lid'),
+          message_id: wahaMessageId,
+        },
+      };
+      
+      // Enviar al webhook (no bloqueante)
+      sendToExternalWebhook(webhookPayload).catch(err => 
+        console.error('Failed to send to webhook:', err)
+      );
+    }
+
     // Guardar mensaje
     await saveMessage(supabase, conversation.id, userId, messageData, mediaUrl, mediaType);
 
     // Solo crear lead para mensajes entrantes (!fromMe)
     if (!fromMe) {
-      const lead = await getOrCreateLead(supabase, userId, phoneNumber, pushName, session);
+      const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, pushName, session);
       
       if (lead && !conversation.lead_id) {
         // Vincular conversación con lead si aún no está vinculada
         await linkConversationToLead(supabase, conversation.id, lead.id);
+      }
+
+      // Si es un nuevo lead, enviar al webhook
+      if (isNewLead && lead) {
+        console.log('New lead detected, sending to webhook...');
+        
+        const webhookPayload = {
+          type: 'lead',
+          source: 'whatsapp_incoming',
+          timestamp: new Date().toISOString(),
+          session_name: session,
+          
+          waha_raw_data: rawPayload || messageData,
+          
+          conversation: {
+            id: conversation.id,
+            phone_number: conversation.phone_number,
+            pushname: conversation.pushname,
+            user_id: conversation.user_id,
+            status: conversation.status,
+            lead_id: lead.id,
+            last_message: conversation.last_message,
+            last_message_time: conversation.last_message_time,
+            unread_count: conversation.unread_count,
+            channel_type: conversation.channel_type,
+            whatsapp_number: conversation.whatsapp_number,
+            created_at: conversation.created_at,
+          },
+          
+          lead: {
+            id: lead.id,
+            name: lead.name,
+            phone: lead.phone,
+            column_id: lead.column_id,
+            position: lead.position,
+            user_id: lead.user_id,
+            bot_active: lead.bot_active,
+            notes: lead.notes,
+            created_at: lead.created_at,
+          },
+          
+          extracted_fields: {
+            phone_number_normalized: phoneNumber,
+            phone_number_raw: messageData.from,
+            remote_jid_alt: messageData._data?.key?.remoteJidAlt,
+            pushname: pushName,
+            is_lid: messageData.from?.includes('@lid'),
+            message_id: wahaMessageId,
+          },
+        };
+        
+        // Enviar al webhook (no bloqueante)
+        sendToExternalWebhook(webhookPayload).catch(err => 
+          console.error('Failed to send lead to webhook:', err)
+        );
       }
 
       // Llamar al agente de IA si hay uno activo y el bot está habilitado
@@ -550,7 +673,7 @@ serve(async (req) => {
     // Procesar mensajes recibidos - capturar todos los eventos de tipo message
     if (event === 'message' || event === 'message.any') {
       console.log('Message event detected:', event);
-      await processMessageEvent(supabase, eventPayload, session);
+      await processMessageEvent(supabase, eventPayload, session, payload);
     }
 
     return new Response(
