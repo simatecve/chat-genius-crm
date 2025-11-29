@@ -515,225 +515,6 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           </Button>
         </div>
 
-        {/* INFORMACIÓN */}
-        <Card className="p-3 bg-card border-border">
-          <button
-            onClick={() => toggleSection('info')}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center space-x-2">
-              <User className="h-4 w-4 text-success" />
-              <h3 className="font-medium text-sm text-foreground">INFORMACIÓN</h3>
-            </div>
-            {expandedSections.info ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
-
-          {expandedSections.info && (
-            <div className="mt-3 space-y-3 text-sm">
-              <div className="flex items-center space-x-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <div className="w-full">
-                  <p className="text-xs text-muted-foreground">Nombre</p>
-                  <p className="font-medium text-foreground">{contactName}</p>
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center space-x-2 mb-1">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">Teléfono</p>
-                </div>
-                {isEditing && !isCajero ? (
-                  <Input
-                    value={formData.phone_number}
-                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                    placeholder="Ej: 593983859723"
-                    className="h-8 ml-6"
-                  />
-                ) : (
-                  <p className="font-medium ml-6">
-                    {isCajero 
-                      ? maskPhoneNumber(formData.phone_number || phoneNumber)
-                      : (formData.phone_number || phoneNumber)}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {/* CONTROL DE BOT */}
-        <Card className="p-3 bg-card border-border">
-          <button
-            onClick={() => toggleSection('bot')}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center space-x-2">
-              {isBlocked ? (
-                <BotOff className="h-4 w-4 text-destructive" />
-              ) : (
-                <Bot className="h-4 w-4 text-green-500" />
-              )}
-              <h3 className="font-medium text-sm text-foreground">CONTROL DE BOT</h3>
-            </div>
-            {expandedSections.bot ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
-
-          {expandedSections.bot && (
-            <div className="mt-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-foreground font-medium">
-                    Estado: {isBlocked ? 'Desactivado' : 'Activo'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {isBlocked 
-                      ? 'El bot no responderá a este contacto' 
-                      : 'El bot puede responder automáticamente'}
-                  </p>
-                </div>
-              </div>
-              <Button
-                onClick={toggleBotBlock}
-                disabled={isBotToggling}
-                variant={isBlocked ? 'default' : 'destructive'}
-                className="w-full"
-                size="sm"
-              >
-                {isBotToggling ? (
-                  'Procesando...'
-                ) : isBlocked ? (
-                  <>
-                    <Bot className="h-4 w-4 mr-2" />
-                    Activar Bot
-                  </>
-                ) : (
-                  <>
-                    <BotOff className="h-4 w-4 mr-2" />
-                    Desactivar Bot
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
-        </Card>
-
-        {/* DATOS PERSONALES */}
-        <Card className="p-3 bg-card border-border">
-          <button
-            onClick={() => toggleSection('personal')}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center space-x-2">
-              <User className="h-4 w-4 text-success" />
-              <h3 className="font-medium text-sm text-foreground">DATOS PERSONALES</h3>
-            </div>
-            {expandedSections.personal ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
-
-          {expandedSections.personal && (
-            <div className="mt-3 space-y-3">
-              <div>
-                <Label className="text-xs">Género</Label>
-                {isEditing ? (
-                  <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Masculino">Masculino</SelectItem>
-                      <SelectItem value="Femenino">Femenino</SelectItem>
-                      <SelectItem value="Otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-sm mt-1">{formData.gender || 'No especificado'}</p>
-                )}
-              </div>
-
-              <div>
-                <Label className="text-xs">Origen</Label>
-                {isEditing ? (
-                  <Input
-                    value={formData.origin}
-                    onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                    placeholder="Describe el origen..."
-                    className="h-8"
-                  />
-                ) : (
-                  <p className="text-sm mt-1">{formData.origin || 'No especificado'}</p>
-                )}
-              </div>
-
-              <div>
-                <Label className="text-xs">Fecha de Nacimiento</Label>
-                {isEditing ? (
-                  <Input
-                    type="date"
-                    value={formData.birth_date}
-                    onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                    className="h-8"
-                  />
-                ) : (
-                  <p className="text-sm mt-1">
-                    {formData.birth_date ? format(new Date(formData.birth_date), 'dd/MM/yyyy') : 'No especificado'}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {/* AGENTE */}
-        <Card className="p-3 bg-card border-border">
-          <button
-            onClick={() => toggleSection('agent')}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center space-x-2">
-              <Users className="h-4 w-4 text-success" />
-              <h3 className="font-medium text-sm text-foreground">AGENTE</h3>
-            </div>
-            {expandedSections.agent ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
-
-          {expandedSections.agent && (
-            <div className="mt-3">
-              {isEditing ? (
-                <Input
-                  value={formData.agent_id}
-                  onChange={(e) => setFormData({ ...formData, agent_id: e.target.value })}
-                  placeholder="Seleccionar agente..."
-                  className="h-8"
-                />
-              ) : (
-                <p className="text-sm">{formData.agent_id || 'Sin agente asignado'}</p>
-              )}
-            </div>
-          )}
-        </Card>
-
-        {/* EMBUDO */}
-        <Card className="p-3 bg-card border-border">
-          <button
-            onClick={() => toggleSection('funnel')}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-success" />
-              <h3 className="font-medium text-sm text-foreground">EMBUDO</h3>
-            </div>
-            {expandedSections.funnel ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
-
-          {expandedSections.funnel && (
-            <div className="mt-3">
-              <p className="text-sm text-foreground">
-                {currentEmbudo ? currentEmbudo.name : formData.funnel_stage || 'PRIMER CONTACTO'}
-              </p>
-            </div>
-          )}
-        </Card>
-
         {/* CASINO */}
         <Card className="p-3 bg-card border-success">
           <button
@@ -976,7 +757,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                 </DialogContent>
               </Dialog>
 
-              <p className="text-xs text-center text-muted-foreground">
+              <p className="text-xs text-muted-foreground text-center">
                 Gestiona depósitos y retiros del casino
               </p>
             </div>
@@ -1064,6 +845,225 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </Card>
+
+        {/* INFORMACIÓN */}
+        <Card className="p-3 bg-card border-border">
+          <button
+            onClick={() => toggleSection('info')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <User className="h-4 w-4 text-success" />
+              <h3 className="font-medium text-sm text-foreground">INFORMACIÓN</h3>
+            </div>
+            {expandedSections.info ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+
+          {expandedSections.info && (
+            <div className="mt-3 space-y-3 text-sm">
+              <div className="flex items-center space-x-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <div className="w-full">
+                  <p className="text-xs text-muted-foreground">Nombre</p>
+                  <p className="font-medium text-foreground">{contactName}</p>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center space-x-2 mb-1">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                </div>
+                {isEditing && !isCajero ? (
+                  <Input
+                    value={formData.phone_number}
+                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                    placeholder="Ej: 593983859723"
+                    className="h-8 ml-6"
+                  />
+                ) : (
+                  <p className="font-medium ml-6">
+                    {isCajero 
+                      ? maskPhoneNumber(formData.phone_number || phoneNumber)
+                      : (formData.phone_number || phoneNumber)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* CONTROL DE BOT */}
+        <Card className="p-3 bg-card border-border">
+          <button
+            onClick={() => toggleSection('bot')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              {isBlocked ? (
+                <BotOff className="h-4 w-4 text-destructive" />
+              ) : (
+                <Bot className="h-4 w-4 text-green-500" />
+              )}
+              <h3 className="font-medium text-sm text-foreground">CONTROL DE BOT</h3>
+            </div>
+            {expandedSections.bot ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+
+          {expandedSections.bot && (
+            <div className="mt-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-foreground font-medium">
+                    Estado: {isBlocked ? 'Desactivado' : 'Activo'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {isBlocked 
+                      ? 'El bot no responderá a este contacto' 
+                      : 'El bot puede responder automáticamente'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={toggleBotBlock}
+                disabled={isBotToggling}
+                variant={isBlocked ? 'default' : 'destructive'}
+                className="w-full"
+                size="sm"
+              >
+                {isBotToggling ? (
+                  'Procesando...'
+                ) : isBlocked ? (
+                  <>
+                    <Bot className="h-4 w-4 mr-2" />
+                    Activar Bot
+                  </>
+                ) : (
+                  <>
+                    <BotOff className="h-4 w-4 mr-2" />
+                    Desactivar Bot
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        {/* DATOS PERSONALES */}
+        <Card className="p-3 bg-card border-border">
+          <button
+            onClick={() => toggleSection('personal')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <User className="h-4 w-4 text-success" />
+              <h3 className="font-medium text-sm text-foreground">DATOS PERSONALES</h3>
+            </div>
+            {expandedSections.personal ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+
+          {expandedSections.personal && (
+            <div className="mt-3 space-y-3">
+              <div>
+                <Label className="text-xs">Género</Label>
+                {isEditing ? (
+                  <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Femenino">Femenino</SelectItem>
+                      <SelectItem value="Otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm mt-1">{formData.gender || 'No especificado'}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-xs">Origen</Label>
+                {isEditing ? (
+                  <Input
+                    value={formData.origin}
+                    onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                    placeholder="Describe el origen..."
+                    className="h-8"
+                  />
+                ) : (
+                  <p className="text-sm mt-1">{formData.origin || 'No especificado'}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-xs">Fecha de Nacimiento</Label>
+                {isEditing ? (
+                  <Input
+                    type="date"
+                    value={formData.birth_date}
+                    onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                    className="h-8"
+                  />
+                ) : (
+                  <p className="text-sm mt-1">
+                    {formData.birth_date ? format(new Date(formData.birth_date), 'dd/MM/yyyy') : 'No especificado'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* AGENTE */}
+        <Card className="p-3 bg-card border-border">
+          <button
+            onClick={() => toggleSection('agent')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4 text-success" />
+              <h3 className="font-medium text-sm text-foreground">AGENTE</h3>
+            </div>
+            {expandedSections.agent ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+
+          {expandedSections.agent && (
+            <div className="mt-3">
+              {isEditing ? (
+                <Input
+                  value={formData.agent_id}
+                  onChange={(e) => setFormData({ ...formData, agent_id: e.target.value })}
+                  placeholder="Seleccionar agente..."
+                  className="h-8"
+                />
+              ) : (
+                <p className="text-sm">{formData.agent_id || 'Sin agente asignado'}</p>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* EMBUDO */}
+        <Card className="p-3 bg-card border-border">
+          <button
+            onClick={() => toggleSection('funnel')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-success" />
+              <h3 className="font-medium text-sm text-foreground">EMBUDO</h3>
+            </div>
+            {expandedSections.funnel ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+
+          {expandedSections.funnel && (
+            <div className="mt-3">
+              <p className="text-sm text-foreground">
+                {currentEmbudo ? currentEmbudo.name : formData.funnel_stage || 'PRIMER CONTACTO'}
+              </p>
             </div>
           )}
         </Card>
