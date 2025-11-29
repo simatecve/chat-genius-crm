@@ -16,6 +16,7 @@ import { casinoApiService } from '@/services/casinoApiService';
 import { supabase } from '@/integrations/supabase/client';
 import { useBotBlock } from '@/hooks/useBotBlock';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
+import { useProfile } from '@/hooks/useProfile';
 
 interface ContactInfoPanelProps {
   conversationId: string;
@@ -31,6 +32,13 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   const { effectiveUserId } = useEffectiveUserId();
   const { toast } = useToast();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(phoneNumber, contactName);
+  const { isCajero } = useProfile();
+  
+  // Función para enmascarar números de teléfono
+  const maskPhoneNumber = (phone: string) => {
+    if (!phone) return '';
+    return '****' + phone.slice(-4);
+  };
   
   const [contactDetails, setContactDetails] = useState<ContactDetail | null>(null);
   const [sales, setSales] = useState<ContactSale[]>([]);
@@ -534,7 +542,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <p className="text-xs text-muted-foreground">Teléfono</p>
                 </div>
-                {isEditing ? (
+                {isEditing && !isCajero ? (
                   <Input
                     value={formData.phone_number}
                     onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
@@ -542,7 +550,11 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
                     className="h-8 ml-6"
                   />
                 ) : (
-                  <p className="font-medium ml-6">{formData.phone_number || phoneNumber}</p>
+                  <p className="font-medium ml-6">
+                    {isCajero 
+                      ? maskPhoneNumber(formData.phone_number || phoneNumber)
+                      : (formData.phone_number || phoneNumber)}
+                  </p>
                 )}
               </div>
             </div>
