@@ -424,6 +424,77 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     }
   };
 
+  const updateContactName = async (newName: string) => {
+    try {
+      // 1. Actualizar contact_name en la conversación
+      const { error: convError } = await supabase
+        .from('conversations')
+        .update({ 
+          contact_name: newName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId);
+      
+      if (convError) {
+        console.error('Error updating conversation contact_name:', convError);
+      }
+
+      // 2. Buscar y actualizar el contacto por número de teléfono
+      const cleanPhone = phoneNumber.replace(/\D/g, '');
+      const { data: contacts, error: searchError } = await supabase
+        .from('contacts')
+        .select('id')
+        .or(`phone_number.eq.${cleanPhone},phone_number.like.%${cleanPhone.slice(-10)}%`)
+        .limit(1);
+      
+      if (!searchError && contacts && contacts.length > 0) {
+        const { error: contactError } = await supabase
+          .from('contacts')
+          .update({ 
+            first_name: newName,
+            name: newName,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', contacts[0].id);
+        
+        if (contactError) {
+          console.error('Error updating contact name:', contactError);
+        }
+      }
+
+      console.log('Contact name updated to:', newName);
+    } catch (error) {
+      console.error('Error in updateContactName:', error);
+    }
+  };
+
+  const sendCasinoUserWebhook = async (username: string, password: string) => {
+    try {
+      const webhookUrl = 'https://n8n2025.nocodeveloper.site/webhook/usuarios-casino';
+      
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'casino_user_created',
+          timestamp: new Date().toISOString(),
+          username,
+          password,
+          phoneNumber,
+          originalContactName: contactName,
+          conversationId,
+        }),
+      });
+      
+      console.log('Casino user webhook sent successfully');
+    } catch (error) {
+      console.error('Error sending casino user webhook:', error);
+      // No bloqueante - no afecta el flujo principal
+    }
+  };
+
   const handleCreateCasinoPlayer = async () => {
     if (!casinoPassword.username || !casinoPassword.password) {
       toast({
@@ -480,6 +551,17 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         toast({
           title: 'Webhook ejecutado',
           description: 'La respuesta se muestra en el modal.',
+        });
+        
+        // Actualizar el nombre del contacto con el username del casino
+        await updateContactName(casinoPassword.username);
+        
+        // Enviar al webhook de usuarios casino
+        await sendCasinoUserWebhook(casinoPassword.username, casinoPassword.password);
+        
+        toast({
+          title: 'Contacto actualizado',
+          description: `Nombre actualizado a: ${casinoPassword.username}`,
         });
       } else {
         toast({
