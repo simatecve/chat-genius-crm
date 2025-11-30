@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, MoreVertical, ChevronDown } from 'lucide-react';
+import { Search, MoreVertical, ChevronDown, MessageCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -158,19 +158,37 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   isCajero,
   maskPhoneNumber
 }) => {
+  // Determinar el ícono según el tipo de canal
+  const getChannelIcon = () => {
+    if (conversation.channel_type === 'telegram') {
+      return <MessageCircle className="h-4 w-4 text-telegram-blue" />;
+    }
+    return null;
+  };
+
   return <div onClick={onSelect} className={cn("p-4 cursor-pointer hover:bg-muted/50 transition-colors", isSelected && "bg-muted")}>
       <div className="flex items-center gap-3">
-        <Avatar className="h-12 w-12">
-          <AvatarFallback className="bg-primary text-primary-foreground">
-            {getInitials(conversation.pushname)}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-12 w-12">
+            <AvatarFallback className="bg-primary text-primary-foreground">
+              {getInitials(conversation.pushname)}
+            </AvatarFallback>
+          </Avatar>
+          {/* Ícono del canal en la esquina del avatar */}
+          {getChannelIcon() && (
+            <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-1 border border-border">
+              {getChannelIcon()}
+            </div>
+          )}
+        </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-medium truncate">
-              {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-medium truncate">
+                {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
+              </h3>
+            </div>
             <span className="text-xs text-muted-foreground">
               {conversation.last_message_time && formatTime(conversation.last_message_time)}
             </span>

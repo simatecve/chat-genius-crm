@@ -106,18 +106,28 @@ const TelegramBotConnectionForm = ({ onClose }: TelegramBotConnectionFormProps) 
     }
 
     setCreating(true);
+    let insertedBotId: string | null = null;
+    
     try {
-      // Obtener información del bot desde Telegram API
+      // Paso 1: Validar el token con Telegram API
+      console.log('[TelegramBot] Validando token con Telegram API...');
       const botInfoResponse = await fetch(`https://api.telegram.org/bot${formData.bot_token}/getMe`);
+      
+      if (!botInfoResponse.ok) {
+        throw new Error('No se pudo conectar con Telegram API');
+      }
+      
       const botInfoData = await botInfoResponse.json();
       
       if (!botInfoData.ok) {
-        throw new Error('Token de bot inválido');
+        throw new Error('Token de bot inválido. Verifica que el token sea correcto.');
       }
 
       const botInfo = botInfoData.result;
+      console.log('[TelegramBot] Token válido. Bot:', botInfo.username);
       
-      // Primero insertar el bot para obtener su ID
+      // Paso 2: Insertar el bot en la base de datos
+      console.log('[TelegramBot] Creando registro en base de datos...');
       const { data: insertedBot, error: insertError } = await supabase
         .from('telegram_bots')
         .insert({
@@ -133,38 +143,69 @@ const TelegramBotConnectionForm = ({ onClose }: TelegramBotConnectionFormProps) 
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('[TelegramBot] Error al insertar en DB:', insertError);
+        throw new Error('No se pudo guardar el bot en la base de datos');
+      }
+      
+      insertedBotId = insertedBot.id;
+      console.log('[TelegramBot] Bot guardado con ID:', insertedBotId);
 
-      // Configurar webhook del bot con el ID del registro en la URL
-      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-bot-webhook?bot_db_id=${insertedBot.id}`;
+      // Paso 3: Configurar webhook del bot
+      const webhookUrl = `https://pxvembsxhwvpotydtiqa.supabase.co/functions/v1/telegram-bot-webhook?bot_db_id=${insertedBot.id}`;
+      console.log('[TelegramBot] Configurando webhook:', webhookUrl);
       
       const webhookResponse = await fetch(
         `https://api.telegram.org/bot${formData.bot_token}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
       );
+      
+      if (!webhookResponse.ok) {
+        throw new Error('No se pudo configurar el webhook en Telegram');
+      }
+      
       const webhookData = await webhookResponse.json();
       
       if (!webhookData.ok) {
-        throw new Error('No se pudo configurar el webhook del bot');
+        throw new Error(`Error de Telegram: ${webhookData.description || 'No se pudo configurar el webhook'}`);
       }
 
-      // Actualizar el bot con la URL del webhook
-      await supabase
+      console.log('[TelegramBot] Webhook configurado correctamente');
+
+      // Paso 4: Actualizar el bot con la URL del webhook
+      const { error: updateError } = await supabase
         .from('telegram_bots')
         .update({ webhook_url: webhookUrl })
         .eq('id', insertedBot.id);
+      
+      if (updateError) {
+        console.error('[TelegramBot] Error al actualizar webhook_url:', updateError);
+        // No lanzamos error aquí porque el webhook ya está configurado
+      }
+
+      console.log('[TelegramBot] ✅ Bot de Telegram creado y configurado exitosamente');
 
       toast({
         title: "Éxito",
-        description: "Bot de Telegram creado y configurado correctamente",
+        description: `Bot @${botInfo.username} creado y configurado correctamente`,
       });
 
       handleClose();
       
     } catch (error: any) {
-      console.error('Error creating telegram bot:', error);
+      console.error('[TelegramBot] ❌ Error en el proceso:', error);
+      
+      // Si se creó el bot pero falló la configuración del webhook, intentar limpiarlo
+      if (insertedBotId) {
+        console.log('[TelegramBot] Limpiando bot incompleto...');
+        await supabase
+          .from('telegram_bots')
+          .delete()
+          .eq('id', insertedBotId);
+      }
+      
       toast({
-        title: "Error",
-        description: error.message || "No se pudo crear el bot",
+        title: "Error al crear el bot",
+        description: error.message || "No se pudo crear el bot de Telegram",
         variant: "destructive",
       });
     } finally {
