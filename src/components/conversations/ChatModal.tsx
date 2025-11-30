@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import ChatArea from './ChatArea';
 import { ContactInfoPanel } from './ContactInfoPanel';
 import { Database } from '@/integrations/supabase/types';
+import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -24,6 +25,22 @@ export default function ChatModal({
     onSendMessage,
     isSending
 }: ChatModalProps) {
+    const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
+    const { activeConnections, isSessionActive } = useWhatsAppConnections();
+
+    // Auto-seleccionar sesión cuando cambia la conversación
+    useEffect(() => {
+        if (conversation && conversation.channel_type === 'whatsapp' && conversation.whatsapp_number) {
+            if (isSessionActive(conversation.whatsapp_number)) {
+                setSelectedWhatsAppSession(conversation.whatsapp_number);
+            } else if (activeConnections.length > 0) {
+                setSelectedWhatsAppSession(activeConnections[0].name);
+            } else {
+                setSelectedWhatsAppSession(null);
+            }
+        }
+    }, [conversation, activeConnections, isSessionActive]);
+
     if (!isOpen || !conversation) return null;
 
     // Close modal on Escape key
@@ -68,6 +85,16 @@ export default function ChatModal({
                             onSendMessage={onSendMessage}
                             isSending={isSending}
                             onToggleInfoPanel={() => { }} // Info panel is always visible in modal
+                            whatsappConnections={activeConnections}
+                            selectedSession={selectedWhatsAppSession}
+                            onSessionChange={setSelectedWhatsAppSession}
+                            originalSessionStatus={
+                                conversation?.channel_type === 'whatsapp'
+                                    ? isSessionActive(conversation.whatsapp_number)
+                                        ? 'active'
+                                        : 'disconnected'
+                                    : 'active'
+                            }
                         />
                     </div>
 
