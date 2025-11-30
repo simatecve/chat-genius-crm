@@ -458,52 +458,102 @@ const WorkspaceManagement = () => {
 
       {/* Column Dialog */}
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-        <DialogContent>
+        <DialogContent className="bg-[#2a3942] border-[#3e4c59] text-white max-w-xl">
           <DialogHeader>
-            <DialogTitle>
-              {editingColumn ? 'Editar Embudo' : 'Nuevo Embudo'}
+            <DialogTitle className="text-xl font-semibold text-white">
+              {editingColumn ? 'Editar embudo' : 'Agregar embudo'}
             </DialogTitle>
-            <DialogDescription>
-              {editingColumn 
-                ? 'Modifica el nombre y color del embudo'
-                : 'Crea un nuevo embudo en el espacio de trabajo'}
-            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="column-name">Nombre del Embudo</Label>
-              <Input
-                id="column-name"
-                value={columnName}
-                onChange={(e) => setColumnName(e.target.value)}
-                placeholder="Ej: Primer Contacto, Calificación"
-              />
+          
+          {/* Icono de edición centrado */}
+          <div className="flex justify-center py-4">
+            <div className="w-16 h-16 rounded-lg bg-[#202c33] flex items-center justify-center">
+              <Edit className="h-8 w-8 text-gray-400" />
             </div>
+          </div>
+
+          <div className="space-y-6">
+            {/* Campo de nombre con badge */}
             <div className="space-y-2">
-              <Label htmlFor="column-color">Color</Label>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-3 bg-[#202c33] rounded-lg px-4 py-3">
+                <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded">
+                  {editingColumn ? columns.findIndex(c => c.id === editingColumn.id) + 1 : columns.filter(c => c.workspace_id === selectedWorkspace).length + 1}
+                </span>
                 <Input
-                  id="column-color"
-                  type="color"
-                  value={columnColor}
-                  onChange={(e) => setColumnColor(e.target.value)}
-                  className="w-20 h-10"
-                />
-                <Input
-                  type="text"
-                  value={columnColor}
-                  onChange={(e) => setColumnColor(e.target.value)}
-                  className="flex-1"
+                  id="column-name"
+                  value={columnName}
+                  onChange={(e) => setColumnName(e.target.value)}
+                  placeholder="Nombre del embudo"
+                  className="flex-1 border-0 bg-transparent text-white placeholder:text-gray-500 focus-visible:ring-0 px-0 uppercase"
                 />
               </div>
             </div>
+
+            {/* Sección de colores */}
+            <div className="space-y-3">
+              <Label className="text-white text-lg font-semibold">Color</Label>
+              <div className="grid grid-cols-9 gap-2">
+                {/* Fila 1: Verdes */}
+                {['#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0891b2', '#0284c7', '#3b82f6', '#2563eb', '#1d4ed8'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setColumnColor(color)}
+                    className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${
+                      columnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+                
+                {/* Fila 2: Purples y Magentas */}
+                {['#8b5cf6', '#7c3aed', '#a855f7', '#d946ef', '#ec4899', '#db2777', '#ef4444', '#f87171', '#fb923c'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setColumnColor(color)}
+                    className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${
+                      columnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+                
+                {/* Fila 3: Rojos y Naranjas */}
+                {['#dc2626', '#b91c1c', '#b45309', '#d97706', '#f59e0b', '#f97316', '#fb923c', '#fbbf24', '#facc15'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setColumnColor(color)}
+                    className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${
+                      columnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+                
+                {/* Fila 4: Grises y Negro */}
+                {['#ffffff', '#d1d5db', '#9ca3af', '#6b7280', '#4b5563', '#374151', '#1f2937', '#000000'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setColumnColor(color)}
+                    className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${
+                      columnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''
+                    } ${color === '#ffffff' ? 'border border-gray-600' : ''}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowColumnDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={editingColumn ? handleUpdateColumn : handleCreateColumn}>
-              {editingColumn ? 'Actualizar' : 'Crear'}
+          <DialogFooter className="mt-6">
+            <Button 
+              onClick={editingColumn ? handleUpdateColumn : handleCreateColumn}
+              className="w-full bg-[#00a884] hover:bg-[#00a884]/90 text-white font-medium py-3 rounded-lg"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              {editingColumn ? 'Editar embudo' : 'Agregar embudo'}
             </Button>
           </DialogFooter>
         </DialogContent>
