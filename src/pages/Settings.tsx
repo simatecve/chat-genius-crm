@@ -13,7 +13,7 @@ import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 
 import Integrations from '@/components/Integrations';
 import WorkspaceManagement from '@/components/WorkspaceManagement';
-import WhatsAppConnections from '@/pages/WhatsAppConnections';
+import SessionsManager from '@/components/sessions/SessionsManager';
 import QuickReplies from '@/components/QuickReplies';
 import UserManagement from '@/components/UserManagement';
 import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon, Tag, Brain } from 'lucide-react';
@@ -244,7 +244,7 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="sessions" className="mt-6">
-          <WhatsAppConnections />
+          <SessionsManager />
         </TabsContent>
 
         <TabsContent value="quick-replies" className="mt-6">
