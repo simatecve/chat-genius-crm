@@ -83,10 +83,14 @@ export default function TagsTab() {
                         title: "Éxito",
                         description: "Etiqueta actualizada correctamente",
                     });
+                    await loadEtiquetas();
                     cerrarModal();
-                    loadEtiquetas();
                 } else {
-                    throw new Error(response.error);
+                    toast({
+                        title: "Error al actualizar",
+                        description: response.error || "No se pudo actualizar la etiqueta",
+                        variant: "destructive",
+                    });
                 }
             } else {
                 const response = await tagsServices.createEtiqueta(formData);
@@ -95,17 +99,21 @@ export default function TagsTab() {
                         title: "Éxito",
                         description: "Etiqueta creada correctamente",
                     });
+                    await loadEtiquetas();
                     cerrarModal();
-                    loadEtiquetas();
                 } else {
-                    throw new Error(response.error);
+                    toast({
+                        title: "Error al crear",
+                        description: response.error || "No se pudo crear la etiqueta. Verifica los permisos.",
+                        variant: "destructive",
+                    });
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error al guardar etiqueta:', error);
             toast({
                 title: "Error",
-                description: "No se pudo guardar la etiqueta",
+                description: error?.message || "No se pudo guardar la etiqueta. Intenta nuevamente.",
                 variant: "destructive",
             });
         }
