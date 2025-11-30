@@ -20,9 +20,18 @@ interface WhatsAppConnection {
   status: string | null;
 }
 
+interface TelegramBot {
+  id: string;
+  bot_name: string;
+  bot_username: string | null;
+  status: string | null;
+}
+
 interface FormData {
   name: string;
+  channel_type: 'whatsapp' | 'telegram' | 'none';
   whatsapp_connection_id: string;
+  telegram_bot_id: string;
   instructions: string;
   message_delay: number;
   is_active: boolean;
@@ -31,11 +40,14 @@ interface FormData {
 const CreateAIAgent = () => {
   const navigate = useNavigate();
   const [whatsappConnections, setWhatsappConnections] = useState<WhatsAppConnection[]>([]);
+  const [telegramBots, setTelegramBots] = useState<TelegramBot[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: '',
+    channel_type: 'none',
     whatsapp_connection_id: 'none',
+    telegram_bot_id: 'none',
     instructions: '',
     message_delay: 1,
     is_active: false
@@ -45,29 +57,41 @@ const CreateAIAgent = () => {
 
   useEffect(() => {
     if (user) {
-      loadWhatsAppConnections();
+      loadConnections();
     } else {
-      // Si no hay usuario, no estamos cargando
       setLoading(false);
     }
   }, [user]);
 
-  const loadWhatsAppConnections = async () => {
+  const loadConnections = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Cargar conexiones de WhatsApp
+      const { data: whatsappData, error: whatsappError } = await supabase
         .from('whatsapp_connections')
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setWhatsappConnections(data || []);
+      if (whatsappError) throw whatsappError;
+      setWhatsappConnections(whatsappData || []);
+
+      // Cargar bots de Telegram
+      const { data: telegramData, error: telegramError } = await supabase
+        .from('telegram_bots')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (telegramError) throw telegramError;
+      setTelegramBots(telegramData || []);
+      
     } catch (error) {
-      console.error('Error loading WhatsApp connections:', error);
+      console.error('Error loading connections:', error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar las conexiones de WhatsApp",
+        description: "No se pudieron cargar las conexiones",
         variant: "destructive"
       });
     } finally {
@@ -97,16 +121,24 @@ const CreateAIAgent = () => {
 
   const createAgent = async () => {
     try {
-      const whatsappConnection = whatsappConnections.find(conn => conn.id === formData.whatsapp_connection_id);
+      const agentData: any = {
+        user_id: user?.id!,
+        name: formData.name.trim(),
+        system_prompt: formData.instructions.trim(),
+        is_active: formData.is_active,
+        channel_type: formData.channel_type === 'none' ? 'all' : formData.channel_type,
+      };
+
+      // Asignar la conexión según el tipo de canal
+      if (formData.channel_type === 'whatsapp' && formData.whatsapp_connection_id !== 'none') {
+        agentData.whatsapp_connection_id = formData.whatsapp_connection_id;
+      } else if (formData.channel_type === 'telegram' && formData.telegram_bot_id !== 'none') {
+        agentData.telegram_bot_id = formData.telegram_bot_id;
+      }
       
       const { data, error } = await supabase
         .from('ai_agents')
-        .insert({
-          user_id: user?.id!,
-          name: formData.name.trim(),
-          system_prompt: formData.instructions.trim(),
-          is_active: formData.is_active
-        })
+        .insert(agentData)
         .select()
         .single();
 
@@ -117,7 +149,6 @@ const CreateAIAgent = () => {
         description: "Agente de IA creado correctamente"
       });
 
-      // Navegar de regreso a la página de agentes
       setTimeout(() => {
         navigate('/asistente-ia');
       }, 1500);
@@ -181,18 +212,40 @@ const CreateAIAgent = () => {
           
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre del Agente *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ej: Asistente de Ventas"
-                    required
-                  />
-                </div>
-                
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre del Agente *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ej: Asistente de Ventas"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="channel_type">Tipo de Canal *</Label>
+                <Select
+                  value={formData.channel_type}
+                  onValueChange={(value: any) => setFormData(prev => ({ 
+                    ...prev, 
+                    channel_type: value,
+                    whatsapp_connection_id: 'none',
+                    telegram_bot_id: 'none'
+                  }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo de canal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin canal específico</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="telegram">Telegram Bot</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.channel_type === 'whatsapp' && (
                 <div className="space-y-2">
                   <Label htmlFor="whatsapp_connection">Conexión WhatsApp</Label>
                   <Select
@@ -221,7 +274,38 @@ const CreateAIAgent = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              )}
+
+              {formData.channel_type === 'telegram' && (
+                <div className="space-y-2">
+                  <Label htmlFor="telegram_bot">Bot de Telegram</Label>
+                  <Select
+                    value={formData.telegram_bot_id}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, telegram_bot_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar bot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin bot</SelectItem>
+                      {telegramBots.map((bot) => (
+                        <SelectItem key={bot.id} value={bot.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{bot.bot_name} (@{bot.bot_username})</span>
+                            <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                              bot.status === 'active' 
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {bot.status || 'inactivo'}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
               <div className="space-y-2">
                 <Label htmlFor="instructions">Instrucciones del Agente *</Label>
