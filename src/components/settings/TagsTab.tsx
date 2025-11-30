@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Search, Edit2, Trash2, Plus, X, AlertTriangle } from 'lucide-react';
+import { Tag, Edit2, Trash2, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { tagsServices, EtiquetaResponse, EtiquetaData } from '@/services/tagsServices';
@@ -18,16 +17,21 @@ export default function TagsTab() {
     const [etiquetaToDelete, setEtiquetaToDelete] = useState<EtiquetaResponse | null>(null);
     const [formData, setFormData] = useState<EtiquetaData>({
         nombre: '',
-        color: '#F29A1F',
+        color: '#10b981',
         descripcion: ''
     });
-    const [searchTerm, setSearchTerm] = useState('');
     const { toast } = useToast();
 
-    // Colores predefinidos para las etiquetas
+    // Paleta de colores completa como en la referencia
     const coloresPredefinidos = [
-        '#F29A1F', '#00cec9', '#0984e3', '#6c5ce7', '#fd79a8',
-        '#fdcb6e', '#e17055', '#d63031', '#2d3436', '#636e72'
+        // Row 1 - Greens & Blues
+        '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+        // Row 2 - Purples & Pinks
+        '#c026d3', '#e879f9', '#ec4899', '#f472b6', '#fb7185',
+        // Row 3 - Reds & Oranges
+        '#f87171', '#ef4444', '#dc2626', '#b91c1c', '#f97316', '#fb923c', '#fbbf24', '#facc15',
+        // Row 4 - Whites & Grays & Blacks  
+        '#ffffff', '#e5e7eb', '#9ca3af', '#6b7280', '#4b5563', '#374151', '#1f2937', '#111827', '#000000'
     ];
 
     const loadEtiquetas = async () => {
@@ -150,7 +154,7 @@ export default function TagsTab() {
             setEditingEtiqueta(null);
             setFormData({
                 nombre: '',
-                color: '#F29A1F',
+                color: '#10b981',
                 descripcion: ''
             });
         }
@@ -162,148 +166,132 @@ export default function TagsTab() {
         setEditingEtiqueta(null);
         setFormData({
             nombre: '',
-            color: '#F29A1F',
+            color: '#10b981',
             descripcion: ''
         });
     };
 
-    const etiquetasFiltradas = etiquetas.filter(etiqueta => {
-        if (!etiqueta || !etiqueta.nombre) return false;
-        const term = searchTerm.toLowerCase();
-        return etiqueta.nombre.toLowerCase().includes(term) ||
-            (etiqueta.descripcion && etiqueta.descripcion.toLowerCase().includes(term));
-    });
+    const etiquetasFiltradas = etiquetas;
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Etiquetas</h2>
-                    <p className="text-muted-foreground">Gestiona las etiquetas para clasificar tus contactos y tareas.</p>
-                </div>
-                <Button onClick={() => abrirModal()} className="bg-[#F29A1F] hover:bg-[#d8891c] text-white">
-                    <Plus className="mr-2 h-4 w-4" /> Nueva Etiqueta
-                </Button>
+        <div className="space-y-6 p-6">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+                <Tag className="h-6 w-6 text-foreground" />
+                <h2 className="text-2xl font-bold text-foreground">Etiquetas</h2>
+                <Badge variant="secondary" className="ml-2">
+                    {etiquetas.length}
+                </Badge>
             </div>
+            <p className="text-muted-foreground text-sm">
+                Crear, editar y eliminar tus etiquetas
+            </p>
 
-            <div className="flex items-center space-x-2">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Buscar etiquetas..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8"
-                    />
-                </div>
+            {/* Content Area */}
+            <div className="bg-[#2a3942] rounded-lg p-6 min-h-[400px]">
+                {loading ? (
+                    <div className="flex justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap gap-3">
+                        {etiquetasFiltradas.map((etiqueta) => (
+                            <div
+                                key={etiqueta.id}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 bg-transparent hover:bg-white/5 transition-colors group"
+                                style={{ borderColor: etiqueta.color }}
+                            >
+                                <span className="text-sm font-medium uppercase text-foreground">
+                                    {etiqueta.nombre}
+                                </span>
+                                <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => abrirModal(etiqueta)}
+                                        className="p-1 hover:bg-white/10 rounded transition-colors"
+                                        title="Editar"
+                                    >
+                                        <Edit2 className="h-3 w-3 text-foreground" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(etiqueta)}
+                                        className="p-1 hover:bg-white/10 rounded transition-colors"
+                                        title="Eliminar"
+                                    >
+                                        <Trash2 className="h-3 w-3 text-foreground" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {/* Add Button */}
+                        <button
+                            onClick={() => abrirModal()}
+                            className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+                            title="Nueva etiqueta"
+                        >
+                            <Plus className="h-6 w-6 text-foreground" />
+                        </button>
+                    </div>
+                )}
+
+                {!loading && etiquetasFiltradas.length === 0 && (
+                    <div className="text-center py-12">
+                        <Tag className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
+                        <h3 className="mt-4 text-lg font-semibold text-foreground">No hay etiquetas</h3>
+                        <p className="text-muted-foreground text-sm mt-2">
+                            Haz clic en el botón + para crear tu primera etiqueta
+                        </p>
+                    </div>
+                )}
             </div>
-
-            {loading ? (
-                <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F29A1F]"></div>
-                </div>
-            ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {etiquetasFiltradas.length === 0 ? (
-                        <div className="col-span-full text-center py-12 border rounded-lg bg-muted/10">
-                            <Tag className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                            <h3 className="mt-4 text-lg font-semibold">No hay etiquetas</h3>
-                            <p className="text-muted-foreground">
-                                {searchTerm ? 'No se encontraron etiquetas con ese término.' : 'Comienza creando tu primera etiqueta.'}
-                            </p>
-                        </div>
-                    ) : (
-                        etiquetasFiltradas.map((etiqueta) => (
-                            <Card key={etiqueta.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                                <CardContent className="p-4">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-center space-x-3">
-                                            <div
-                                                className="w-4 h-4 rounded-full flex-shrink-0"
-                                                style={{ backgroundColor: etiqueta.color }}
-                                            />
-                                            <div>
-                                                <h4 className="font-semibold">{etiqueta.nombre}</h4>
-                                                {etiqueta.descripcion && (
-                                                    <p className="text-sm text-muted-foreground line-clamp-2">{etiqueta.descripcion}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex space-x-1">
-                                            <Button variant="ghost" size="icon" onClick={() => abrirModal(etiqueta)}>
-                                                <Edit2 className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleDelete(etiqueta)} className="text-destructive hover:text-destructive">
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))
-                    )}
-                </div>
-            )}
 
             {/* Modal Crear/Editar */}
             <Dialog open={showModal} onOpenChange={setShowModal}>
-                <DialogContent>
+                <DialogContent className="bg-[#2a3942] border-[#374151] max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{editingEtiqueta ? 'Editar Etiqueta' : 'Nueva Etiqueta'}</DialogTitle>
+                        <DialogTitle className="text-foreground text-lg">
+                            {editingEtiqueta ? 'Editar etiqueta' : 'Crear etiqueta'}
+                        </DialogTitle>
                     </DialogHeader>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
-                            <Label htmlFor="nombre">Nombre</Label>
                             <Input
                                 id="nombre"
                                 value={formData.nombre}
                                 onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                placeholder="Ej: Cliente VIP"
+                                placeholder="Nombre"
                                 required
+                                className="bg-[#1f2937] border-[#374151] text-foreground placeholder:text-muted-foreground"
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <Label>Color</Label>
-                            <div className="flex flex-wrap gap-2 mb-2">
+                        <div className="space-y-3">
+                            <p className="text-sm font-medium text-foreground">Color</p>
+                            <div className="grid grid-cols-9 gap-2">
                                 {coloresPredefinidos.map((color) => (
                                     <button
                                         key={color}
                                         type="button"
                                         onClick={() => setFormData({ ...formData, color })}
-                                        className={`w-8 h-8 rounded-full border-2 transition-all ${formData.color === color ? 'border-primary scale-110 ring-2 ring-offset-2 ring-primary' : 'border-transparent hover:scale-105'
-                                            }`}
+                                        className={`w-10 h-10 rounded-full transition-all ${
+                                            formData.color === color 
+                                                ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942] scale-110' 
+                                                : 'hover:scale-105'
+                                        }`}
                                         style={{ backgroundColor: color }}
+                                        title={color}
                                     />
                                 ))}
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <Input
-                                    type="color"
-                                    value={formData.color}
-                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                    className="w-12 h-10 p-1 cursor-pointer"
-                                />
-                                <span className="text-sm text-muted-foreground">{formData.color}</span>
-                            </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="descripcion">Descripción</Label>
-                            <Input
-                                id="descripcion"
-                                value={formData.descripcion}
-                                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                placeholder="Descripción opcional"
-                            />
-                        </div>
-
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={cerrarModal}>Cancelar</Button>
-                            <Button type="submit" className="bg-[#F29A1F] hover:bg-[#d8891c] text-white">
-                                {editingEtiqueta ? 'Actualizar' : 'Crear'}
-                            </Button>
-                        </DialogFooter>
+                        <Button 
+                            type="submit" 
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            {editingEtiqueta ? 'Actualizar Etiqueta' : 'Crear Etiqueta'}
+                        </Button>
                     </form>
                 </DialogContent>
             </Dialog>
