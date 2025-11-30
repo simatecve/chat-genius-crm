@@ -107,22 +107,55 @@ const TelegramBotConnectionForm = ({ onClose }: TelegramBotConnectionFormProps) 
 
     setCreating(true);
     try {
-      const { error: insertError } = await supabase
+      // Obtener información del bot desde Telegram API
+      const botInfoResponse = await fetch(`https://api.telegram.org/bot${formData.bot_token}/getMe`);
+      const botInfoData = await botInfoResponse.json();
+      
+      if (!botInfoData.ok) {
+        throw new Error('Token de bot inválido');
+      }
+
+      const botInfo = botInfoData.result;
+      
+      // Primero insertar el bot para obtener su ID
+      const { data: insertedBot, error: insertError } = await supabase
         .from('telegram_bots')
         .insert({
           user_id: effectiveUserId,
           bot_name: formData.bot_name,
           bot_token: formData.bot_token,
+          bot_id: botInfo.id,
+          bot_username: botInfo.username,
           status: 'active',
           workspace_id: formData.workspace_id || null,
           default_column_id: formData.default_column_id || null,
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
 
+      // Configurar webhook del bot con el ID del registro en la URL
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-bot-webhook?bot_db_id=${insertedBot.id}`;
+      
+      const webhookResponse = await fetch(
+        `https://api.telegram.org/bot${formData.bot_token}/setWebhook?url=${encodeURIComponent(webhookUrl)}`
+      );
+      const webhookData = await webhookResponse.json();
+      
+      if (!webhookData.ok) {
+        throw new Error('No se pudo configurar el webhook del bot');
+      }
+
+      // Actualizar el bot con la URL del webhook
+      await supabase
+        .from('telegram_bots')
+        .update({ webhook_url: webhookUrl })
+        .eq('id', insertedBot.id);
+
       toast({
         title: "Éxito",
-        description: "Bot de Telegram creado correctamente",
+        description: "Bot de Telegram creado y configurado correctamente",
       });
 
       handleClose();
