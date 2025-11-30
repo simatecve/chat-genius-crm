@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.create-user]
 verify_jwt = true
 
+[functions.ia-default-agent]
+verify_jwt = false
+
 [functions.mercadopago-webhook]
 verify_jwt = false
 
@@ -13,6 +16,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-mass-campaign]
+verify_jwt = true
+
+[functions.telegram-bot-webhook]
+verify_jwt = false
+
+[functions.telegram-send-message]
 verify_jwt = true
 
 [functions.waha-create-session]
@@ -31,7 +40,4 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.waha-webhook]
-verify_jwt = false
-
-[functions.telegram-bot-webhook]
 verify_jwt = false

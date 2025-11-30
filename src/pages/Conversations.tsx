@@ -151,7 +151,32 @@ const Conversations = () => {
     if ((!messageText.trim() && !attachment) || !selectedConversation || !effectiveUserId) return;
 
     try {
-      // Obtener la sesión de WhatsApp asociada al número
+      const channelType = selectedConversation.channel_type || 'whatsapp';
+      
+      // Si es Telegram
+      if (channelType === 'telegram') {
+        const chatId = selectedConversation.phone_number;
+        const telegramBotId = selectedConversation.telegram_bot_id;
+        
+        if (!telegramBotId) {
+          console.error('No telegram_bot_id found for this conversation');
+          return;
+        }
+
+        await sendMessage({
+          conversationId: selectedConversation.id,
+          userId: effectiveUserId,
+          message: messageText.trim(),
+          sessionName: '', // No usado en Telegram
+          phoneNumber: chatId,
+          channelType: 'telegram',
+          telegramBotId: telegramBotId
+        });
+        
+        return;
+      }
+      
+      // Si es WhatsApp
       const { data: whatsappConnection, error: connectionError } = await supabase
         .from('whatsapp_connections')
         .select('name')
@@ -180,7 +205,9 @@ const Conversations = () => {
         userId: effectiveUserId,
         message: messageText.trim(),
         sessionName: sessionName,
-        phoneNumber: phoneNumber
+        phoneNumber: phoneNumber,
+        channelType: 'whatsapp',
+        telegramBotId: null
       });
     } catch (error) {
       console.error('Error sending message:', error);
