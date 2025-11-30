@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +20,8 @@ interface SidebarGroup {
 export const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const location = useLocation();
+  const currentPath = location.pathname;
   const {
     user
   } = useAuth();
@@ -28,6 +31,14 @@ export const Sidebar = () => {
   const { resolvedTheme } = useTheme();
   const logoLightUrl = 'http://nocodeveloper.site/capibet/logocapinegro.png';
   const logoDarkUrl = 'https://nocodeveloper.site/capibet/logocapi.png';
+
+  // Función para detectar si una ruta está activa
+  const isActiveRoute = (href: string) => {
+    if (href === '/') {
+      return currentPath === '/';
+    }
+    return currentPath.startsWith(href);
+  };
 
   // Crear grupos de sidebar dinámicamente con el contador de conversaciones
   const sidebarGroups: SidebarGroup[] = [{
@@ -116,11 +127,11 @@ export const Sidebar = () => {
                     {group.label}
                   </h3>}
                 <div className="space-y-1">
-                  {group.items.map((item, itemIndex) => <a key={itemIndex} href={item.href} className={cn("group flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent", item.href === '/' && "bg-sidebar-accent border border-sidebar-border shadow-sm")}>
-                      <item.icon className={cn("h-5 w-5 transition-colors", item.href === '/' ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
+                  {group.items.map((item, itemIndex) => <Link key={itemIndex} to={item.href} className={cn("group flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent", isActiveRoute(item.href) && "bg-sidebar-accent border border-sidebar-border shadow-sm")}>
+                      <item.icon className={cn("h-5 w-5 transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
                       
                       {!isCollapsed && <div className="flex items-center justify-between w-full">
-                          <span className={cn("font-medium transition-colors", item.href === '/' ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")}>
+                          <span className={cn("font-medium transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")}>
                             {item.label}
                           </span>
                           
@@ -128,7 +139,7 @@ export const Sidebar = () => {
                               {item.badge}
                             </span>}
                         </div>}
-                    </a>)}
+                    </Link>)}
                 </div>
               </div>)}
           </nav>
