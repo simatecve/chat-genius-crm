@@ -587,6 +587,8 @@ async function processTelegramMessage(supabase: any, update: any, botDbId: strin
 
     if (aiAgent) {
       console.log('[telegram-bot-webhook] AI agent found, generating response...');
+      console.log('[telegram-bot-webhook] System prompt:', aiAgent.system_prompt);
+      console.log('[telegram-bot-webhook] Model:', aiAgent.model);
       
       try {
         // Obtener historial de mensajes de la conversación (últimos 10)
