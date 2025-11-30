@@ -115,21 +115,33 @@ export const useMessages = (conversationId: string | null) => {
     staleTime: 10000,
   });
 
-  // Mutation para enviar mensaje a través de WAHA
+  // Mutation para enviar mensaje a través de WAHA o Telegram
   const sendMessageMutation = useMutation({
     mutationFn: ({ 
       conversationId, 
       userId, 
       message, 
       sessionName, 
-      phoneNumber 
+      phoneNumber,
+      channelType,
+      telegramBotId
     }: {
       conversationId: string;
       userId: string;
       message: string;
       sessionName: string;
       phoneNumber: string;
-    }) => ConversationService.sendMessage(conversationId, userId, message, sessionName, phoneNumber),
+      channelType?: string;
+      telegramBotId?: string | null;
+    }) => ConversationService.sendMessage(
+      conversationId, 
+      userId, 
+      message, 
+      sessionName, 
+      phoneNumber,
+      channelType,
+      telegramBotId
+    ),
     onSuccess: () => {
       toast({
         title: 'Mensaje enviado',

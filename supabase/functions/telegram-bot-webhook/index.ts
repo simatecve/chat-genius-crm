@@ -244,6 +244,63 @@ async function saveMessage(
   return data;
 }
 
+// Guardar o actualizar contacto en la tabla contacts
+async function saveOrUpdateContact(
+  supabase: any,
+  userId: string,
+  chatId: string,
+  userName: string | null
+) {
+  // Buscar contacto existente
+  let { data: contact, error } = await supabase
+    .from('contacts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('phone_number', chatId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error searching contact:', error);
+    return null;
+  }
+
+  if (!contact) {
+    // Crear nuevo contacto
+    const newContact = {
+      user_id: userId,
+      phone_number: chatId,
+      name: userName || `Telegram ${chatId}`,
+      first_name: userName,
+      origin: 'telegram_bot',
+    };
+
+    const { data: created, error: createError } = await supabase
+      .from('contacts')
+      .insert(newContact)
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Error creating contact:', createError);
+      return null;
+    }
+
+    console.log('New Telegram contact created:', created.id);
+    return created;
+  } else {
+    // Actualizar nombre si cambió
+    if (userName && userName !== contact.name) {
+      await supabase
+        .from('contacts')
+        .update({ name: userName, first_name: userName })
+        .eq('id', contact.id);
+      console.log('Telegram contact updated:', contact.id);
+    }
+  }
+
+  return contact;
+}
+
 // Buscar o crear lead
 async function getOrCreateLead(
   supabase: any,
@@ -473,6 +530,9 @@ async function processTelegramMessage(supabase: any, update: any, botDbId: strin
     // Guardar mensaje
     await saveMessage(supabase, conversation.id, userId, message, mediaUrl, mediaType);
 
+    // Guardar o actualizar contacto
+    await saveOrUpdateContact(supabase, userId, chatId, userName);
+
     // Crear lead
     const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, chatId, userName, telegramBotId);
     
@@ -526,8 +586,130 @@ async function processTelegramMessage(supabase: any, update: any, botDbId: strin
       .maybeSingle();
 
     if (aiAgent) {
-      console.log('AI agent found, triggering response...');
-      // TODO: Implementar respuesta de AI para Telegram
+      console.log('[telegram-bot-webhook] AI agent found, generating response...');
+      
+      try {
+        // Obtener historial de mensajes de la conversación (últimos 10)
+        const { data: previousMessages } = await supabase
+          .from('messages')
+          .select('content, direction, is_bot')
+          .eq('conversation_id', conversation.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        // Construir historial de conversación para el AI
+        const conversationHistory = (previousMessages || [])
+          .reverse()
+          .map((msg: any) => ({
+            role: msg.direction === 'inbound' ? 'user' : 'assistant',
+            content: msg.content
+          }));
+
+        // Llamar al Lovable AI Gateway
+        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+        
+        if (!LOVABLE_API_KEY) {
+          console.error('[telegram-bot-webhook] LOVABLE_API_KEY not configured');
+          return;
+        }
+
+        const aiMessages = [
+          { role: 'system', content: aiAgent.system_prompt },
+          ...conversationHistory,
+          { role: 'user', content: messageContent }
+        ];
+
+        console.log('[telegram-bot-webhook] Calling Lovable AI...');
+        
+        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: aiAgent.model || 'google/gemini-2.5-flash',
+            messages: aiMessages,
+            temperature: aiAgent.temperature || 0.7,
+            max_tokens: aiAgent.max_tokens || 500,
+          }),
+        });
+
+        if (!aiResponse.ok) {
+          const errorText = await aiResponse.text();
+          console.error('[telegram-bot-webhook] Lovable AI error:', errorText);
+          return;
+        }
+
+        const aiResult = await aiResponse.json();
+        const aiResponseText = aiResult.choices?.[0]?.message?.content || '';
+
+        if (!aiResponseText) {
+          console.log('[telegram-bot-webhook] No AI response generated');
+          return;
+        }
+
+        console.log('[telegram-bot-webhook] AI response generated, sending to Telegram...');
+
+        // Enviar respuesta del AI al usuario via Telegram
+        const telegramUrl = `https://api.telegram.org/bot${bot.bot_token}/sendMessage`;
+        const telegramPayload = {
+          chat_id: chatId,
+          text: aiResponseText,
+          parse_mode: 'HTML'
+        };
+
+        const telegramResponse = await fetch(telegramUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(telegramPayload),
+        });
+
+        if (!telegramResponse.ok) {
+          const errorText = await telegramResponse.text();
+          console.error('[telegram-bot-webhook] Error sending AI response to Telegram:', errorText);
+          return;
+        }
+
+        const telegramResult = await telegramResponse.json();
+        console.log('[telegram-bot-webhook] AI response sent successfully');
+
+        // Guardar respuesta del AI en la base de datos
+        const aiMessageData = {
+          conversation_id: conversation.id,
+          user_id: userId,
+          content: aiResponseText,
+          direction: 'outbound',
+          status: 'sent',
+          message_type: 'text',
+          is_bot: true,
+          created_at: new Date().toISOString(),
+          metadata: {
+            telegram_message_id: telegramResult.result?.message_id || null,
+            ai_agent_id: aiAgent.id,
+            ai_model: aiAgent.model,
+            sent_via: 'ai_agent'
+          }
+        };
+
+        await supabase
+          .from('messages')
+          .insert(aiMessageData);
+
+        // Actualizar conversación
+        await supabase
+          .from('conversations')
+          .update({
+            last_message: aiResponseText,
+            last_message_time: new Date().toISOString(),
+          })
+          .eq('id', conversation.id);
+
+        console.log('[telegram-bot-webhook] AI message saved to database');
+
+      } catch (error) {
+        console.error('[telegram-bot-webhook] Error processing AI agent:', error);
+      }
     }
     
   } catch (error) {

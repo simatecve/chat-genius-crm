@@ -130,12 +130,48 @@ export class ConversationService {
     userId: string,
     message: string,
     sessionName: string,
-    phoneNumber: string
+    phoneNumber: string,
+    channelType?: string,
+    telegramBotId?: string | null
   ): Promise<Message | null> {
     try {
-      console.log('Sending message via edge function...');
+      console.log('[ConversationService] Sending message...', {
+        channelType,
+        telegramBotId,
+        conversationId
+      });
       
-      // Llamar al edge function waha-send-message
+      // Si es Telegram, usar telegram-send-message
+      if (channelType === 'telegram' && telegramBotId) {
+        console.log('[ConversationService] Sending via Telegram...');
+        
+        const { data, error } = await supabase.functions.invoke('telegram-send-message', {
+          body: {
+            chatId: phoneNumber,
+            message,
+            userId,
+            conversationId,
+            telegramBotId,
+            isBot: false
+          }
+        });
+
+        if (error) {
+          console.error('[ConversationService] Error calling telegram-send-message:', error);
+          throw error;
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to send Telegram message');
+        }
+
+        console.log('[ConversationService] Telegram message sent successfully');
+        return data.savedMessage;
+      }
+      
+      // Si es WhatsApp, usar waha-send-message
+      console.log('[ConversationService] Sending via WhatsApp...');
+      
       const { data, error } = await supabase.functions.invoke('waha-send-message', {
         body: {
           sessionName,
@@ -147,18 +183,18 @@ export class ConversationService {
       });
 
       if (error) {
-        console.error('Error calling edge function:', error);
+        console.error('[ConversationService] Error calling waha-send-message:', error);
         throw error;
       }
 
       if (!data?.success) {
-        throw new Error(data?.error || 'Failed to send message');
+        throw new Error(data?.error || 'Failed to send WhatsApp message');
       }
 
-      console.log('Message sent successfully via edge function:', data.savedMessage);
+      console.log('[ConversationService] WhatsApp message sent successfully');
       return data.savedMessage;
     } catch (error) {
-      console.error('Error in sendMessage:', error);
+      console.error('[ConversationService] Error in sendMessage:', error);
       throw error;
     }
   }
