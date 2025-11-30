@@ -621,6 +621,10 @@ async function processTelegramMessage(supabase: any, update: any, botDbId: strin
 
         console.log('[telegram-bot-webhook] Calling Lovable AI...');
         
+        const modelToUse = aiAgent.model && aiAgent.model !== 'gpt-3.5-turbo' 
+          ? aiAgent.model 
+          : 'google/gemini-2.5-flash';
+        
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -628,7 +632,7 @@ async function processTelegramMessage(supabase: any, update: any, botDbId: strin
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: aiAgent.model || 'google/gemini-2.5-flash',
+            model: modelToUse,
             messages: aiMessages,
             temperature: aiAgent.temperature || 0.7,
             max_tokens: aiAgent.max_tokens || 500,
