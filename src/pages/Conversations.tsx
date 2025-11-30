@@ -8,9 +8,11 @@ import { ContactInfoPanel } from '@/components/conversations/ContactInfoPanel';
 import { useConversations, useMessages, useSearchConversations } from '@/hooks/useConversations';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
+import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
 import { Database } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
+import { toast } from '@/hooks/use-toast';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -30,11 +32,13 @@ const Conversations = () => {
   const [columns, setColumns] = useState<{ id: string; name: string }[]>([]);
   const [workspaceLeadIds, setWorkspaceLeadIds] = useState<string[]>([]);
   const [embudoLeadIds, setEmbudoLeadIds] = useState<string[]>([]);
+  const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
   const { data: searchResults } = useSearchConversations(searchTerm);
   const { messages, sendMessage, isSending } = useMessages(selectedConversation?.id || null);
+  const { activeConnections, isSessionActive } = useWhatsAppConnections();
 
   console.log('[Conversations] Current state:', {
     selectedConversationId: selectedConversation?.id,
@@ -144,6 +148,18 @@ const Conversations = () => {
     if (conversation.unread_count && conversation.unread_count > 0) {
       markAsRead(conversation.id);
     }
+    
+    // Auto-seleccionar sesión WhatsApp si está activa
+    if (conversation.channel_type === 'whatsapp' && conversation.whatsapp_number) {
+      if (isSessionActive(conversation.whatsapp_number)) {
+        setSelectedWhatsAppSession(conversation.whatsapp_number);
+      } else if (activeConnections.length > 0) {
+        // Si la sesión original no está activa, pre-seleccionar la primera activa
+        setSelectedWhatsAppSession(activeConnections[0].name);
+      } else {
+        setSelectedWhatsAppSession(null);
+      }
+    }
   };
 
   // Manejar envío de mensaje
@@ -177,20 +193,16 @@ const Conversations = () => {
       }
       
       // Si es WhatsApp
-      const { data: whatsappConnection, error: connectionError } = await supabase
-        .from('whatsapp_connections')
-        .select('name')
-        .eq('user_id', effectiveUserId)
-        .eq('status', 'WORKING')
-        .limit(1)
-        .single();
-
-      if (connectionError || !whatsappConnection) {
-        console.error('No active WhatsApp connection found');
+      if (!selectedWhatsAppSession) {
+        toast({
+          title: 'Sesión no seleccionada',
+          description: 'Selecciona una conexión de WhatsApp para enviar mensajes',
+          variant: 'destructive',
+        });
         return;
       }
 
-      const sessionName = whatsappConnection.name;
+      const sessionName = selectedWhatsAppSession;
       const phoneNumber = selectedConversation.phone_number;
 
       // Por ahora solo soportamos mensajes de texto
@@ -244,6 +256,16 @@ const Conversations = () => {
             onSendMessage={handleSendMessage}
             isSending={isSending}
             onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
+            whatsappConnections={activeConnections}
+            selectedSession={selectedWhatsAppSession}
+            onSessionChange={setSelectedWhatsAppSession}
+            originalSessionStatus={
+              selectedConversation?.channel_type === 'whatsapp'
+                ? isSessionActive(selectedConversation.whatsapp_number)
+                  ? 'active'
+                  : 'disconnected'
+                : 'active'
+            }
           />
         </ResizablePanel>
 

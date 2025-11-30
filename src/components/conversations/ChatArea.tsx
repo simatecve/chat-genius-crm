@@ -18,6 +18,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuickReplies } from '@/hooks/useQuickReplies';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useProfile } from '@/hooks/useProfile';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { WhatsAppConnection } from '@/hooks/useWhatsAppConnections';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -28,6 +32,10 @@ interface ChatAreaProps {
   onSendMessage: (message: string, attachment?: File) => void;
   isSending: boolean;
   onToggleInfoPanel: () => void;
+  whatsappConnections: WhatsAppConnection[];
+  selectedSession: string | null;
+  onSessionChange: (sessionName: string) => void;
+  originalSessionStatus: 'active' | 'disconnected' | 'deleted';
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -36,6 +44,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   onSendMessage,
   isSending,
   onToggleInfoPanel,
+  whatsappConnections,
+  selectedSession,
+  onSessionChange,
+  originalSessionStatus,
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -317,6 +329,41 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Input de mensaje */}
       <div className="p-3 border-t border-border bg-card">
+        {/* Alerta de sesión desconectada */}
+        {conversation.channel_type === 'whatsapp' && originalSessionStatus === 'disconnected' && (
+          <Alert className="mb-3">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              La sesión original de WhatsApp está desconectada. Selecciona una conexión activa para enviar mensajes.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {/* Selector de sesión WhatsApp */}
+        {conversation.channel_type === 'whatsapp' && whatsappConnections.length > 0 && (
+          <div className="mb-3">
+            <Select value={selectedSession || undefined} onValueChange={onSessionChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar conexión de WhatsApp" />
+              </SelectTrigger>
+              <SelectContent>
+                {whatsappConnections.map((conn) => (
+                  <SelectItem key={conn.id} value={conn.name || conn.phone_number}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {conn.name || conn.phone_number}
+                      </span>
+                      {conn.name === conversation.whatsapp_number && (
+                        <span className="text-xs text-muted-foreground">(Original)</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Preview de archivo seleccionado */}
         {selectedFile && (
           <div className="mb-3 p-3 bg-muted rounded-lg flex items-center justify-between">

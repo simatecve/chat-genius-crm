@@ -413,4 +413,32 @@ export class ConversationService {
       )
       .subscribe();
   }
+
+  /**
+   * Actualiza la sesión de WhatsApp asociada a una conversación
+   */
+  static async updateConversationSession(
+    conversationId: string,
+    newWhatsAppNumber: string
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({
+          whatsapp_number: newWhatsAppNumber,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId);
+
+      if (error) {
+        console.error('Error updating conversation session:', error);
+        throw error;
+      }
+
+      console.log('[ConversationService] Session updated successfully');
+    } catch (error) {
+      console.error('Error in updateConversationSession:', error);
+      throw error;
+    }
+  }
 }
