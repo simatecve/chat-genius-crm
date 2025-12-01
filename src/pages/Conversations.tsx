@@ -39,7 +39,7 @@ const Conversations = () => {
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
   const { data: searchResults } = useSearchConversations(searchTerm);
-  const { messages, sendMessage, isSending } = useMessages(selectedConversation?.id || null);
+  const { messages, sendMessage, sendMessageWithAttachment, isSending } = useMessages(selectedConversation?.id || null);
   const { activeConnections, isSessionActive } = useWhatsAppConnections();
   const { connections: twilioConnections, activeConnections: activeTwilioConnections, isConnectionActive } = useTwilioConnections();
 
@@ -193,6 +193,16 @@ const Conversations = () => {
           return;
         }
 
+        // Telegram no soporta archivos aún
+        if (attachment) {
+          toast({
+            title: 'No soportado',
+            description: 'El envío de archivos por Telegram aún no está implementado',
+            variant: 'destructive',
+          });
+          return;
+        }
+
         await sendMessage({
           conversationId: selectedConversation.id,
           userId: effectiveUserId,
@@ -217,16 +227,41 @@ const Conversations = () => {
           return;
         }
 
-        await sendMessage({
-          conversationId: selectedConversation.id,
-          userId: effectiveUserId,
-          message: messageText.trim(),
-          sessionName: '',
-          phoneNumber: selectedConversation.phone_number,
-          channelType: 'twilio',
-          telegramBotId: null,
-          twilioConnectionId: selectedTwilioConnection
-        });
+        // Si hay archivo adjunto
+        if (attachment) {
+          // Subir archivo a Storage
+          const FileUploadService = (await import('@/services/fileUploadService')).FileUploadService;
+          const { url, path } = await FileUploadService.uploadFile(
+            attachment,
+            effectiveUserId,
+            selectedConversation.id
+          );
+
+          await sendMessageWithAttachment({
+            conversationId: selectedConversation.id,
+            userId: effectiveUserId,
+            message: messageText.trim(),
+            sessionName: '',
+            phoneNumber: selectedConversation.phone_number,
+            fileUrl: url,
+            fileName: attachment.name,
+            mimeType: attachment.type,
+            channelType: 'twilio',
+            telegramBotId: null,
+            twilioConnectionId: selectedTwilioConnection
+          });
+        } else {
+          await sendMessage({
+            conversationId: selectedConversation.id,
+            userId: effectiveUserId,
+            message: messageText.trim(),
+            sessionName: '',
+            phoneNumber: selectedConversation.phone_number,
+            channelType: 'twilio',
+            telegramBotId: null,
+            twilioConnectionId: selectedTwilioConnection
+          });
+        }
         
         return;
       }
@@ -244,24 +279,46 @@ const Conversations = () => {
       const sessionName = selectedWhatsAppSession;
       const phoneNumber = selectedConversation.phone_number;
 
-      // Por ahora solo soportamos mensajes de texto
+      // Si hay archivo adjunto
       if (attachment) {
-        console.warn('Attachments not yet supported with WAHA');
-        // TODO: Implementar envío de archivos con WAHA
-        return;
-      }
+        // Subir archivo a Storage
+        const FileUploadService = (await import('@/services/fileUploadService')).FileUploadService;
+        const { url, path } = await FileUploadService.uploadFile(
+          attachment,
+          effectiveUserId,
+          selectedConversation.id
+        );
 
-      await sendMessage({
-        conversationId: selectedConversation.id,
-        userId: effectiveUserId,
-        message: messageText.trim(),
-        sessionName: sessionName,
-        phoneNumber: phoneNumber,
-        channelType: 'whatsapp',
-        telegramBotId: null
-      });
+        await sendMessageWithAttachment({
+          conversationId: selectedConversation.id,
+          userId: effectiveUserId,
+          message: messageText.trim(),
+          sessionName: sessionName,
+          phoneNumber: phoneNumber,
+          fileUrl: url,
+          fileName: attachment.name,
+          mimeType: attachment.type,
+          channelType: 'whatsapp',
+          telegramBotId: null
+        });
+      } else {
+        await sendMessage({
+          conversationId: selectedConversation.id,
+          userId: effectiveUserId,
+          message: messageText.trim(),
+          sessionName: sessionName,
+          phoneNumber: phoneNumber,
+          channelType: 'whatsapp',
+          telegramBotId: null
+        });
+      }
     } catch (error) {
       console.error('Error sending message:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo enviar el mensaje',
+        variant: 'destructive',
+      });
     }
   };
 

@@ -163,6 +163,63 @@ export const useMessages = (conversationId: string | null) => {
     },
   });
 
+  // Mutation para enviar mensaje con adjunto
+  const sendMessageWithAttachmentMutation = useMutation({
+    mutationFn: ({ 
+      conversationId, 
+      userId, 
+      message, 
+      sessionName, 
+      phoneNumber,
+      fileUrl,
+      fileName,
+      mimeType,
+      channelType,
+      telegramBotId,
+      twilioConnectionId
+    }: {
+      conversationId: string;
+      userId: string;
+      message: string;
+      sessionName: string;
+      phoneNumber: string;
+      fileUrl: string;
+      fileName: string;
+      mimeType: string;
+      channelType?: string;
+      telegramBotId?: string | null;
+      twilioConnectionId?: string | null;
+    }) => ConversationService.sendMessageWithAttachment(
+      conversationId, 
+      userId, 
+      message, 
+      sessionName, 
+      phoneNumber,
+      fileUrl,
+      fileName,
+      mimeType,
+      channelType,
+      telegramBotId,
+      twilioConnectionId
+    ),
+    onSuccess: () => {
+      toast({
+        title: 'Mensaje enviado',
+        description: 'El archivo se envió correctamente',
+      });
+      // Invalidar mensajes para refrescar
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+    },
+    onError: (error) => {
+      console.error('Error sending message with attachment:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo enviar el archivo',
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Suscripción a cambios en tiempo real de mensajes
   useEffect(() => {
     if (!conversationId) return;
@@ -200,14 +257,12 @@ export const useMessages = (conversationId: string | null) => {
     isLoading: messagesQuery.isLoading,
     error: messagesQuery.error,
     sendMessage: sendMessageMutation.mutate,
-    isSending: sendMessageMutation.isPending,
+    sendMessageWithAttachment: sendMessageWithAttachmentMutation.mutate,
+    isSending: sendMessageMutation.isPending || sendMessageWithAttachmentMutation.isPending,
     refetch: messagesQuery.refetch,
   };
 };
 
-/**
- * Hook para obtener una conversación específica
- */
 export const useConversation = (conversationId: string | null) => {
   return useQuery({
     queryKey: ['conversation', conversationId],

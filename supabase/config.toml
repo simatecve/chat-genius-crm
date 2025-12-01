@@ -36,6 +36,9 @@ verify_jwt = true
 [functions.waha-send-message]
 verify_jwt = true
 
+[functions.waha-send-file]
+verify_jwt = true
+
 [functions.waha-session-status]
 verify_jwt = true
 
@@ -46,6 +49,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.twilio-send-message]
+verify_jwt = true
+
+[functions.twilio-send-file]
 verify_jwt = true
 
 [functions.twilio-ai-agent-response]
