@@ -470,4 +470,90 @@ export class ConversationService {
       throw error;
     }
   }
+
+  /**
+   * Envía un mensaje con archivo adjunto
+   */
+  static async sendMessageWithAttachment(
+    conversationId: string,
+    userId: string,
+    message: string,
+    sessionName: string,
+    phoneNumber: string,
+    fileUrl: string,
+    fileName: string,
+    mimeType: string,
+    channelType?: string,
+    telegramBotId?: string | null,
+    twilioConnectionId?: string | null
+  ): Promise<Message | null> {
+    try {
+      console.log('[ConversationService] Sending message with attachment...', {
+        channelType,
+        fileName,
+        mimeType
+      });
+
+      // Si es Twilio, usar twilio-send-file
+      if (channelType === 'twilio' && twilioConnectionId) {
+        console.log('[ConversationService] Sending via Twilio with file...');
+        
+        const { data, error } = await supabase.functions.invoke('twilio-send-file', {
+          body: {
+            twilioConnectionId,
+            phoneNumber,
+            message,
+            fileUrl,
+            fileName,
+            mimeType,
+            userId,
+            conversationId
+          }
+        });
+
+        if (error) {
+          console.error('[ConversationService] Error calling twilio-send-file:', error);
+          throw error;
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to send Twilio file');
+        }
+
+        console.log('[ConversationService] Twilio file sent successfully');
+        return data.savedMessage;
+      }
+
+      // Si es WhatsApp (WAHA), usar waha-send-file
+      console.log('[ConversationService] Sending via WhatsApp with file...');
+      
+      const { data, error } = await supabase.functions.invoke('waha-send-file', {
+        body: {
+          sessionName,
+          phoneNumber,
+          message,
+          fileUrl,
+          fileName,
+          mimeType,
+          userId,
+          conversationId
+        }
+      });
+
+      if (error) {
+        console.error('[ConversationService] Error calling waha-send-file:', error);
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to send WhatsApp file');
+      }
+
+      console.log('[ConversationService] WhatsApp file sent successfully');
+      return data.savedMessage;
+    } catch (error) {
+      console.error('[ConversationService] Error in sendMessageWithAttachment:', error);
+      throw error;
+    }
+  }
 }
