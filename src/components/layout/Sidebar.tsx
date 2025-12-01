@@ -138,7 +138,7 @@ export const Sidebar = () => {
                             isActiveRoute(item.href) && "bg-sidebar-accent border border-sidebar-border shadow-sm"
                           )}
                         >
-                          <item.icon className={cn("h-6 w-6 transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
+                          <item.icon className={cn("h-7 w-7 transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
                         </Link>
                       </TooltipTrigger>
                       <TooltipContent side="right">
