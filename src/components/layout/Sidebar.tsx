@@ -19,7 +19,7 @@ interface SidebarGroup {
   items: SidebarItem[];
 }
 export const Sidebar = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const currentPath = location.pathname;
@@ -134,11 +134,16 @@ export const Sidebar = () => {
                         <Link
                           to={item.href}
                           className={cn(
-                            "group flex items-center justify-center px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent",
-                            isActiveRoute(item.href) && "bg-sidebar-accent border border-sidebar-border shadow-sm"
+                            "group flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 hover:bg-sidebar-accent relative",
+                            isActiveRoute(item.href) && "bg-sidebar-accent shadow-md"
                           )}
                         >
-                          <item.icon className={cn("h-8 w-8 transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
+                          <item.icon className={cn("h-6 w-6 transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
+                          {item.badge && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                              {item.badge}
+                            </span>
+                          )}
                         </Link>
                       </TooltipTrigger>
                       <TooltipContent side="right">
