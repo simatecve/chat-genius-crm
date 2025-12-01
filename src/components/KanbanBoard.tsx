@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
@@ -316,32 +317,53 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4 px-1">
-        {columns.map((column) => {
-          const columnLeads = getLeadsByColumn(column.id);
-          
-          return (
-            <div 
-              key={column.id} 
-              className="flex-shrink-0 w-64"
-            >
-              <Card 
-                className="h-full border-t-4 bg-card/50 backdrop-blur-sm"
-                style={{ borderTopColor: column.color }}
+      <TooltipProvider>
+        <div className="flex gap-4 overflow-x-auto pb-4 px-1">
+          {columns.map((column) => {
+            const columnLeads = getLeadsByColumn(column.id);
+            // Contar conversaciones en este embudo
+            const conversationsCount = columnLeads.reduce((count, lead) => {
+              return count + (lead.conversations?.length || 0);
+            }, 0);
+            
+            return (
+              <div 
+                key={column.id} 
+                className="flex-shrink-0 w-64"
               >
-                <CardHeader className="pb-3 pt-4 px-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 flex-1">
-                      <CardTitle className="text-sm font-semibold uppercase tracking-wide truncate">
-                        {column.name}
-                      </CardTitle>
-                      {column.is_default && (
-                        <Badge variant="outline" className="text-xs shrink-0">
-                          Por defecto
-                        </Badge>
-                      )}
+                <Card 
+                  className="h-full border-t-4 bg-card/50 backdrop-blur-sm"
+                  style={{ borderTopColor: column.color }}
+                >
+                  <CardHeader className="pb-3 pt-4 px-4">
+                    <div className="flex items-center justify-between">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center space-x-2 flex-1 cursor-help">
+                            <CardTitle className="text-sm font-semibold uppercase tracking-wide truncate">
+                              {column.name}
+                            </CardTitle>
+                            {column.is_default && (
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                Por defecto
+                              </Badge>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent 
+                          side="top" 
+                          className="bg-[#1f2c34] border-[#2a3942] px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{column.name}</span>
+                            <div className="flex items-center gap-1">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span className="text-sm font-medium">{conversationsCount}</span>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
-                  </div>
                   <div className="flex items-center gap-2 mt-3">
                     <Users className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground font-medium">
@@ -430,6 +452,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           );
         })}
       </div>
+      </TooltipProvider>
     </DragDropContext>
   );
 };
