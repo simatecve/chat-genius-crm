@@ -164,25 +164,46 @@ Nuestro equipo te responderá en breve.` : 'Gracias por tu mensaje. Nuestro equi
 
     console.log('AI response prepared:', aiResponseText.substring(0, 100));
 
-    // 6. Enviar respuesta automática a través de WhatsApp (usar conversación ya obtenida)
+    // 6. Enviar respuesta automática según el canal
     if (!conversation) {
       throw new Error('Conversation not found');
     }
 
-    const { data: sendResult, error: sendError } = await supabase.functions.invoke('waha-send-message', {
-      body: {
-        sessionName: sessionName,
-        phoneNumber: conversation.phone_number,
-        message: aiResponseText,
-        userId: userId,
-        conversationId: conversationId,
-        isBot: true
-      }
-    });
+    const channelType = conversation.channel_type || 'whatsapp';
 
-    if (sendError) {
-      console.error('Error sending message:', sendError);
-      throw new Error('Failed to send AI response');
+    if (channelType === 'telegram' && conversation.telegram_bot_id) {
+      await supabase.functions.invoke('telegram-send-message', {
+        body: {
+          chatId: conversation.phone_number,
+          message: aiResponseText,
+          userId,
+          conversationId,
+          telegramBotId: conversation.telegram_bot_id,
+          isBot: true
+        }
+      });
+    } else if (channelType === 'twilio' && conversation.twilio_connection_id) {
+      await supabase.functions.invoke('twilio-send-message', {
+        body: {
+          twilioConnectionId: conversation.twilio_connection_id,
+          phoneNumber: conversation.phone_number,
+          message: aiResponseText,
+          userId,
+          conversationId,
+          isBot: true
+        }
+      });
+    } else {
+      await supabase.functions.invoke('waha-send-message', {
+        body: {
+          sessionName,
+          phoneNumber: conversation.phone_number,
+          message: aiResponseText,
+          userId,
+          conversationId,
+          isBot: true
+        }
+      });
     }
 
     console.log('AI response sent successfully');

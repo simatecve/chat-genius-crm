@@ -41,3 +41,12 @@ verify_jwt = true
 
 [functions.waha-webhook]
 verify_jwt = false
+
+[functions.twilio-webhook]
+verify_jwt = false
+
+[functions.twilio-send-message]
+verify_jwt = true
+
+[functions.twilio-ai-agent-response]
+verify_jwt = false

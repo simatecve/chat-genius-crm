@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useProfile } from '@/hooks/useProfile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WhatsAppConnection } from '@/hooks/useWhatsAppConnections';
+import { TwilioConnection } from '@/hooks/useTwilioConnections';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -35,6 +36,9 @@ interface ChatAreaProps {
   whatsappConnections: WhatsAppConnection[];
   selectedSession: string | null;
   onSessionChange: (sessionName: string) => void;
+  twilioConnections: TwilioConnection[];
+  selectedTwilioConnection: string | null;
+  onTwilioConnectionChange: (connectionId: string) => void;
   originalSessionStatus: 'active' | 'disconnected' | 'deleted';
 }
 
@@ -47,6 +51,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   whatsappConnections,
   selectedSession,
   onSessionChange,
+  twilioConnections,
+  selectedTwilioConnection,
+  onTwilioConnectionChange,
   originalSessionStatus,
 }) => {
   const [newMessage, setNewMessage] = useState('');
@@ -288,9 +295,99 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
 
+      {/* Selector de conexión WhatsApp si la original no está activa */}
+      {conversation.channel_type === 'whatsapp' && originalSessionStatus !== 'active' && whatsappConnections.length > 0 && (
+        <div className="mx-3 mt-3">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              La sesión original no está disponible. Selecciona una conexión activa:
+              <Select value={selectedSession || ''} onValueChange={onSessionChange}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Seleccionar conexión WhatsApp" />
+                </SelectTrigger>
+                <SelectContent>
+                  {whatsappConnections.map((conn) => (
+                    <SelectItem key={conn.id} value={conn.name || ''}>
+                      {conn.name} - {conn.phone_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Selector de conexión Twilio si la original no está activa */}
+      {conversation.channel_type === 'twilio' && originalSessionStatus !== 'active' && twilioConnections.length > 0 && (
+        <div className="mx-3 mt-3">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              La conexión original no está disponible. Selecciona una conexión activa:
+              <Select value={selectedTwilioConnection || ''} onValueChange={onTwilioConnectionChange}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Seleccionar conexión Twilio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {twilioConnections.map((conn) => (
+                    <SelectItem key={conn.id} value={conn.id}>
+                      {conn.connection_name} - {conn.phone_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Selector de conexión WhatsApp si la original no está activa */}
+      {conversation.channel_type === 'whatsapp' && originalSessionStatus !== 'active' && whatsappConnections.length > 0 && (
+        <div className="mx-3 mt-3">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <Select value={selectedSession || ''} onValueChange={onSessionChange}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Seleccionar conexión WhatsApp" />
+                </SelectTrigger>
+                <SelectContent>
+                  {whatsappConnections.map((conn) => (
+                    <SelectItem key={conn.id} value={conn.name || ''}>{conn.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Selector de conexión Twilio */}
+      {conversation.channel_type === 'twilio' && originalSessionStatus !== 'active' && twilioConnections.length > 0 && (
+        <div className="mx-3 mt-3">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <Select value={selectedTwilioConnection || ''} onValueChange={onTwilioConnectionChange}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Seleccionar conexión Twilio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {twilioConnections.map((conn) => (
+                    <SelectItem key={conn.id} value={conn.id}>{conn.connection_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       {/* Área de mensajes */}
       <ScrollArea 
-        className="flex-1 min-h-0 p-4 bg-background" 
+        className="flex-1 min-h-0 p-4 bg-background"
         ref={scrollAreaRef}
       >
         <div className="space-y-4">

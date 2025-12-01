@@ -4,6 +4,7 @@ import ChatArea from './ChatArea';
 import { ContactInfoPanel } from './ContactInfoPanel';
 import { Database } from '@/integrations/supabase/types';
 import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
+import { useTwilioConnections } from '@/hooks/useTwilioConnections';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -26,7 +27,9 @@ export default function ChatModal({
     isSending
 }: ChatModalProps) {
     const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
+    const [selectedTwilioConnection, setSelectedTwilioConnection] = useState<string | null>(null);
     const { activeConnections, isSessionActive } = useWhatsAppConnections();
+    const { connections: twilioConnections, isConnectionActive } = useTwilioConnections();
 
     // Auto-seleccionar sesión cuando cambia la conversación
     useEffect(() => {
@@ -84,16 +87,23 @@ export default function ChatModal({
                             messages={messages}
                             onSendMessage={onSendMessage}
                             isSending={isSending}
-                            onToggleInfoPanel={() => { }} // Info panel is always visible in modal
+                            onToggleInfoPanel={() => { }}
                             whatsappConnections={activeConnections}
                             selectedSession={selectedWhatsAppSession}
                             onSessionChange={setSelectedWhatsAppSession}
+                            twilioConnections={twilioConnections}
+                            selectedTwilioConnection={selectedTwilioConnection}
+                            onTwilioConnectionChange={setSelectedTwilioConnection}
                             originalSessionStatus={
                                 conversation?.channel_type === 'whatsapp'
                                     ? isSessionActive(conversation.whatsapp_number)
                                         ? 'active'
                                         : 'disconnected'
-                                    : 'active'
+                                    : conversation?.channel_type === 'twilio'
+                                      ? isConnectionActive(conversation.twilio_connection_id)
+                                        ? 'active'
+                                        : 'disconnected'
+                                      : 'active'
                             }
                         />
                     </div>

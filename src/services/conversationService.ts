@@ -132,7 +132,8 @@ export class ConversationService {
     sessionName: string,
     phoneNumber: string,
     channelType?: string,
-    telegramBotId?: string | null
+    telegramBotId?: string | null,
+    twilioConnectionId?: string | null
   ): Promise<Message | null> {
     try {
       console.log('[ConversationService] Sending message...', {
@@ -166,6 +167,34 @@ export class ConversationService {
         }
 
         console.log('[ConversationService] Telegram message sent successfully');
+        return data.savedMessage;
+      }
+
+      // Si es Twilio, usar twilio-send-message
+      if (channelType === 'twilio' && twilioConnectionId) {
+        console.log('[ConversationService] Sending via Twilio...');
+        
+        const { data, error } = await supabase.functions.invoke('twilio-send-message', {
+          body: {
+            twilioConnectionId,
+            phoneNumber,
+            message,
+            userId,
+            conversationId,
+            isBot: false
+          }
+        });
+
+        if (error) {
+          console.error('[ConversationService] Error calling twilio-send-message:', error);
+          throw error;
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to send Twilio message');
+        }
+
+        console.log('[ConversationService] Twilio message sent successfully');
         return data.savedMessage;
       }
       

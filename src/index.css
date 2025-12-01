@@ -68,6 +68,7 @@
     
     --whatsapp-green: 142 70% 49%;
     --telegram-blue: 200 100% 40%;
+    --twilio-red: 0 100% 50%;
   }
 
   .dark {
@@ -118,6 +119,7 @@
     
     --whatsapp-green: 142 70% 49%;
     --telegram-blue: 200 100% 40%;
+    --twilio-red: 0 100% 50%;
   }
 
   .bg-white {

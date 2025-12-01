@@ -124,7 +124,8 @@ export const useMessages = (conversationId: string | null) => {
       sessionName, 
       phoneNumber,
       channelType,
-      telegramBotId
+      telegramBotId,
+      twilioConnectionId
     }: {
       conversationId: string;
       userId: string;
@@ -133,6 +134,7 @@ export const useMessages = (conversationId: string | null) => {
       phoneNumber: string;
       channelType?: string;
       telegramBotId?: string | null;
+      twilioConnectionId?: string | null;
     }) => ConversationService.sendMessage(
       conversationId, 
       userId, 
@@ -140,7 +142,8 @@ export const useMessages = (conversationId: string | null) => {
       sessionName, 
       phoneNumber,
       channelType,
-      telegramBotId
+      telegramBotId,
+      twilioConnectionId
     ),
     onSuccess: () => {
       toast({
