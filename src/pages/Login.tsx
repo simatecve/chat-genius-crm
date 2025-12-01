@@ -23,8 +23,8 @@ const Login = () => {
       if (profile.profile_type === 'superadmin') {
         navigate('/admin');
       } else if (profile.profile_type === 'client' || profile.profile_type === 'cajero') {
-        // Both client admins and cajeros go to main dashboard
-        navigate('/');
+        // Both client admins and cajeros go to embudos/leads page
+        navigate('/leads');
       }
     }
   }, [user, profile, profileLoading, navigate]);
