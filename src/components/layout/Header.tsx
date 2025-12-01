@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, LogOut, AlertTriangle, MessageSquare, UserPlus, Trash2, CheckCheck } from 'lucide-react';
+import { Bell, LogOut, MessageSquare, Trash2, ChevronDown, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -8,14 +8,11 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { dashboardService, ActiveConversation } from '@/services/dashboardService';
+import { useProfile } from '@/hooks/useProfile';
 export const Header = () => {
-  const {
-    signOut,
-    user
-  } = useAuth();
-  const {
-    toast
-  } = useToast();
+  const { signOut, user } = useAuth();
+  const { profile } = useProfile();
+  const { toast } = useToast();
   const [activeConversations, setActiveConversations] = React.useState<ActiveConversation[]>([]);
   const unreadCount = React.useMemo(() => activeConversations.reduce((sum, c) => sum + (c.unread_count || 0), 0), [activeConversations]);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
@@ -62,18 +59,23 @@ export const Header = () => {
       description: "Has cerrado sesión correctamente"
     });
   };
-  return <header className="h-16 bg-card/50 backdrop-blur-sm border-b border-border sticky top-0 z-30">
+  const userRole = profile?.profile_type === 'superadmin' ? 'Super Admin' : 
+                   profile?.profile_type === 'client' ? 'Admin' : 
+                   profile?.profile_type === 'cajero' ? 'Cajero' : 'Usuario';
+
+  return <header className="h-16 bg-[#1a1f2e] border-b border-border/50 sticky top-0 z-30">
       <div className="flex items-center justify-between h-full px-6">
         {/* Right section - Actions */}
-        <div className="flex items-center space-x-3 ml-auto">
+        <div className="flex items-center space-x-4 ml-auto">
 
+          {/* Notifications */}
           <DropdownMenu open={alertsOpen} onOpenChange={setAlertsOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="relative" onClick={() => setAlertsOpen((o) => !o)}>
-                <Bell className="h-5 w-5" />
+              <Button variant="ghost" size="sm" className="relative hover:bg-white/10" onClick={() => setAlertsOpen((o) => !o)}>
+                <Bell className="h-5 w-5 text-muted-foreground" />
                 {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
-                  {unreadCount}
-                </span>}
+                   {unreadCount}
+                 </span>}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-96" align="end">
@@ -112,24 +114,41 @@ export const Header = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Theme toggle */}
-          <ThemeToggle />
-
-          {/* Logout */}
-          <Button variant="ghost" size="sm" onClick={handleSignOut}>
-            <LogOut className="h-5 w-5" />
-          </Button>
-
-          {/* User avatar */}
-          <div className="flex items-center space-x-3 pl-3 border-l border-border">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium">{user?.email}</p>
-              <p className="text-xs text-muted-foreground">Usuario</p>
-            </div>
-            <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center text-white font-semibold shadow-lg">
-              {user?.email?.charAt(0).toUpperCase()}
-            </div>
-          </div>
+          {/* User Profile Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center space-x-3 hover:bg-white/10 h-auto py-2 px-3">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-medium text-foreground">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground">{userRole}</p>
+                </div>
+                <div className="w-9 h-9 bg-gradient-primary rounded-full flex items-center justify-center text-white font-semibold shadow-lg">
+                  {user?.email?.charAt(0).toUpperCase()}
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground">{userRole}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <div className="flex items-center justify-between w-full cursor-pointer">
+                  <span className="text-sm">Tema</span>
+                  <ThemeToggle />
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive cursor-pointer">
+                <LogOut className="h-4 w-4 mr-2" />
+                Cerrar sesión
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>;
