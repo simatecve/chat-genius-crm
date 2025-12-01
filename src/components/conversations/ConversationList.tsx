@@ -163,6 +163,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     if (conversation.channel_type === 'telegram') {
       return <MessageCircle className="h-4 w-4 text-telegram-blue" />;
     }
+    if (conversation.channel_type === 'twilio') {
+      return <MessageCircle className="h-4 w-4 text-[hsl(var(--twilio-red))]" />;
+    }
     return null;
   };
 

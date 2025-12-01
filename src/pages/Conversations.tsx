@@ -9,6 +9,7 @@ import { useConversations, useMessages, useSearchConversations } from '@/hooks/u
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
+import { useTwilioConnections } from '@/hooks/useTwilioConnections';
 import { Database } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
@@ -33,12 +34,14 @@ const Conversations = () => {
   const [workspaceLeadIds, setWorkspaceLeadIds] = useState<string[]>([]);
   const [embudoLeadIds, setEmbudoLeadIds] = useState<string[]>([]);
   const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
+  const [selectedTwilioConnection, setSelectedTwilioConnection] = useState<string | null>(null);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
   const { data: searchResults } = useSearchConversations(searchTerm);
   const { messages, sendMessage, isSending } = useMessages(selectedConversation?.id || null);
   const { activeConnections, isSessionActive } = useWhatsAppConnections();
+  const { connections: twilioConnections, activeConnections: activeTwilioConnections, isConnectionActive } = useTwilioConnections();
 
   console.log('[Conversations] Current state:', {
     selectedConversationId: selectedConversation?.id,
@@ -160,6 +163,17 @@ const Conversations = () => {
         setSelectedWhatsAppSession(null);
       }
     }
+
+    // Auto-seleccionar conexión Twilio si está activa
+    if (conversation.channel_type === 'twilio' && conversation.twilio_connection_id) {
+      if (isConnectionActive(conversation.twilio_connection_id)) {
+        setSelectedTwilioConnection(conversation.twilio_connection_id);
+      } else if (activeTwilioConnections.length > 0) {
+        setSelectedTwilioConnection(activeTwilioConnections[0].id);
+      } else {
+        setSelectedTwilioConnection(null);
+      }
+    }
   };
 
   // Manejar envío de mensaje
@@ -187,6 +201,31 @@ const Conversations = () => {
           phoneNumber: chatId,
           channelType: 'telegram',
           telegramBotId: telegramBotId
+        });
+        
+        return;
+      }
+
+      // Si es Twilio
+      if (channelType === 'twilio') {
+        if (!selectedTwilioConnection) {
+          toast({
+            title: 'Conexión no seleccionada',
+            description: 'Selecciona una conexión de Twilio para enviar mensajes',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        await sendMessage({
+          conversationId: selectedConversation.id,
+          userId: effectiveUserId,
+          message: messageText.trim(),
+          sessionName: '',
+          phoneNumber: selectedConversation.phone_number,
+          channelType: 'twilio',
+          telegramBotId: null,
+          twilioConnectionId: selectedTwilioConnection
         });
         
         return;
@@ -259,12 +298,19 @@ const Conversations = () => {
             whatsappConnections={activeConnections}
             selectedSession={selectedWhatsAppSession}
             onSessionChange={setSelectedWhatsAppSession}
+            twilioConnections={twilioConnections}
+            selectedTwilioConnection={selectedTwilioConnection}
+            onTwilioConnectionChange={setSelectedTwilioConnection}
             originalSessionStatus={
               selectedConversation?.channel_type === 'whatsapp'
                 ? isSessionActive(selectedConversation.whatsapp_number)
                   ? 'active'
                   : 'disconnected'
-                : 'active'
+                : selectedConversation?.channel_type === 'twilio'
+                  ? isConnectionActive(selectedConversation.twilio_connection_id)
+                    ? 'active'
+                    : 'disconnected'
+                  : 'active'
             }
           />
         </ResizablePanel>

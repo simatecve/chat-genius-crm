@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import WhatsAppConnectionForm from './WhatsAppConnectionForm';
 import TelegramConnectionForm from './TelegramConnectionForm';
 import TelegramBotConnectionForm from './TelegramBotConnectionForm';
+import TwilioConnectionForm from './TwilioConnectionForm';
 
 interface Channel {
   id: string;
@@ -20,7 +21,7 @@ interface Channel {
 interface Session {
   id: string;
   name: string;
-  type: 'whatsapp' | 'telegram' | 'telegram-bot';
+  type: 'whatsapp' | 'telegram' | 'telegram-bot' | 'twilio';
   identifier: string; // phone_number or bot_username
   status: string;
   created_at: string;
@@ -28,6 +29,7 @@ interface Session {
 
 const channels: Channel[] = [
   { id: 'whatsapp-qr', name: 'WhatsApp QR', icon: '📱', color: 'hsl(var(--whatsapp-green))', enabled: true },
+  { id: 'twilio-whatsapp', name: 'Twilio WhatsApp', icon: '📞', color: 'hsl(var(--twilio-red))', enabled: true },
   { id: 'telegram', name: 'Telegram', icon: '✈️', color: 'hsl(var(--telegram-blue))', enabled: true },
   { id: 'telegram-bot', name: 'Telegram Bot', icon: '🤖', color: 'hsl(var(--telegram-blue))', enabled: true },
   { id: 'whatsapp-api', name: 'WhatsApp API', icon: '📱', color: 'hsl(var(--muted))', enabled: false },
@@ -71,6 +73,13 @@ const SessionsManager = () => {
         .eq('user_id', effectiveUserId)
         .order('created_at', { ascending: false });
 
+      // Fetch Twilio connections
+      const { data: twilioData } = await supabase
+        .from('twilio_connections')
+        .select('*')
+        .eq('user_id', effectiveUserId)
+        .order('created_at', { ascending: false });
+
       const allSessions: Session[] = [];
 
       // Add WhatsApp sessions
@@ -97,6 +106,20 @@ const SessionsManager = () => {
             identifier: bot.bot_username || bot.bot_token?.substring(0, 20) + '...',
             status: bot.status || 'active',
             created_at: bot.created_at
+          });
+        });
+      }
+
+      // Add Twilio sessions
+      if (twilioData) {
+        twilioData.forEach(conn => {
+          allSessions.push({
+            id: conn.id,
+            name: conn.connection_name,
+            type: 'twilio',
+            identifier: conn.phone_number,
+            status: conn.status || 'active',
+            created_at: conn.created_at
           });
         });
       }
@@ -148,6 +171,8 @@ const SessionsManager = () => {
         return '✈️';
       case 'telegram-bot':
         return '🤖';
+      case 'twilio':
+        return '📞';
       default:
         return '📡';
     }
@@ -160,6 +185,8 @@ const SessionsManager = () => {
       case 'telegram':
       case 'telegram-bot':
         return 'hsl(var(--telegram-blue))';
+      case 'twilio':
+        return 'hsl(var(--twilio-red))';
       default:
         return 'hsl(var(--muted))';
     }
@@ -319,6 +346,10 @@ const SessionsManager = () => {
       )}
       {selectedChannel === 'telegram-bot' && (
         <TelegramBotConnectionForm onClose={handleCloseForm} />
+      )}
+
+      {selectedChannel === 'twilio-whatsapp' && (
+        <TwilioConnectionForm onClose={handleCloseForm} />
       )}
     </div>
   );
