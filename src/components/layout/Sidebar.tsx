@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
 import { useTheme } from 'next-themes';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{
@@ -95,7 +96,7 @@ export const Sidebar = () => {
       href: '/configuracion'
     }]
   }];
-  return <>
+  return <TooltipProvider delayDuration={300}>
       {/* Mobile overlay */}
       {isMobileOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsMobileOpen(false)} />}
 
@@ -127,19 +128,38 @@ export const Sidebar = () => {
                     {group.label}
                   </h3>}
                 <div className="space-y-1">
-                  {group.items.map((item, itemIndex) => <Link key={itemIndex} to={item.href} className={cn("group flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent", isActiveRoute(item.href) && "bg-sidebar-accent border border-sidebar-border shadow-sm")}>
+                  {group.items.map((item, itemIndex) => isCollapsed ? (
+                    <Tooltip key={itemIndex}>
+                      <TooltipTrigger asChild>
+                        <Link
+                          to={item.href}
+                          className={cn(
+                            "group flex items-center justify-center px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent",
+                            isActiveRoute(item.href) && "bg-sidebar-accent border border-sidebar-border shadow-sm"
+                          )}
+                        >
+                          <item.icon className={cn("h-6 w-6 transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>{item.label}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <Link key={itemIndex} to={item.href} className={cn("group flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 hover:bg-sidebar-accent", isActiveRoute(item.href) && "bg-sidebar-accent border border-sidebar-border shadow-sm")}>
                       <item.icon className={cn("h-5 w-5 transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")} />
                       
-                      {!isCollapsed && <div className="flex items-center justify-between w-full">
-                          <span className={cn("font-medium transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")}>
-                            {item.label}
-                          </span>
-                          
-                          {item.badge && <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">
-                              {item.badge}
-                            </span>}
-                        </div>}
-                    </Link>)}
+                      <div className="flex items-center justify-between w-full">
+                        <span className={cn("font-medium transition-colors", isActiveRoute(item.href) ? "text-sidebar-primary" : "text-sidebar-foreground group-hover:text-sidebar-primary")}>
+                          {item.label}
+                        </span>
+                        
+                        {item.badge && <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">
+                            {item.badge}
+                          </span>}
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>)}
           </nav>
@@ -163,5 +183,5 @@ export const Sidebar = () => {
           </div>
         </div>
       </div>
-    </>;
+    </TooltipProvider>;
 };
