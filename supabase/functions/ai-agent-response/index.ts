@@ -71,7 +71,7 @@ serve(async (req) => {
     // 3. Verificar si el contacto específico tiene el bot bloqueado
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('phone_number')
+      .select('phone_number, channel_type, telegram_bot_id, twilio_connection_id')
       .eq('id', conversationId)
       .single();
 
