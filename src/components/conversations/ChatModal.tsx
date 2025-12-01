@@ -28,6 +28,7 @@ export default function ChatModal({
 }: ChatModalProps) {
     const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
     const [selectedTwilioConnection, setSelectedTwilioConnection] = useState<string | null>(null);
+    const [showInfoPanel, setShowInfoPanel] = useState(false);
     const { activeConnections, isSessionActive } = useWhatsAppConnections();
     const { connections: twilioConnections, isConnectionActive } = useTwilioConnections();
 
@@ -67,16 +68,65 @@ export default function ChatModal({
     }, [isOpen, onClose]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background rounded-lg w-full max-w-6xl h-[85vh] flex flex-col border border-border relative shadow-2xl">
-                {/* Close button */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 z-[70] text-muted-foreground hover:text-foreground p-2 rounded-lg cursor-pointer transition-colors bg-card border border-border hover:bg-accent"
-                    title="Cerrar (Esc)"
-                >
-                    <X className="w-5 h-5" />
-                </button>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#0d1418] rounded-lg w-full max-w-7xl h-[90vh] flex flex-col border border-[#2a3942] relative shadow-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 bg-[#1f2c34] border-b border-[#2a3942]">
+                    {/* Left side - Contact info */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <button
+                            onClick={onClose}
+                            className="text-muted-foreground hover:text-foreground p-1 rounded-lg cursor-pointer transition-colors"
+                            title="Cerrar (Esc)"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                        
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-semibold flex-shrink-0">
+                            {(conversation.contact_name || conversation.pushname || 'C')[0].toUpperCase()}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-medium text-foreground truncate">
+                                {conversation.contact_name || conversation.pushname || conversation.phone_number}
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                                {conversation.status === 'active' ? 'En línea' : 'Desconectado'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Right side - Action icons */}
+                    <div className="flex items-center gap-4">
+                        <button
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            title="Email"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                        
+                        <button
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            title="Calendario"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                        
+                        <button
+                            onClick={() => setShowInfoPanel(!showInfoPanel)}
+                            className={`transition-colors ${showInfoPanel ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                            title="Información del contacto"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
 
                 {/* Chat content */}
                 <div className="flex-1 flex overflow-hidden">
@@ -87,7 +137,7 @@ export default function ChatModal({
                             messages={messages}
                             onSendMessage={onSendMessage}
                             isSending={isSending}
-                            onToggleInfoPanel={() => { }}
+                            onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
                             whatsappConnections={activeConnections}
                             selectedSession={selectedWhatsAppSession}
                             onSessionChange={setSelectedWhatsAppSession}
@@ -108,15 +158,17 @@ export default function ChatModal({
                         />
                     </div>
 
-                    {/* Contact info panel - always visible in modal */}
-                    <div className="w-96 border-l border-border flex-shrink-0">
-                        <ContactInfoPanel
-                            conversationId={conversation.id}
-                            contactName={conversation.contact_name || conversation.pushname || 'Contacto'}
-                            phoneNumber={conversation.phone_number}
-                            whatsappNumber={conversation.whatsapp_number}
-                        />
-                    </div>
+                    {/* Contact info panel - toggleable */}
+                    {showInfoPanel && (
+                        <div className="w-96 border-l border-[#2a3942] flex-shrink-0 bg-[#0d1418]">
+                            <ContactInfoPanel
+                                conversationId={conversation.id}
+                                contactName={conversation.contact_name || conversation.pushname || 'Contacto'}
+                                phoneNumber={conversation.phone_number}
+                                whatsappNumber={conversation.whatsapp_number}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
