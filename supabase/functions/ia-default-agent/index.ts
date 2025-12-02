@@ -12,7 +12,134 @@ type DefaultAgentResponse = {
   intencionCargaFichas: boolean;
   comprobanteDetectado: boolean;
   respuesta: string;
+  actionExecuted?: {
+    type: 'crear_jugador' | 'depositar_saldo' | 'retirar_saldo';
+    success: boolean;
+    result?: any;
+  };
 };
+
+// Funciones helper para ejecutar webhooks del casino
+async function crearJugador(userName: string, password: string, contactName: string, phoneNumber: string) {
+  try {
+    console.log(`Creating player: ${userName} for ${contactName} (${phoneNumber})`);
+    const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/crear-usuario', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userName, password, contactName, phoneNumber })
+    });
+    const result = await response.json();
+    console.log('Player creation result:', result);
+    return { success: response.ok, data: result };
+  } catch (error) {
+    console.error('Error creating player:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMsg };
+  }
+}
+
+async function depositarSaldo(userName: string, amount: number) {
+  try {
+    console.log(`Depositing ${amount} to ${userName}`);
+    const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/cargar-saldo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userName, amount })
+    });
+    const result = await response.json();
+    console.log('Deposit result:', result);
+    return { success: response.ok, data: result };
+  } catch (error) {
+    console.error('Error depositing:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMsg };
+  }
+}
+
+async function retirarSaldo(userName: string, amount: number) {
+  try {
+    console.log(`Withdrawing ${amount} from ${userName}`);
+    const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/retirar-saldo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userName, amount })
+    });
+    const result = await response.json();
+    console.log('Withdrawal result:', result);
+    return { success: response.ok, data: result };
+  } catch (error) {
+    console.error('Error withdrawing:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMsg };
+  }
+}
+
+// Definición de herramientas (tools) para function calling
+const casinoTools = [
+  {
+    type: "function",
+    function: {
+      name: "crear_jugador",
+      description: "Crear un nuevo jugador en el casino. Usar cuando el usuario quiera registrarse o crear una cuenta. IMPORTANTE: Siempre confirmar con el usuario antes de crear la cuenta.",
+      parameters: {
+        type: "object",
+        properties: {
+          userName: { 
+            type: "string", 
+            description: "Nombre de usuario para el casino (username único)" 
+          },
+          password: { 
+            type: "string", 
+            description: "Contraseña del usuario (mínimo 6 caracteres)" 
+          }
+        },
+        required: ["userName", "password"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "depositar_saldo",
+      description: "Cargar fichas/saldo a un jugador existente. Usar cuando el usuario quiera cargar fichas, depositar o agregar saldo. IMPORTANTE: Confirmar el username y monto antes de ejecutar.",
+      parameters: {
+        type: "object",
+        properties: {
+          userName: { 
+            type: "string", 
+            description: "Nombre de usuario del casino del jugador" 
+          },
+          amount: { 
+            type: "number", 
+            description: "Monto a depositar en pesos" 
+          }
+        },
+        required: ["userName", "amount"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "retirar_saldo",
+      description: "Retirar saldo/fichas de un jugador. Usar cuando el usuario quiera retirar dinero o fichas. IMPORTANTE: Confirmar el username y monto antes de ejecutar.",
+      parameters: {
+        type: "object",
+        properties: {
+          userName: { 
+            type: "string", 
+            description: "Nombre de usuario del casino del jugador" 
+          },
+          amount: { 
+            type: "number", 
+            description: "Monto a retirar en pesos" 
+          }
+        },
+        required: ["userName", "amount"]
+      }
+    }
+  }
+];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -30,7 +157,7 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { userId, messageContent } = await req.json();
+    const { userId, messageContent, contactName, phoneNumber, conversationId } = await req.json();
 
     if (!userId || typeof messageContent !== 'string') {
       return new Response(
@@ -38,6 +165,8 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+
+    console.log('Processing message:', { userId, contactName, phoneNumber, conversationId });
 
     // Obtener configuración global de IA
     const { data: settings, error: settingsError } = await supabase
@@ -119,9 +248,47 @@ serve(async (req) => {
       });
     }
 
-    // Caso conversación normal: usar Gemini 2.5 Flash vía Lovable
+    // Caso conversación normal: usar Gemini 2.5 Flash vía Lovable con tools
     let respuesta = '';
-    const systemPrompt = `🎯 Objetivo general\n\nSimular al asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.\nDebe atender, informar y acompañar al cliente. El registro es gratuito y juego responsable (18+).\n\nSi el usuario pide datos bancarios (CBU/alias/QR/numero de caja), respóndelos usando los siguientes valores dinámicos:\nCBU: ${cbu || '[no configurado]'}\nNúmeros de caja: ${cashierNumbersText ? cashierNumbersText : '[no configurados]'}\n\nSolo derivá automáticamente cuando haya intención real de transferir o envío de comprobante.\nPara preguntas generales (precios, bonos, cómo jugar, juegos), responde amable y breve.\n\nFormato de salida: NO devuelvas JSON, solo devuelve el texto de respuesta conversacional. El sistema lo envolverá en JSON.`;
+    let actionExecuted: DefaultAgentResponse['actionExecuted'] = undefined;
+    
+    const systemPrompt = `🎯 Objetivo general
+
+Eres el asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.
+Debés atender, informar y acompañar al cliente. El registro es gratuito y juego responsable (18+).
+
+🎰 CAPACIDADES DEL CASINO
+Tenés acceso a las siguientes funciones que podés ejecutar:
+
+1. **CREAR JUGADOR**: Cuando alguien quiera registrarse, pedile un username y password.
+   - IMPORTANTE: Confirmá los datos antes de crear la cuenta.
+   - El username debe ser único y la contraseña debe tener al menos 6 caracteres.
+
+2. **DEPOSITAR SALDO**: Cuando alguien quiera cargar fichas, necesitás su username y el monto.
+   - IMPORTANTE: Confirmá el username y el monto antes de ejecutar.
+   - Informá que la carga es inmediata.
+
+3. **RETIRAR SALDO**: Cuando alguien quiera retirar, necesitás su username y el monto.
+   - IMPORTANTE: Confirmá el username y el monto antes de ejecutar.
+   - Informá que el retiro se procesa en minutos.
+
+⚠️ REGLAS IMPORTANTES:
+- Antes de ejecutar cualquier acción, SIEMPRE confirmá los datos con el usuario.
+- Si el usuario no tiene cuenta, ofrecé crearle una primero.
+- Siempre confirmá el monto antes de depositar o retirar.
+- Después de ejecutar una acción, informá el resultado de forma clara y amigable.
+- Si hay un error, explicá qué pasó y cómo solucionarlo.
+
+💰 DATOS BANCARIOS
+Si el usuario pide datos bancarios (CBU/alias/QR/numero de caja):
+CBU: ${cbu || '[no configurado]'}
+Números de caja: ${cashierNumbersText ? cashierNumbersText : '[no configurados]'}
+
+📋 DERIVACIÓN
+Solo derivá automáticamente cuando haya intención real de transferir o envío de comprobante.
+Para preguntas generales (precios, bonos, cómo jugar, juegos), respondé amable y breve.
+
+Formato de salida: NO devuelvas JSON, solo devolvé el texto de respuesta conversacional.`;
 
     const aiMessages = [
       { role: 'system', content: systemPrompt },
@@ -130,6 +297,7 @@ serve(async (req) => {
 
     if (LOVABLE_API_KEY) {
       try {
+        // Primera llamada a la IA con tools
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -139,6 +307,8 @@ serve(async (req) => {
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: aiMessages,
+            tools: casinoTools,
+            tool_choice: 'auto', // La IA decide cuándo usar tools
             temperature: 0.7,
             max_tokens: 500,
           }),
@@ -146,7 +316,105 @@ serve(async (req) => {
 
         if (aiResponse.ok) {
           const aiResult = await aiResponse.json();
-          respuesta = aiResult.choices?.[0]?.message?.content || '';
+          const message = aiResult.choices?.[0]?.message;
+          
+          // Si la IA quiere ejecutar una tool
+          if (message?.tool_calls && message.tool_calls.length > 0) {
+            const toolCall = message.tool_calls[0];
+            console.log('Tool call detected:', toolCall.function.name, toolCall.function.arguments);
+            
+            let args;
+            try {
+              args = JSON.parse(toolCall.function.arguments);
+            } catch (e) {
+              console.error('Error parsing tool arguments:', e);
+              respuesta = 'Disculpá, hubo un error al procesar tu solicitud. ¿Podés intentar de nuevo?';
+              // No retornar undefined, continuar con el flujo normal
+            }
+            
+            if (args) {
+              let toolResult;
+              let actionType: 'crear_jugador' | 'depositar_saldo' | 'retirar_saldo';
+              
+              switch (toolCall.function.name) {
+                case 'crear_jugador':
+                  actionType = 'crear_jugador';
+                  toolResult = await crearJugador(
+                    args.userName, 
+                    args.password, 
+                    contactName || 'Usuario', 
+                    phoneNumber || ''
+                  );
+                  break;
+                case 'depositar_saldo':
+                  actionType = 'depositar_saldo';
+                  toolResult = await depositarSaldo(args.userName, args.amount);
+                  break;
+                case 'retirar_saldo':
+                  actionType = 'retirar_saldo';
+                  toolResult = await retirarSaldo(args.userName, args.amount);
+                  break;
+                default:
+                  console.error('Unknown tool:', toolCall.function.name);
+                  respuesta = 'Disculpá, no pude procesar esa acción. ¿Podés intentar de nuevo?';
+                  toolResult = null;
+                  break;
+              }
+              
+              if (toolResult) {
+                // Guardar información de la acción ejecutada
+                actionExecuted = {
+                  type: actionType!,
+                  success: toolResult.success,
+                  result: toolResult
+                };
+                
+                console.log('Tool execution result:', toolResult);
+                
+                // Segunda llamada a la IA con el resultado de la tool
+                // para que genere una respuesta amigable al usuario
+                const followUpMessages = [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: messageContent },
+                  { role: 'assistant', content: null, tool_calls: [toolCall] },
+                  { 
+                    role: 'tool', 
+                    tool_call_id: toolCall.id,
+                    content: JSON.stringify(toolResult)
+                  }
+                ];
+                
+                const followUpResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    model: 'google/gemini-2.5-flash',
+                    messages: followUpMessages,
+                    temperature: 0.7,
+                    max_tokens: 500,
+                  }),
+                });
+                
+                if (followUpResponse.ok) {
+                  const followUpResult = await followUpResponse.json();
+                  respuesta = followUpResult.choices?.[0]?.message?.content || '';
+                } else {
+                  // Si falla la segunda llamada, generar respuesta básica
+                  if (toolResult.success) {
+                    respuesta = `¡Listo! La operación se completó exitosamente. 🎰`;
+                  } else {
+                    respuesta = `Hubo un problema al procesar tu solicitud: ${toolResult.error || 'Error desconocido'}. Por favor intentá de nuevo o contactá a soporte.`;
+                  }
+                }
+              }
+            }
+          } else {
+            // No hay tool calls, respuesta normal
+            respuesta = message?.content || '';
+          }
         } else {
           const errorText = await aiResponse.text();
           console.error('Lovable AI error:', errorText);
@@ -165,7 +433,8 @@ serve(async (req) => {
       isActivated: true,
       intencionCargaFichas: false,
       comprobanteDetectado: false,
-      respuesta
+      respuesta,
+      actionExecuted
     };
 
     return new Response(JSON.stringify(payload), {

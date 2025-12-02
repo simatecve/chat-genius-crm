@@ -581,7 +581,10 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
             const { data: defaultResult, error: defaultError } = await supabase.functions.invoke('ia-default-agent', {
               body: {
                 userId: userId,
-                messageContent: messageContent
+                messageContent: messageContent,
+                contactName: conversation.contact_name || conversation.pushname || pushName,
+                phoneNumber: conversation.phone_number,
+                conversationId: conversation.id
               }
             });
 
