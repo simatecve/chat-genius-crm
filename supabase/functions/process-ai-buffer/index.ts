@@ -12,7 +12,15 @@ async function processBuffer(supabase: any, buffer: any) {
   try {
     console.log(`[process-ai-buffer] Processing buffer ${buffer.id} with ${buffer.message_count} messages`);
     
-    const messages = JSON.parse(buffer.accumulated_messages);
+    // accumulated_messages puede venir como string JSON o ya parseado
+    let messages: any[];
+    if (typeof buffer.accumulated_messages === 'string') {
+      messages = JSON.parse(buffer.accumulated_messages);
+    } else {
+      messages = buffer.accumulated_messages;
+    }
+    console.log(`[process-ai-buffer] Messages after parse: ${JSON.stringify(messages)}`);
+    
     const conversationId = buffer.conversation_id;
     const userId = buffer.user_id;
     const channelType = buffer.channel_type;
@@ -66,21 +74,35 @@ async function processBuffer(supabase: any, buffer: any) {
     let combinedMessage = '';
     let imageUrls: string[] = [];
 
+    console.log(`[process-ai-buffer] Raw messages type: ${typeof messages}, isArray: ${Array.isArray(messages)}`);
+    console.log(`[process-ai-buffer] Messages count: ${messages.length}`);
+    if (messages.length > 0) {
+      console.log(`[process-ai-buffer] First message type: ${typeof messages[0]}`);
+      console.log(`[process-ai-buffer] First message: ${JSON.stringify(messages[0])}`);
+    }
+
     if (messages.length > 0) {
       if (typeof messages[0] === 'string') {
         // Formato antiguo: array de strings
+        console.log('[process-ai-buffer] Using OLD string format');
         combinedMessage = messages.join('\n\n');
       } else {
         // Formato nuevo: array de objetos { type, content, imageUrl }
+        console.log('[process-ai-buffer] Using NEW object format');
         combinedMessage = messages.map((m: any) => m.content || '').join('\n\n');
-        imageUrls = messages
-          .filter((m: any) => m.type === 'image' && m.imageUrl)
-          .map((m: any) => m.imageUrl);
+        
+        // Extraer imageUrls de mensajes tipo imagen
+        for (const m of messages) {
+          console.log(`[process-ai-buffer] Message: type=${m.type}, hasImageUrl=${!!m.imageUrl}, imageUrl=${m.imageUrl}`);
+          if (m.type === 'image' && m.imageUrl) {
+            imageUrls.push(m.imageUrl);
+          }
+        }
       }
     }
 
     console.log(`[process-ai-buffer] Combined message: ${combinedMessage.substring(0, 100)}...`);
-    console.log(`[process-ai-buffer] Found ${imageUrls.length} images`);
+    console.log(`[process-ai-buffer] Found ${imageUrls.length} images: ${JSON.stringify(imageUrls)}`);
 
     // Intentar llamar a un agente específico
     let aiResponse = null;
