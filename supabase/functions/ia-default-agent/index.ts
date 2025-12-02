@@ -12,6 +12,7 @@ type DefaultAgentResponse = {
   intencionCargaFichas: boolean;
   comprobanteDetectado: boolean;
   respuesta: string;
+  mensajesMultiples?: string[]; // Para enviar varios mensajes separados
   actionExecuted?: {
     type: 'crear_jugador';
     success: boolean;
@@ -137,26 +138,39 @@ serve(async (req) => {
     ];
     const comprobanteDetectado = comprobantePatterns.some(p => text.includes(p));
 
-    // Solicitud explícita de datos bancarios
+    // Solicitud explícita de datos bancarios (CBU, alias, etc.)
     const bankInfoPatterns = [
-      'cbu','alias','qr','numero de caja','número de caja','cajero','caja'
+      'cbu','alias','qr','numero de caja','número de caja','cajero','caja','transferir','transferencia','depositar','deposito','depósito'
     ];
     const bankInfoRequested = bankInfoPatterns.some(p => text.includes(p));
 
-    // Caso derivación por intención/comprobante
+    // Si pide CBU o datos bancarios, responder con mensajes múltiples estructurados
+    if (bankInfoRequested && cbu) {
+      const cajas = cashierNumbersText?.trim() || '';
+      const mensajesMultiples = [
+        'Para transferir te dejo el CBU a continuación ↓',
+        cbu,
+        'Ahora envia el comprobante al siguiente número de atención ↓',
+        cajas || 'Contacta a soporte para obtener el número de atención'
+      ];
+
+      const payload: DefaultAgentResponse = {
+        isActivated: true,
+        intencionCargaFichas: true,
+        comprobanteDetectado: false,
+        respuesta: mensajesMultiples[0],
+        mensajesMultiples
+      };
+
+      return new Response(JSON.stringify(payload), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
+    // Caso derivación por intención/comprobante (sin datos bancarios)
     if (intencionCargaFichas || comprobanteDetectado) {
       let respuesta = 'Por seguridad, te derivo con un asesor que te ayuda con eso 💸';
-      // Si pide datos bancarios explícitos, incluir dinámicos
-      if (bankInfoRequested) {
-        const cajas = cashierNumbersText?.trim() || '';
-        const datos = [
-          cbu ? `CBU: ${cbu}` : '',
-          cajas ? `Números de caja: ${cajas}` : ''
-        ].filter(Boolean).join(' · ');
-        if (datos) {
-          respuesta = `${respuesta} | ${datos}`;
-        }
-      }
 
       const payload: DefaultAgentResponse = {
         isActivated: false,
@@ -207,18 +221,21 @@ serve(async (req) => {
 2. Para consultas sobre depósitos/cargas o retiros, debés derivar a un asesor humano
 
 **INFORMACIÓN DEL CASINO:**
+- Link del casino: http://capibet.fun/
 - CBU para cargas: ${cbu || '[no configurado]'}
 - Números de cajeros: ${cashierNumbersText || '[no configurados]'}
 
 **CREACIÓN DE CUENTAS:**
 - Contraseña por defecto: "Capibet1234" (si el usuario no especifica una)
 - Después de crear la cuenta, SIEMPRE enviá las credenciales completas: usuario y contraseña
-- Formato de respuesta: "¡Listo! Tu cuenta fue creada. Usuario: [usuario] - Contraseña: [contraseña]"
+- Formato de respuesta: "¡Listo! Tu cuenta fue creada. Usuario: [usuario] - Contraseña: [contraseña]. Ingresá desde: http://capibet.fun/"
+- SIEMPRE incluí el link http://capibet.fun/ cuando crees una cuenta o cuando pregunten cómo acceder al casino
 
 **REGLAS IMPORTANTES:**
 - Si te piden cargar fichas, depositar o retirar saldo, respondé: "Para gestionar depósitos y retiros, necesito que hables con uno de nuestros asesores humanos. Ellos te van a ayudar con eso de inmediato."
 - NUNCA inventes información. Si no sabés algo, decilo claramente y recomendá contactar a un asesor
 - Si te preguntan por juegos específicos, promociones, o detalles técnicos que no conocés, recomendá que contacten a un asesor humano
+- Si preguntan el link o cómo entrar al casino, respondé: http://capibet.fun/
 
 Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en cada respuesta.`;
 
