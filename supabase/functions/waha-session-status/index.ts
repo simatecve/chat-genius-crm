@@ -46,15 +46,27 @@ serve(async (req) => {
     }
 
     const sessionData = await wahaResponse.json();
-    console.log('Session status:', sessionData);
+    console.log('Session status from WAHA:', sessionData);
 
-    const status = sessionData.status || 'UNKNOWN';
+    const wahaStatus = sessionData.status || 'UNKNOWN';
     const phoneNumber = sessionData.me?.id ? sessionData.me.id.split('@')[0] : null;
+
+    // Normalizar el estado de WAHA a nuestros estados internos
+    let normalizedStatus = 'unknown';
+    if (wahaStatus === 'WORKING') {
+      normalizedStatus = 'connected';
+    } else if (wahaStatus === 'SCAN_QR_CODE') {
+      normalizedStatus = 'pending_qr';
+    } else if (['STARTING', 'STOPPED', 'FAILED'].includes(wahaStatus)) {
+      normalizedStatus = 'disconnected';
+    }
+
+    console.log(`WAHA status "${wahaStatus}" normalized to "${normalizedStatus}"`);
 
     // Actualizar estado en la base de datos
     if (connection_id) {
       const updateData: any = {
-        status: status,
+        status: normalizedStatus,
         updated_at: new Date().toISOString(),
       };
 
@@ -69,13 +81,16 @@ serve(async (req) => {
 
       if (updateError) {
         console.error('Database update error:', updateError);
+      } else {
+        console.log(`Database updated: connection ${connection_id} set to "${normalizedStatus}"`);
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        status: status,
+        status: normalizedStatus,
+        waha_status: wahaStatus,
         session: sessionData,
         phone_number: phoneNumber
       }),
