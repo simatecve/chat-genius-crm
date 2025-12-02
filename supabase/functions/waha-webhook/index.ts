@@ -546,72 +546,53 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
           return;
         }
 
-        console.log('Bot is enabled, calling AI agent...');
-        const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-agent-response', {
-          body: {
-            conversationId: conversation.id,
-            userId: userId,
-            messageContent: messageContent,
-            sessionName: session
-          }
-        });
+        console.log('Bot is enabled, adding message to buffer...');
+        
+        // Buscar o crear buffer para esta conversación
+        const { data: existingBuffer } = await supabase
+          .from('ai_response_buffer')
+          .select('*')
+          .eq('conversation_id', conversation.id)
+          .eq('processed', false)
+          .single();
 
-        if (aiError) {
-          console.error('Error calling AI agent:', aiError);
+        if (existingBuffer) {
+          // Actualizar buffer existente
+          const currentMessages = JSON.parse(existingBuffer.accumulated_messages);
+          currentMessages.push(messageContent);
+          
+          await supabase
+            .from('ai_response_buffer')
+            .update({
+              message_count: existingBuffer.message_count + 1,
+              accumulated_messages: JSON.stringify(currentMessages),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingBuffer.id);
+
+          console.log(`Buffer updated: ${existingBuffer.message_count + 1} messages`);
+
+          // Si alcanzó 4 mensajes, procesar inmediatamente
+          if (existingBuffer.message_count + 1 >= 4) {
+            console.log('Buffer reached 4 messages, processing immediately...');
+            await supabase.functions.invoke('process-ai-buffer', { body: {} });
+          }
         } else {
-          console.log('AI agent response:', aiResult);
-        }
-
-        // Fallback: si no hay agente activo, usar el agente por defecto si está habilitado
-        const shouldFallback = !aiResult?.processed;
-        if (shouldFallback) {
-          console.log('No active AI agent processed the message. Checking ia_default_settings...');
-          const { data: defaultSettings, error: defaultSettingsError } = await supabase
-            .from('ia_default_settings')
-            .select('is_enabled')
-            .eq('id', 1)
-            .single();
-
-          if (defaultSettingsError) {
-            console.error('Error fetching ia_default_settings:', defaultSettingsError);
-          }
-
-          if (defaultSettings?.is_enabled) {
-            console.log('Default IA agent is enabled. Invoking ia-default-agent...');
-            const { data: defaultResult, error: defaultError } = await supabase.functions.invoke('ia-default-agent', {
-              body: {
-                userId: userId,
-                messageContent: messageContent,
-                contactName: conversation.contact_name || conversation.pushname || pushName,
-                phoneNumber: conversation.phone_number,
-                conversationId: conversation.id
-              }
+          // Crear nuevo buffer
+          await supabase
+            .from('ai_response_buffer')
+            .insert({
+              conversation_id: conversation.id,
+              user_id: userId,
+              message_count: 1,
+              accumulated_messages: JSON.stringify([messageContent]),
+              channel_type: 'whatsapp',
+              session_name: session,
+              phone_number: conversation.phone_number,
+              processed: false
             });
 
-            if (defaultError) {
-              console.error('Error calling ia-default-agent:', defaultError);
-            } else if (defaultResult && defaultResult.respuesta) {
-              console.log('Sending default IA agent response...');
-              const { data: sendResult, error: sendError } = await supabase.functions.invoke('waha-send-message', {
-                body: {
-                  sessionName: session,
-                  phoneNumber: conversation.phone_number,
-                  message: defaultResult.respuesta,
-                  userId: userId,
-                  conversationId: conversation.id,
-                  isBot: true
-                }
-              });
-
-              if (sendError) {
-                console.error('Error sending default IA message:', sendError);
-              } else {
-                console.log('Default IA response sent:', sendResult);
-              }
-            }
-          } else {
-            console.log('Default IA agent is disabled. No automated response will be sent.');
-          }
+          console.log('New buffer created');
         }
       } catch (aiError) {
         console.error('Exception calling AI agent:', aiError);

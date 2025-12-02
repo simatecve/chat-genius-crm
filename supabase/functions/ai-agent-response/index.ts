@@ -121,10 +121,23 @@ serve(async (req) => {
     console.log('Conversation history length:', conversationHistory.length);
 
     // 5. Llamar a Lovable AI con el agente configurado
+    // Agregar instrucciones de estilo conversacional al system prompt
+    const conversationalInstructions = `
+**IMPORTANTE - ESTILO CONVERSACIONAL:**
+- NO saludes con "Hola" en cada mensaje. Solo saludá si es la primera vez que hablas con este contacto.
+- Mantené el hilo natural de la conversación sin repetir información ya dada.
+- Sé breve y directo, como una conversación real por WhatsApp.
+
+---
+
+`;
+
+    const enhancedSystemPrompt = conversationalInstructions + agent.system_prompt;
+
     const aiMessages = [
       {
         role: 'system',
-        content: agent.system_prompt
+        content: enhancedSystemPrompt
       },
       ...conversationHistory
     ];

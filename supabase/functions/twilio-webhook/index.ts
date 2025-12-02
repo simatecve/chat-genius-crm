@@ -449,17 +449,55 @@ serve(async (req) => {
       );
     }
 
-    // Disparar respuesta del agente IA si está configurado
-    console.log('Invoking twilio-ai-agent-response...');
-    supabase.functions.invoke('twilio-ai-agent-response', {
-      body: {
-        conversationId: conversation.id,
-        userId,
-        messageContent: messageBody,
-        phoneNumber,
-        twilioConnectionId: connectionId,
+    // Agregar al buffer de respuestas IA
+    const { data: botSettings } = await supabase
+      .from('user_bot_settings')
+      .select('bot_enabled')
+      .eq('user_id', userId)
+      .single();
+
+    if (botSettings?.bot_enabled !== false) {
+      console.log('[twilio-webhook] Bot enabled, adding to buffer...');
+      
+      const { data: existingBuffer } = await supabase
+        .from('ai_response_buffer')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .eq('processed', false)
+        .single();
+
+      if (existingBuffer) {
+        const currentMessages = JSON.parse(existingBuffer.accumulated_messages);
+        currentMessages.push(messageBody);
+        
+        await supabase
+          .from('ai_response_buffer')
+          .update({
+            message_count: existingBuffer.message_count + 1,
+            accumulated_messages: JSON.stringify(currentMessages),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingBuffer.id);
+
+        if (existingBuffer.message_count + 1 >= 4) {
+          console.log('[twilio-webhook] Buffer reached 4 messages, processing...');
+          await supabase.functions.invoke('process-ai-buffer', { body: {} });
+        }
+      } else {
+        await supabase
+          .from('ai_response_buffer')
+          .insert({
+            conversation_id: conversation.id,
+            user_id: userId,
+            message_count: 1,
+            accumulated_messages: JSON.stringify([messageBody]),
+            channel_type: 'twilio',
+            twilio_connection_id: connectionId,
+            phone_number: phoneNumber,
+            processed: false
+          });
       }
-    }).catch(err => console.error('Error invoking AI agent:', err));
+    }
 
     return new Response('OK', {
       status: 200,

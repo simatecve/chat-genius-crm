@@ -120,6 +120,79 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_response_buffer: {
+        Row: {
+          accumulated_messages: Json
+          channel_type: string
+          conversation_id: string
+          created_at: string
+          first_message_at: string
+          id: string
+          message_count: number
+          phone_number: string
+          processed: boolean
+          session_name: string | null
+          telegram_bot_id: string | null
+          twilio_connection_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accumulated_messages?: Json
+          channel_type?: string
+          conversation_id: string
+          created_at?: string
+          first_message_at?: string
+          id?: string
+          message_count?: number
+          phone_number: string
+          processed?: boolean
+          session_name?: string | null
+          telegram_bot_id?: string | null
+          twilio_connection_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accumulated_messages?: Json
+          channel_type?: string
+          conversation_id?: string
+          created_at?: string
+          first_message_at?: string
+          id?: string
+          message_count?: number
+          phone_number?: string
+          processed?: boolean
+          session_name?: string | null
+          telegram_bot_id?: string | null
+          twilio_connection_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_response_buffer_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_response_buffer_telegram_bot_id_fkey"
+            columns: ["telegram_bot_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_response_buffer_twilio_connection_id_fkey"
+            columns: ["twilio_connection_id"]
+            isOneToOne: false
+            referencedRelation: "twilio_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automated_message_logs: {
         Row: {
           created_at: string | null

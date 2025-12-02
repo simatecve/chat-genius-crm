@@ -575,146 +575,54 @@ async function processTelegramMessage(supabase: any, update: any, botDbId: strin
       );
     }
 
-    // Invocar AI agent si está activo
-    const { data: aiAgent } = await supabase
-      .from('ai_agents')
-      .select('*')
+    // Verificar si hay bot habilitado y agregar al buffer
+    const { data: botSettings } = await supabase
+      .from('user_bot_settings')
+      .select('bot_enabled')
       .eq('user_id', userId)
-      .eq('telegram_bot_id', telegramBotId)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
+      .single();
 
-    if (aiAgent) {
-      console.log('[telegram-bot-webhook] AI agent found, generating response...');
-      console.log('[telegram-bot-webhook] System prompt:', aiAgent.system_prompt);
-      console.log('[telegram-bot-webhook] Model:', aiAgent.model);
+    if (botSettings?.bot_enabled !== false) {
+      console.log('[telegram-bot-webhook] Bot enabled, adding to buffer...');
       
-      try {
-        // Obtener historial de mensajes de la conversación (últimos 10)
-        const { data: previousMessages } = await supabase
-          .from('messages')
-          .select('content, direction, is_bot')
-          .eq('conversation_id', conversation.id)
-          .order('created_at', { ascending: false })
-          .limit(10);
+      // Buscar o crear buffer
+      const { data: existingBuffer } = await supabase
+        .from('ai_response_buffer')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .eq('processed', false)
+        .single();
 
-        // Construir historial de conversación para el AI
-        const conversationHistory = (previousMessages || [])
-          .reverse()
-          .map((msg: any) => ({
-            role: msg.direction === 'inbound' ? 'user' : 'assistant',
-            content: msg.content
-          }));
-
-        // Llamar al Lovable AI Gateway
-        const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (existingBuffer) {
+        const currentMessages = JSON.parse(existingBuffer.accumulated_messages);
+        currentMessages.push(messageContent);
         
-        if (!LOVABLE_API_KEY) {
-          console.error('[telegram-bot-webhook] LOVABLE_API_KEY not configured');
-          return;
-        }
-
-        const aiMessages = [
-          { role: 'system', content: aiAgent.system_prompt },
-          ...conversationHistory,
-          { role: 'user', content: messageContent }
-        ];
-
-        console.log('[telegram-bot-webhook] Calling Lovable AI...');
-        
-        const modelToUse = aiAgent.model && aiAgent.model !== 'gpt-3.5-turbo' 
-          ? aiAgent.model 
-          : 'google/gemini-2.5-flash';
-        
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: modelToUse,
-            messages: aiMessages,
-            temperature: aiAgent.temperature || 0.7,
-            max_tokens: aiAgent.max_tokens || 500,
-          }),
-        });
-
-        if (!aiResponse.ok) {
-          const errorText = await aiResponse.text();
-          console.error('[telegram-bot-webhook] Lovable AI error:', errorText);
-          return;
-        }
-
-        const aiResult = await aiResponse.json();
-        const aiResponseText = aiResult.choices?.[0]?.message?.content || '';
-
-        if (!aiResponseText) {
-          console.log('[telegram-bot-webhook] No AI response generated');
-          return;
-        }
-
-        console.log('[telegram-bot-webhook] AI response generated, sending to Telegram...');
-
-        // Enviar respuesta del AI al usuario via Telegram
-        const telegramUrl = `https://api.telegram.org/bot${bot.bot_token}/sendMessage`;
-        const telegramPayload = {
-          chat_id: chatId,
-          text: aiResponseText,
-          parse_mode: 'HTML'
-        };
-
-        const telegramResponse = await fetch(telegramUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(telegramPayload),
-        });
-
-        if (!telegramResponse.ok) {
-          const errorText = await telegramResponse.text();
-          console.error('[telegram-bot-webhook] Error sending AI response to Telegram:', errorText);
-          return;
-        }
-
-        const telegramResult = await telegramResponse.json();
-        console.log('[telegram-bot-webhook] AI response sent successfully');
-
-        // Guardar respuesta del AI en la base de datos
-        const aiMessageData = {
-          conversation_id: conversation.id,
-          user_id: userId,
-          content: aiResponseText,
-          direction: 'outbound',
-          status: 'sent',
-          message_type: 'text',
-          is_bot: true,
-          created_at: new Date().toISOString(),
-          metadata: {
-            telegram_message_id: telegramResult.result?.message_id || null,
-            ai_agent_id: aiAgent.id,
-            ai_model: aiAgent.model,
-            sent_via: 'ai_agent'
-          }
-        };
-
         await supabase
-          .from('messages')
-          .insert(aiMessageData);
-
-        // Actualizar conversación
-        await supabase
-          .from('conversations')
+          .from('ai_response_buffer')
           .update({
-            last_message: aiResponseText,
-            last_message_time: new Date().toISOString(),
+            message_count: existingBuffer.message_count + 1,
+            accumulated_messages: JSON.stringify(currentMessages),
+            updated_at: new Date().toISOString()
           })
-          .eq('id', conversation.id);
+          .eq('id', existingBuffer.id);
 
-        console.log('[telegram-bot-webhook] AI message saved to database');
-
-      } catch (error) {
-        console.error('[telegram-bot-webhook] Error processing AI agent:', error);
+        if (existingBuffer.message_count + 1 >= 4) {
+          console.log('[telegram-bot-webhook] Buffer reached 4 messages, processing...');
+          await supabase.functions.invoke('process-ai-buffer', { body: {} });
+        }
+      } else {
+        await supabase
+          .from('ai_response_buffer')
+          .insert({
+            conversation_id: conversation.id,
+            user_id: userId,
+            message_count: 1,
+            accumulated_messages: JSON.stringify([messageContent]),
+            channel_type: 'telegram',
+            telegram_bot_id: telegramBotId,
+            phone_number: chatId,
+            processed: false
+          });
       }
     }
     
