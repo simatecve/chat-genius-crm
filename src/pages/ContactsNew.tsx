@@ -195,9 +195,12 @@ export default function ContactsNew() {
   };
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Contactos</h1>
+    <div className="container mx-auto py-6 px-4 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Contactos</h1>
+          <p className="text-muted-foreground mt-1">Gestiona tu base de datos de contactos</p>
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
@@ -207,21 +210,21 @@ export default function ContactsNew() {
             <Upload className="mr-2 h-4 w-4" />
             Importar
           </Button>
-          <Button onClick={() => setIsFormOpen(true)}>
+          <Button onClick={() => setIsFormOpen(true)} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
             <Plus className="mr-2 h-4 w-4" />
             Agregar Contacto
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar"
+            placeholder="Buscar contactos..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-card border-border"
           />
         </div>
         <Button variant="outline" size="icon">
@@ -229,7 +232,7 @@ export default function ContactsNew() {
         </Button>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-lg bg-card overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>

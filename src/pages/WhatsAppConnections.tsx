@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Plus, Phone, List, Trash2, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -480,8 +481,8 @@ const WhatsAppConnections = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Conexiones WhatsApp</h1>
-            <p className="text-muted-foreground">Gestiona tus conexiones de WhatsApp</p>
+            <h1 className="text-3xl font-bold text-foreground">Conexiones WhatsApp</h1>
+            <p className="text-muted-foreground mt-1">Gestiona tus conexiones de WhatsApp y mantén tus sesiones activas</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -663,21 +664,28 @@ const WhatsAppConnections = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {connections.map((connection) => {
+            const isConnected = connection.status === 'conectado' || connection.status === 'working';
             return (
-              <Card key={connection.id} className="hover:shadow-md transition-shadow">
+              <Card key={connection.id} className={`bg-gradient-to-br from-card to-card/80 border-l-4 transition-all duration-200 hover:shadow-lg ${
+                isConnected ? 'border-l-primary' : 'border-l-destructive'
+              }`}>
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
-                      <h3 className="font-semibold">{connection.name}</h3>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        isConnected ? 'bg-primary/20 text-primary' : 'bg-destructive/20 text-destructive'
+                      }`}>
+                        <Phone className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">{connection.name}</h3>
+                        <p className="text-sm text-muted-foreground">{connection.phone_number}</p>
+                      </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        connection.status === 'conectado' 
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
+                      <Badge variant={isConnected ? 'default' : 'destructive'} className="text-xs">
                         {connection.status}
-                      </span>
+                      </Badge>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button 
@@ -710,9 +718,6 @@ const WhatsAppConnections = () => {
                       </AlertDialog>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {connection.phone_number}
-                  </p>
                   <p className="text-xs text-muted-foreground mb-4">
                     Creado: {new Date(connection.created_at).toLocaleDateString()}
                   </p>

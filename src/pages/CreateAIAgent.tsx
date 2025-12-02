@@ -190,21 +190,21 @@ const CreateAIAgent = () => {
           </Button>
         </div>
         <div className="max-w-2xl mx-auto">
-        <Card>
+        <Card className="bg-gradient-to-br from-card to-card/80 border-l-4 border-l-primary">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                  <Bot className="h-6 w-6" />
+                <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <Bot className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Crear Nuevo Agente de IA</CardTitle>
+                  <CardTitle className="text-2xl text-foreground">Crear Nuevo Agente de IA</CardTitle>
                   <p className="text-muted-foreground mt-1">
                     Configura un nuevo asistente de inteligencia artificial
                   </p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleCancel}>
+              <Button variant="ghost" size="icon" onClick={handleCancel}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
