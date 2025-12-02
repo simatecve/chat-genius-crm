@@ -10,6 +10,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
+import { useTelegramConnections } from '@/hooks/useTelegramConnections';
+import { useTwilioConnections } from '@/hooks/useTwilioConnections';
 
 export default function CreateMassCampaign() {
   const navigate = useNavigate();
@@ -18,13 +21,11 @@ export default function CreateMassCampaign() {
   const { user } = useAuth();
   
   const [loading, setLoading] = useState(false);
-  const [connections, setConnections] = useState<any[]>([]);
   const [contactLists, setContactLists] = useState<any[]>([]);
-  const [aiAgents, setAiAgents] = useState<any[]>([]);
   
+  const [channelType, setChannelType] = useState<'whatsapp' | 'telegram' | 'twilio'>('whatsapp');
   const [selectedConnection, setSelectedConnection] = useState('');
   const [selectedContactList, setSelectedContactList] = useState('');
-  const [selectedAiAgent, setSelectedAiAgent] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [message, setMessage] = useState('');
   const [messagesPerRound, setMessagesPerRound] = useState('10');
@@ -32,6 +33,11 @@ export default function CreateMassCampaign() {
   const [waitTimeEnabled, setWaitTimeEnabled] = useState(true);
   const [editWithAi, setEditWithAi] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  
+  // Hooks para las conexiones
+  const { activeConnections: whatsappConnections } = useWhatsAppConnections();
+  const { activeConnections: telegramConnections } = useTelegramConnections();
+  const { activeConnections: twilioConnections } = useTwilioConnections();
 
   useEffect(() => {
     loadData();
@@ -41,15 +47,6 @@ export default function CreateMassCampaign() {
     if (!user) return;
 
     try {
-      // Cargar conexiones de WhatsApp
-      const { data: conns } = await supabase
-        .from('whatsapp_connections')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'connected');
-      
-      setConnections(conns || []);
-
       // Cargar listas de contactos
       const { data: lists } = await supabase
         .from('contact_lists')
@@ -58,21 +55,23 @@ export default function CreateMassCampaign() {
         .order('name');
       
       setContactLists(lists || []);
-
-      // Cargar AI Agents
-      const { data: agents } = await supabase
-        .from('ai_agents')
-        .select('id, name')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('name');
-      
-      setAiAgents(agents || []);
-
     } catch (error) {
       console.error('Error loading data:', error);
     }
   };
+
+  // Obtener las conexiones activas según el canal seleccionado
+  const getCurrentConnections = () => {
+    if (channelType === 'whatsapp') return whatsappConnections;
+    if (channelType === 'telegram') return telegramConnections;
+    if (channelType === 'twilio') return twilioConnections;
+    return [];
+  };
+
+  // Resetear la conexión seleccionada cuando cambia el tipo de canal
+  useEffect(() => {
+    setSelectedConnection('');
+  }, [channelType]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -120,23 +119,34 @@ export default function CreateMassCampaign() {
         }
       }
 
+      // Preparar datos según el canal
+      const campaignData: any = {
+        user_id: user!.id,
+        name: `Campaña ${new Date().toLocaleDateString()}`,
+        message: message,
+        contact_list_id: selectedContactList || null,
+        min_delay: waitTimeEnabled ? parseInt(waitTime) : 0,
+        max_delay: waitTimeEnabled ? parseInt(waitTime) + 10 : 10,
+        edit_with_ai: editWithAi,
+        attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : null,
+        attachment_names: attachmentNames.length > 0 ? attachmentNames : null,
+        status: 'pending',
+        channel_type: channelType,
+      };
+
+      // Asignar la conexión según el tipo de canal
+      if (channelType === 'whatsapp') {
+        campaignData.whatsapp_connection_id = selectedConnection;
+      } else if (channelType === 'telegram') {
+        campaignData.telegram_bot_id = selectedConnection;
+      } else if (channelType === 'twilio') {
+        campaignData.twilio_connection_id = selectedConnection;
+      }
+
       // Crear campaña
       const { data: campaign, error } = await supabase
         .from('mass_campaigns')
-        .insert({
-          user_id: user!.id,
-          name: `Campaña ${new Date().toLocaleDateString()}`,
-          message: message,
-          whatsapp_connection_id: selectedConnection,
-          contact_list_id: selectedContactList || null,
-          min_delay: waitTimeEnabled ? parseInt(waitTime) : 0,
-          max_delay: waitTimeEnabled ? parseInt(waitTime) + 10 : 10,
-          edit_with_ai: editWithAi,
-          attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : null,
-          attachment_names: attachmentNames.length > 0 ? attachmentNames : null,
-          status: 'pending',
-          channel_type: 'whatsapp',
-        })
+        .insert(campaignData)
         .select()
         .single();
 
@@ -176,64 +186,78 @@ export default function CreateMassCampaign() {
           <h1 className="text-2xl font-semibold text-white">Nuevo envío masivo</h1>
         </div>
 
-        {/* Selección de sesión y lista de contactos */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <Select value={selectedConnection} onValueChange={setSelectedConnection}>
+        {/* Selección de canal */}
+        <div className="mb-4">
+          <Label className="text-white mb-2 block">Canal de comunicación</Label>
+          <Select value={channelType} onValueChange={(value: any) => setChannelType(value)}>
             <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
-              <SelectValue placeholder="Buscar sesión de WhatsApp" />
+              <SelectValue placeholder="Seleccionar canal" />
             </SelectTrigger>
             <SelectContent>
-              {connections.map((conn) => (
-                <SelectItem key={conn.id} value={conn.id}>
-                  {conn.name} - {conn.phone_number}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedContactList} onValueChange={setSelectedContactList}>
-            <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
-              <SelectValue placeholder="Buscar lista de contactos" />
-            </SelectTrigger>
-            <SelectContent>
-              {contactLists.map((list) => (
-                <SelectItem key={list.id} value={list.id}>
-                  {list.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+              <SelectItem value="telegram">Telegram</SelectItem>
+              <SelectItem value="twilio">Twilio (SMS/WhatsApp Business)</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* AI Agent y modificar con IA */}
+        {/* Selección de sesión y lista de contactos */}
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-4">
-            <Label className="text-white mb-2 block">Agente de IA (opcional)</Label>
-            <Select value={selectedAiAgent} onValueChange={setSelectedAiAgent}>
-              <SelectTrigger className="bg-[#1f2c34] border-[#3d4d57] text-white">
-                <SelectValue placeholder="Seleccionar agente de IA" />
+          <div>
+            <Label className="text-white mb-2 block">
+              Sesión de {channelType === 'whatsapp' ? 'WhatsApp' : channelType === 'telegram' ? 'Telegram' : 'Twilio'}
+            </Label>
+            <Select value={selectedConnection} onValueChange={setSelectedConnection}>
+              <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
+                <SelectValue placeholder={`Buscar sesión de ${channelType}`} />
               </SelectTrigger>
               <SelectContent>
-                {aiAgents.map((agent) => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.name}
+                {getCurrentConnections().map((conn: any) => (
+                  <SelectItem key={conn.id} value={conn.id}>
+                    {channelType === 'whatsapp' 
+                      ? `${conn.name || conn.phone_number}` 
+                      : channelType === 'telegram'
+                      ? `${conn.bot_name}`
+                      : `${conn.connection_name} - ${conn.phone_number}`
+                    }
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          <div>
+            <Label className="text-white mb-2 block">Lista de contactos</Label>
+            <Select value={selectedContactList} onValueChange={setSelectedContactList}>
+              <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
+                <SelectValue placeholder="Buscar lista de contactos" />
+              </SelectTrigger>
+              <SelectContent>
+                {contactLists.map((list) => (
+                  <SelectItem key={list.id} value={list.id}>
+                    {list.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Personalizar con IA */}
+        <div className="mb-4">
           <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-4">
             <div className="flex items-center justify-between">
-              <Label className="text-white">Personalizar con IA</Label>
+              <div>
+                <Label className="text-white">Personalizar con IA</Label>
+                <p className="text-sm text-gray-400 mt-1">
+                  La IA personalizará cada mensaje para que sea único
+                </p>
+              </div>
               <Switch
                 checked={editWithAi}
                 onCheckedChange={setEditWithAi}
               />
             </div>
-            <p className="text-sm text-gray-400 mt-2">
-              La IA personalizará cada mensaje para que sea único
-            </p>
           </div>
         </div>
 
