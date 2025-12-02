@@ -2,6 +2,9 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 
+// Declarar EdgeRuntime para TypeScript
+declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void };
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -479,12 +482,12 @@ serve(async (req) => {
           })
           .eq('id', existingBuffer.id);
 
-        if (existingBuffer.message_count + 1 >= 4) {
-          console.log('[twilio-webhook] Buffer reached 4 messages, processing...');
+        if (existingBuffer.message_count + 1 >= 2) {
+          console.log('[twilio-webhook] Buffer reached 2 messages, processing...');
           await supabase.functions.invoke('process-ai-buffer', { body: {} });
         }
       } else {
-        await supabase
+        const { data: newBuffer } = await supabase
           .from('ai_response_buffer')
           .insert({
             conversation_id: conversation.id,
@@ -495,7 +498,27 @@ serve(async (req) => {
             twilio_connection_id: connectionId,
             phone_number: phoneNumber,
             processed: false
-          });
+          })
+          .select()
+          .single();
+
+        console.log('[twilio-webhook] New buffer created, scheduling processing in 10 seconds...');
+
+        EdgeRuntime.waitUntil((async () => {
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          
+          const { data: currentBuffer } = await supabase
+            .from('ai_response_buffer')
+            .select('processed')
+            .eq('conversation_id', conversation.id)
+            .eq('processed', false)
+            .maybeSingle();
+          
+          if (currentBuffer) {
+            console.log('[twilio-webhook] 10 seconds passed, processing buffer...');
+            await supabase.functions.invoke('process-ai-buffer', { body: {} });
+          }
+        })());
       }
     }
 
