@@ -186,16 +186,16 @@ export function MassCampaigns() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1f2c34] p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Campañas Masivas</h1>
-            <p className="text-gray-400">Gestiona tus campañas de mensajería</p>
+            <h1 className="text-3xl font-bold text-foreground">Campañas Masivas</h1>
+            <p className="text-muted-foreground mt-1">Gestiona tus campañas de mensajería</p>
           </div>
           <Button 
             onClick={() => navigate('/crear-campana-masiva')}
-            className="bg-[#00a884] hover:bg-[#00a884]/90 text-white"
+            className="bg-gradient-to-r from-primary to-primary/90"
           >
             <Plus className="h-4 w-4 mr-2" />
             Nueva Campaña
@@ -203,23 +203,23 @@ export function MassCampaigns() {
         </div>
 
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Buscar campañas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-[#2a3942] border-[#3d4d57] text-white placeholder:text-gray-400"
+            className="pl-10 bg-card border-border text-foreground placeholder:text-muted-foreground"
           />
         </div>
 
         {filteredCampaigns.length === 0 ? (
-          <Card className="bg-[#2a3942] border-[#3d4d57]">
+          <Card className="bg-gradient-to-br from-card to-card/80 border-border">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <MessageSquare className="h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-white mb-2">
+              <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
                 {searchTerm ? 'No se encontraron campañas' : 'No tienes campañas aún'}
               </h3>
-              <p className="text-gray-400 text-center mb-4">
+              <p className="text-muted-foreground text-center mb-4">
                 {searchTerm 
                   ? 'Intenta con otros términos de búsqueda'
                   : 'Crea tu primera campaña masiva para comenzar'
@@ -228,7 +228,7 @@ export function MassCampaigns() {
               {!searchTerm && (
                 <Button 
                   onClick={() => navigate('/crear-campana-masiva')}
-                  className="bg-[#00a884] hover:bg-[#00a884]/90 text-white"
+                  className="bg-gradient-to-r from-primary to-primary/90"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Crear Primera Campaña
@@ -239,15 +239,15 @@ export function MassCampaigns() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredCampaigns.map((campaign) => (
-              <Card key={campaign.id} className="bg-[#2a3942] border-[#3d4d57] hover:shadow-md transition-shadow">
+              <Card key={campaign.id} className="bg-gradient-to-br from-card to-card/80 border-l-4 border-l-primary hover:shadow-lg transition-shadow rounded-xl">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-lg text-white mb-1">
+                      <CardTitle className="text-lg text-foreground mb-1">
                         {campaign.name}
                       </CardTitle>
                       {campaign.description && (
-                        <CardDescription className="text-sm text-gray-400">
+                        <CardDescription className="text-sm text-muted-foreground">
                           {campaign.description}
                         </CardDescription>
                       )}
@@ -258,25 +258,25 @@ export function MassCampaigns() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4 text-gray-400" />
-                      <span className="text-gray-300">
+                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-foreground">
                         {campaign.whatsapp_connection_name || 'Sin conexión'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <span className="text-gray-300">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-foreground">
                         Delay: {campaign.min_delay}s - {campaign.max_delay}s
                       </span>
                     </div>
                     {campaign.edit_with_ai && (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-[#00a884]">✨ Con IA</span>
+                        <span className="text-xs text-primary">✨ Con IA</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-gray-400" />
-                      <span className="text-gray-300">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-foreground">
                         {progressMap[campaign.id]?.sent || 0}/{campaign.total_count || progressMap[campaign.id]?.queued || 0} enviados
                         {progressMap[campaign.id]?.failed ? ` • ${progressMap[campaign.id]?.failed} fallidos` : ''}
                       </span>
@@ -288,7 +288,7 @@ export function MassCampaigns() {
                       variant="outline"
                       size="sm"
                       onClick={() => navigate(`/crear-campana-masiva/${campaign.id}`)}
-                      className="flex-1 border-[#3d4d57] hover:bg-[#3d4d57] text-white"
+                      className="flex-1 border-border hover:bg-muted"
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Editar
@@ -297,7 +297,7 @@ export function MassCampaigns() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteCampaign(campaign.id)}
-                      className="border-[#3d4d57] hover:bg-red-600 hover:text-white text-gray-300"
+                      className="border-border hover:bg-destructive hover:text-destructive-foreground"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -307,7 +307,7 @@ export function MassCampaigns() {
                     <Button
                       onClick={() => handleSendCampaign(campaign)}
                       disabled={sendingCampaign === campaign.id}
-                      className="w-full bg-[#00a884] hover:bg-[#00a884]/90 text-white"
+                      className="w-full bg-gradient-to-r from-primary to-primary/90"
                     >
                       {sendingCampaign === campaign.id ? (
                         <>

@@ -171,7 +171,7 @@ export default function CreateMassCampaign() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1f2c34] p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -179,18 +179,21 @@ export default function CreateMassCampaign() {
             variant="ghost"
             size="icon"
             onClick={() => navigate('/mass-campaigns')}
-            className="text-white hover:bg-[#2a3942]"
+            className="hover:bg-muted"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-semibold text-white">Nuevo envío masivo</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Nuevo envío masivo</h1>
+            <p className="text-muted-foreground mt-1">Configura tu campaña de mensajería</p>
+          </div>
         </div>
 
         {/* Selección de canal */}
         <div className="mb-4">
-          <Label className="text-white mb-2 block">Canal de comunicación</Label>
+          <Label className="text-foreground mb-2 block">Canal de comunicación</Label>
           <Select value={channelType} onValueChange={(value: any) => setChannelType(value)}>
-            <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
+            <SelectTrigger className="bg-card border-border text-foreground">
               <SelectValue placeholder="Seleccionar canal" />
             </SelectTrigger>
             <SelectContent>
@@ -204,11 +207,11 @@ export default function CreateMassCampaign() {
         {/* Selección de sesión y lista de contactos */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <Label className="text-white mb-2 block">
+            <Label className="text-foreground mb-2 block">
               Sesión de {channelType === 'whatsapp' ? 'WhatsApp' : channelType === 'telegram' ? 'Telegram' : 'Twilio'}
             </Label>
             <Select value={selectedConnection} onValueChange={setSelectedConnection}>
-              <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
+              <SelectTrigger className="bg-card border-border text-foreground">
                 <SelectValue placeholder={`Buscar sesión de ${channelType}`} />
               </SelectTrigger>
               <SelectContent>
@@ -227,9 +230,9 @@ export default function CreateMassCampaign() {
           </div>
 
           <div>
-            <Label className="text-white mb-2 block">Lista de contactos</Label>
+            <Label className="text-foreground mb-2 block">Lista de contactos</Label>
             <Select value={selectedContactList} onValueChange={setSelectedContactList}>
-              <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
+              <SelectTrigger className="bg-card border-border text-foreground">
                 <SelectValue placeholder="Buscar lista de contactos" />
               </SelectTrigger>
               <SelectContent>
@@ -245,11 +248,11 @@ export default function CreateMassCampaign() {
 
         {/* Personalizar con IA */}
         <div className="mb-4">
-          <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-4">
+          <div className="bg-gradient-to-br from-card to-card/80 border border-border rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-white">Personalizar con IA</Label>
-                <p className="text-sm text-gray-400 mt-1">
+                <Label className="text-foreground">Personalizar con IA</Label>
+                <p className="text-sm text-muted-foreground mt-1">
                   La IA personalizará cada mensaje para que sea único
                 </p>
               </div>
@@ -263,13 +266,13 @@ export default function CreateMassCampaign() {
 
         {/* Área de mensaje */}
         <div className="mb-4">
-          <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-3">
+          <div className="bg-gradient-to-br from-card to-card/80 border border-border rounded-xl p-3">
             <div className="flex items-start gap-2 mb-2">
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-transparent">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-transparent">
                 <Smile className="h-5 w-5" />
               </Button>
               <label htmlFor="file-upload">
-                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-transparent" asChild>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-transparent" asChild>
                   <span>
                     <Paperclip className="h-5 w-5" />
                   </span>
@@ -286,17 +289,17 @@ export default function CreateMassCampaign() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Escriba su mensaje"
-                className="flex-1 bg-transparent border-none text-white placeholder:text-gray-400 focus-visible:ring-0 resize-none min-h-[100px]"
+                className="flex-1 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-0 resize-none min-h-[100px]"
               />
             </div>
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {attachments.map((file, index) => (
-                  <div key={index} className="flex items-center gap-2 bg-[#1f2c34] px-3 py-1 rounded-md">
-                    <span className="text-sm text-gray-300">{file.name}</span>
+                  <div key={index} className="flex items-center gap-2 bg-background px-3 py-1 rounded-md">
+                    <span className="text-sm text-foreground">{file.name}</span>
                     <button
                       onClick={() => handleRemoveAttachment(index)}
-                      className="text-gray-400 hover:text-red-500"
+                      className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -309,36 +312,36 @@ export default function CreateMassCampaign() {
 
         {/* Configuración de envío */}
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-4">
+          <div className="bg-gradient-to-br from-card to-card/80 border border-border rounded-xl p-4">
             <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-[#00a884] mt-1" />
+              <Clock className="h-5 w-5 text-primary mt-1" />
               <div className="flex-1">
-                <h3 className="text-white font-medium mb-1">Mensajes por ronda y sesión</h3>
-                <p className="text-sm text-gray-400 mb-3">
+                <h3 className="text-foreground font-medium mb-1">Mensajes por ronda y sesión</h3>
+                <p className="text-sm text-muted-foreground mb-3">
                   Número de mensajes para enviar por cada ronda de envío
                 </p>
                 <Input
                   type="number"
                   value={messagesPerRound}
                   onChange={(e) => setMessagesPerRound(e.target.value)}
-                  className="bg-[#1f2c34] border-[#3d4d57] text-white"
+                  className="bg-background border-border text-foreground"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-4">
+          <div className="bg-gradient-to-br from-card to-card/80 border border-border rounded-xl p-4">
             <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-[#00a884] mt-1" />
+              <Clock className="h-5 w-5 text-primary mt-1" />
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-white font-medium">Tiempo de espera (segundos)</h3>
+                  <h3 className="text-foreground font-medium">Tiempo de espera (segundos)</h3>
                   <Switch
                     checked={waitTimeEnabled}
                     onCheckedChange={setWaitTimeEnabled}
                   />
                 </div>
-                <p className="text-sm text-gray-400 mb-3">
+                <p className="text-sm text-muted-foreground mb-3">
                   Tiempo de espera entre cada mensaje enviado
                 </p>
                 <Input
@@ -346,7 +349,7 @@ export default function CreateMassCampaign() {
                   value={waitTime}
                   onChange={(e) => setWaitTime(e.target.value)}
                   disabled={!waitTimeEnabled}
-                  className="bg-[#1f2c34] border-[#3d4d57] text-white disabled:opacity-50"
+                  className="bg-background border-border text-foreground disabled:opacity-50"
                 />
               </div>
             </div>
@@ -357,7 +360,7 @@ export default function CreateMassCampaign() {
         <Button
           onClick={handleSubmit}
           disabled={loading}
-          className="w-full bg-[#00a884] hover:bg-[#00a884]/90 text-white font-semibold py-6 text-lg"
+          className="w-full bg-gradient-to-r from-primary to-primary/90 font-semibold py-6 text-lg rounded-xl"
         >
           {loading ? 'PROCESANDO...' : 'INICIAR ENVÍO MASIVO'}
         </Button>
