@@ -1,0 +1,263 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Procesar un buffer de mensajes
+async function processBuffer(supabase: any, buffer: any) {
+  try {
+    console.log(`[process-ai-buffer] Processing buffer ${buffer.id} with ${buffer.message_count} messages`);
+    
+    const messages = JSON.parse(buffer.accumulated_messages);
+    const conversationId = buffer.conversation_id;
+    const userId = buffer.user_id;
+    const channelType = buffer.channel_type;
+
+    // Obtener datos de la conversación
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('id', conversationId)
+      .single();
+
+    if (!conversation) {
+      console.error('[process-ai-buffer] Conversation not found');
+      return;
+    }
+
+    // Verificar si el bot está habilitado
+    const { data: botSettings } = await supabase
+      .from('user_bot_settings')
+      .select('bot_enabled')
+      .eq('user_id', userId)
+      .single();
+
+    if (botSettings?.bot_enabled === false) {
+      console.log('[process-ai-buffer] Bot disabled, skipping');
+      await supabase
+        .from('ai_response_buffer')
+        .update({ processed: true })
+        .eq('id', buffer.id);
+      return;
+    }
+
+    // Verificar si el contacto bloqueó el bot
+    const { data: blockedContact } = await supabase
+      .from('contacto_bloqueado_bot')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('numero', conversation.phone_number)
+      .single();
+
+    if (blockedContact) {
+      console.log('[process-ai-buffer] Contact blocked bot, skipping');
+      await supabase
+        .from('ai_response_buffer')
+        .update({ processed: true })
+        .eq('id', buffer.id);
+      return;
+    }
+
+    // Combinar todos los mensajes en uno solo
+    const combinedMessage = messages.join('\n\n');
+
+    // Intentar llamar a un agente específico
+    let aiResponse = null;
+
+    if (channelType === 'telegram') {
+      const { data: aiResult } = await supabase.functions.invoke('ai-agent-response', {
+        body: {
+          conversationId,
+          userId,
+          messageContent: combinedMessage,
+          channelType: 'telegram',
+          telegramBotId: buffer.telegram_bot_id
+        }
+      });
+      aiResponse = aiResult;
+    } else if (channelType === 'twilio') {
+      const { data: aiResult } = await supabase.functions.invoke('twilio-ai-agent-response', {
+        body: {
+          conversationId,
+          userId,
+          messageContent: combinedMessage,
+          phoneNumber: conversation.phone_number,
+          twilioConnectionId: buffer.twilio_connection_id
+        }
+      });
+      aiResponse = aiResult;
+    } else {
+      // WhatsApp
+      const { data: aiResult } = await supabase.functions.invoke('ai-agent-response', {
+        body: {
+          conversationId,
+          userId,
+          messageContent: combinedMessage,
+          sessionName: buffer.session_name
+        }
+      });
+      aiResponse = aiResult;
+    }
+
+    // Si no hay agente específico, intentar con el agente por defecto
+    if (!aiResponse?.processed) {
+      console.log('[process-ai-buffer] No active AI agent, checking default IA...');
+      
+      const { data: defaultSettings } = await supabase
+        .from('ia_default_settings')
+        .select('is_enabled')
+        .eq('id', 1)
+        .single();
+
+      if (defaultSettings?.is_enabled) {
+        console.log('[process-ai-buffer] Invoking default IA agent...');
+        
+        const { data: defaultResult } = await supabase.functions.invoke('ia-default-agent', {
+          body: {
+            userId,
+            messageContent: combinedMessage,
+            contactName: conversation.contact_name || conversation.pushname,
+            phoneNumber: conversation.phone_number,
+            conversationId
+          }
+        });
+
+        if (defaultResult?.respuesta) {
+          // Enviar respuesta según el canal
+          if (channelType === 'telegram') {
+            // Obtener bot info
+            const { data: bot } = await supabase
+              .from('telegram_bots')
+              .select('bot_token')
+              .eq('id', buffer.telegram_bot_id)
+              .single();
+
+            if (bot) {
+              await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: conversation.phone_number,
+                  text: defaultResult.respuesta
+                })
+              });
+            }
+          } else if (channelType === 'twilio') {
+            await supabase.functions.invoke('twilio-send-message', {
+              body: {
+                twilioConnectionId: buffer.twilio_connection_id,
+                toNumber: conversation.phone_number,
+                message: defaultResult.respuesta,
+                userId,
+                conversationId,
+                isBot: true
+              }
+            });
+          } else {
+            // WhatsApp
+            await supabase.functions.invoke('waha-send-message', {
+              body: {
+                sessionName: buffer.session_name,
+                phoneNumber: conversation.phone_number,
+                message: defaultResult.respuesta,
+                userId,
+                conversationId,
+                isBot: true
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // Marcar buffer como procesado
+    await supabase
+      .from('ai_response_buffer')
+      .update({ 
+        processed: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', buffer.id);
+
+    console.log(`[process-ai-buffer] Buffer ${buffer.id} processed successfully`);
+
+  } catch (error) {
+    console.error('[process-ai-buffer] Error processing buffer:', error);
+    // Marcar como procesado para evitar bucles infinitos
+    await supabase
+      .from('ai_response_buffer')
+      .update({ 
+        processed: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', buffer.id);
+  }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
+    console.log('[process-ai-buffer] Checking for pending buffers...');
+
+    // Buscar buffers pendientes que cumplan las condiciones:
+    // - 4 o más mensajes acumulados
+    // - O primer mensaje con más de 20 segundos
+    const twentySecondsAgo = new Date(Date.now() - 20000).toISOString();
+
+    const { data: pendingBuffers, error } = await supabase
+      .from('ai_response_buffer')
+      .select('*')
+      .eq('processed', false)
+      .or(`message_count.gte.4,first_message_at.lt.${twentySecondsAgo}`)
+      .limit(10); // Procesar máximo 10 buffers por ejecución
+
+    if (error) {
+      console.error('[process-ai-buffer] Error fetching buffers:', error);
+      return new Response(
+        JSON.stringify({ error: 'Error fetching buffers' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[process-ai-buffer] Found ${pendingBuffers?.length || 0} buffers to process`);
+
+    if (pendingBuffers && pendingBuffers.length > 0) {
+      // Procesar cada buffer
+      for (const buffer of pendingBuffers) {
+        await processBuffer(supabase, buffer);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        processed: pendingBuffers?.length || 0
+      }),
+      { 
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+
+  } catch (error) {
+    console.error('[process-ai-buffer] Error:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+});

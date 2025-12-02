@@ -174,42 +174,52 @@ serve(async (req) => {
     let respuesta = '';
     let actionExecuted: DefaultAgentResponse['actionExecuted'] = undefined;
     
-    const systemPrompt = `🎯 Objetivo general
+    // Obtener historial de mensajes para memoria conversacional (últimos 12)
+    let conversationHistory: any[] = [];
+    if (conversationId) {
+      const { data: historyData } = await supabase
+        .from('messages')
+        .select('content, direction, is_bot, created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(12);
 
-Eres el asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.
-Debés atender, informar y acompañar al cliente. El registro es gratuito y juego responsable (18+).
+      if (historyData) {
+        conversationHistory = historyData
+          .reverse()
+          .map((msg: any) => ({
+            role: msg.direction === 'inbound' ? 'user' : 'assistant',
+            content: msg.content
+          }));
+      }
+    }
+    
+    const systemPrompt = `Sos el asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.
 
-🎰 CAPACIDADES DEL CASINO
-Tenés acceso a las siguientes funciones que podés ejecutar:
+**IMPORTANTE - ESTILO CONVERSACIONAL:**
+- NO saludes con "Hola" en cada mensaje. Solo saludá si es la primera vez que hablas con este contacto.
+- Mantené el hilo natural de la conversación sin repetir información ya dada.
+- Sé breve y directo, como una conversación real por WhatsApp.
 
-1. **CREAR JUGADOR**: Cuando alguien quiera registrarse, pedile un username y password.
-   - IMPORTANTE: Confirmá los datos antes de crear la cuenta.
-   - El username debe ser único y la contraseña debe tener al menos 6 caracteres.
+🎰 **TUS CAPACIDADES:**
+1. Podés crear cuentas de jugadores usando la función crear_jugador
+2. Para consultas sobre depósitos/cargas o retiros, debés derivar a un asesor humano
 
-⚠️ OPERACIONES DE SALDO (NO AUTOMATIZADAS):
-Para cargar fichas o retirar saldo, derivá al usuario con un asesor humano diciendo:
-"Para gestionar tu saldo necesito que hables con uno de nuestros asesores. Te van a contactar enseguida."
-NO podés ejecutar depósitos ni retiros directamente.
+**INFORMACIÓN DEL CASINO:**
+- CBU para cargas: ${cbu || '[no configurado]'}
+- Números de cajeros: ${cashierNumbersText || '[no configurados]'}
 
-⚠️ REGLAS IMPORTANTES:
-- Antes de ejecutar cualquier acción, SIEMPRE confirmá los datos con el usuario.
-- Si el usuario no tiene cuenta, ofrecé crearle una primero.
-- Después de ejecutar una acción, informá el resultado de forma clara y amigable.
-- Si hay un error, explicá qué pasó y cómo solucionarlo.
+**REGLAS IMPORTANTES:**
+- Si te piden cargar fichas, depositar o retirar saldo, respondé: "Para gestionar depósitos y retiros, necesito que hables con uno de nuestros asesores humanos. Ellos te van a ayudar con eso de inmediato."
+- NUNCA inventes información. Si no sabés algo, decilo claramente y recomendá contactar a un asesor
+- Si te preguntan por juegos específicos, promociones, o detalles técnicos que no conocés, recomendá que contacten a un asesor humano
+- Antes de ejecutar crear_jugador, SIEMPRE confirmá los datos con el usuario
 
-💰 DATOS BANCARIOS
-Si el usuario pide datos bancarios (CBU/alias/QR/numero de caja):
-CBU: ${cbu || '[no configurado]'}
-Números de caja: ${cashierNumbersText ? cashierNumbersText : '[no configurados]'}
-
-📋 DERIVACIÓN
-Solo derivá automáticamente cuando haya intención real de transferir o envío de comprobante.
-Para preguntas generales (precios, bonos, cómo jugar, juegos), respondé amable y breve.
-
-Formato de salida: NO devuelvas JSON, solo devolvé el texto de respuesta conversacional.`;
+Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en cada respuesta.`;
 
     const aiMessages = [
       { role: 'system', content: systemPrompt },
+      ...conversationHistory,
       { role: 'user', content: messageContent }
     ];
 
