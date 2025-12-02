@@ -142,7 +142,15 @@ serve(async (req) => {
       );
     }
 
-    console.log('Processing message:', { userId, contactName, phoneNumber, conversationId, hasImages: !!(imageUrls?.length) });
+    console.log('Processing message:', { 
+      userId, 
+      contactName, 
+      phoneNumber, 
+      conversationId, 
+      hasImages: !!(imageUrls?.length),
+      imageUrlsCount: imageUrls?.length || 0,
+      imageUrls: imageUrls || []
+    });
 
     // Obtener configuración global de IA
     const { data: settings, error: settingsError } = await supabase
