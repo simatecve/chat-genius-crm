@@ -9,6 +9,35 @@ const corsHeaders = {
 // Función de delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper para obtener MIME type de nombre de archivo
+function getMimeTypeFromFileName(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    // Audio
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'webm': 'audio/webm',
+    'm4a': 'audio/mp4',
+    'aac': 'audio/aac',
+    // Imágenes
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    // Videos
+    'mp4': 'video/mp4',
+    'avi': 'video/avi',
+    'mov': 'video/quicktime',
+    // Documentos
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+  return mimeTypes[ext || ''] || 'application/octet-stream';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -40,6 +69,9 @@ serve(async (req) => {
       throw new Error('Campaign not found');
     }
 
+    const channelType = campaign.channel_type || 'whatsapp';
+    console.log(`Starting campaign ${campaign_id} on channel: ${channelType}`);
+
     // Obtener el agente de IA si edit_with_ai está activo
     let aiAgent = null;
     if (campaign.edit_with_ai) {
@@ -52,21 +84,66 @@ serve(async (req) => {
       aiAgent = agent;
     }
 
-    // Obtener sesión de WhatsApp activa
-    const { data: activeConnection } = await supabase
-      .from('whatsapp_connections')
-      .select('name, phone_number, status')
-      .eq('user_id', campaign.user_id)
-      .eq('status', 'WORKING')
-      .limit(1)
-      .maybeSingle();
+    // Obtener conexión según el canal
+    let connectionData: any = null;
+    let sessionName = '';
+    let connectionNumber = '';
 
-    if (!activeConnection) {
-      throw new Error('No active WhatsApp connection found');
+    if (channelType === 'whatsapp') {
+      // Obtener conexión de WhatsApp
+      const { data: waConn } = await supabase
+        .from('whatsapp_connections')
+        .select('*')
+        .eq('id', campaign.whatsapp_connection_id)
+        .single();
+      
+      if (!waConn) {
+        // Fallback: buscar cualquier conexión activa
+        const { data: activeConn } = await supabase
+          .from('whatsapp_connections')
+          .select('*')
+          .eq('user_id', campaign.user_id)
+          .or('status.eq.WORKING,status.eq.connected')
+          .limit(1)
+          .maybeSingle();
+        connectionData = activeConn;
+      } else {
+        connectionData = waConn;
+      }
+      
+      if (!connectionData) {
+        throw new Error('No active WhatsApp connection found');
+      }
+      sessionName = connectionData.name || connectionData.phone_number || 'default';
+      connectionNumber = connectionData.phone_number;
+
+    } else if (channelType === 'telegram') {
+      // Obtener bot de Telegram
+      const { data: tgBot } = await supabase
+        .from('telegram_bots')
+        .select('*')
+        .eq('id', campaign.telegram_bot_id)
+        .single();
+      
+      if (!tgBot) {
+        throw new Error('Telegram bot not found');
+      }
+      connectionData = tgBot;
+
+    } else if (channelType === 'twilio') {
+      // Obtener conexión de Twilio
+      const { data: twConn } = await supabase
+        .from('twilio_connections')
+        .select('*')
+        .eq('id', campaign.twilio_connection_id)
+        .single();
+      
+      if (!twConn) {
+        throw new Error('Twilio connection not found');
+      }
+      connectionData = twConn;
+      connectionNumber = twConn.phone_number;
     }
-
-    const sessionName = campaign.whatsapp_connection_name || activeConnection.name || activeConnection.phone_number || 'default';
-    const whatsappNumber = activeConnection.phone_number;
 
     // Obtener contactos de la lista
     const { data: listMembers, error: membersError } = await supabase
@@ -92,7 +169,7 @@ serve(async (req) => {
       })
       .eq('id', campaign_id);
 
-    console.log(`Starting campaign ${campaign_id} with ${contacts.length} contacts`);
+    console.log(`Campaign ${campaign_id} with ${contacts.length} contacts, ${campaign.attachment_urls?.length || 0} attachments`);
 
     const minDelayMs = (campaign.min_delay || 3) * 1000;
     const maxDelayMs = (campaign.max_delay || 8) * 1000;
@@ -104,10 +181,10 @@ serve(async (req) => {
       const contact = contacts[i];
       
       try {
-        let messageToSend = campaign.message;
+        let messageToSend = campaign.message || '';
 
         // Personalizar mensaje con IA si está habilitado
-        if (campaign.edit_with_ai && lovableApiKey) {
+        if (campaign.edit_with_ai && lovableApiKey && messageToSend) {
           try {
             console.log(`Personalizing message for ${contact.name} with AI...`);
             const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -146,118 +223,287 @@ serve(async (req) => {
           }
         }
 
-        // Reemplazar placeholders básicos (soportar ambos formatos: {nombre} y [nombre])
-        messageToSend = messageToSend
-          .replace(/\{nombre\}/gi, contact.name || '')
-          .replace(/\[nombre\]/gi, contact.name || '')
-          .replace(/\{telefono\}/gi, contact.phone_number || '')
-          .replace(/\[telefono\]/gi, contact.phone_number || '');
+        // Reemplazar placeholders básicos
+        if (messageToSend) {
+          messageToSend = messageToSend
+            .replace(/\{nombre\}/gi, contact.name || '')
+            .replace(/\[nombre\]/gi, contact.name || '')
+            .replace(/\{telefono\}/gi, contact.phone_number || '')
+            .replace(/\[telefono\]/gi, contact.phone_number || '');
+        }
 
-        // Formatear número para WAHA
+        // Formatear número
         const cleanNumber = contact.phone_number.replace(/\D/g, '');
-        const chatId = `${cleanNumber}@c.us`;
+        
+        console.log(`Sending message ${i + 1}/${contacts.length} to ${cleanNumber} via ${channelType}`);
 
-        console.log(`Sending message ${i + 1}/${contacts.length} to ${chatId}`);
+        let sendSuccess = false;
+        let conversationId: string | null = null;
 
-        // Enviar via WAHA
-        const wahaResponse = await fetch(`${wahaBaseUrl}/api/sendText`, {
-          method: 'POST',
-          headers: {
-            'X-Api-Key': wahaApiKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chatId: chatId,
-            text: messageToSend,
-            session: sessionName,
-            linkPreview: true,
-          }),
-        });
+        // Buscar o crear conversación
+        const { data: existingConv } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('phone_number', cleanNumber)
+          .eq('user_id', campaign.user_id)
+          .maybeSingle();
 
-        const wahaResult = await wahaResponse.json();
-
-        if (wahaResponse.ok) {
-          console.log(`✅ Message sent to ${contact.name}`);
-
-          // Buscar o crear conversación
-          let conversationId: string | null = null;
+        if (existingConv) {
+          conversationId = existingConv.id;
+        } else {
+          // Crear nueva conversación
+          const newConvData: any = {
+            phone_number: cleanNumber,
+            contact_name: contact.name || cleanNumber,
+            user_id: campaign.user_id,
+            last_message: messageToSend || '📎 Archivo',
+            last_message_time: new Date().toISOString(),
+            channel_type: channelType,
+          };
           
-          const { data: existingConv } = await supabase
+          if (channelType === 'whatsapp') {
+            newConvData.whatsapp_number = connectionNumber;
+          } else if (channelType === 'telegram') {
+            newConvData.telegram_bot_id = campaign.telegram_bot_id;
+          } else if (channelType === 'twilio') {
+            newConvData.twilio_connection_id = campaign.twilio_connection_id;
+          }
+          
+          const { data: newConv } = await supabase
             .from('conversations')
-            .select('id, whatsapp_number, contact_name')
-            .eq('phone_number', cleanNumber)
-            .eq('user_id', campaign.user_id)
-            .maybeSingle();
+            .insert(newConvData)
+            .select('id')
+            .single();
+          
+          if (newConv) {
+            conversationId = newConv.id;
+          }
+        }
 
-          if (existingConv) {
-            conversationId = existingConv.id;
-            
-            // Actualizar conversación existente con campos faltantes
-            const updateFields: Record<string, any> = {
-              last_message: messageToSend,
-              last_message_time: new Date().toISOString(),
-            };
-            
-            // Si whatsapp_number está vacío, actualizarlo
-            if (!existingConv.whatsapp_number) {
-              updateFields.whatsapp_number = whatsappNumber;
-            }
-            
-            // Si contact_name está vacío, actualizarlo
-            if (!existingConv.contact_name) {
-              updateFields.contact_name = contact.name || cleanNumber;
-            }
-            
-            await supabase
-              .from('conversations')
-              .update(updateFields)
-              .eq('id', conversationId);
+        // ========== ENVÍO SEGÚN CANAL ==========
+        
+        if (channelType === 'whatsapp') {
+          // WHATSAPP - WAHA
+          const chatId = `${cleanNumber}@c.us`;
+          
+          // Si hay archivos adjuntos, enviarlos primero
+          if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
+            for (let j = 0; j < campaign.attachment_urls.length; j++) {
+              const fileUrl = campaign.attachment_urls[j];
+              const fileName = campaign.attachment_names?.[j] || 'archivo';
+              const mimeType = campaign.attachment_mime_types?.[j] || getMimeTypeFromFileName(fileName);
+              const caption = j === 0 ? messageToSend : ''; // Solo el primer archivo lleva caption
               
-          } else {
-            // Crear nueva conversación
-            const { data: newConv } = await supabase
-              .from('conversations')
-              .insert({
-                phone_number: cleanNumber,
-                contact_name: contact.name || cleanNumber,
-                user_id: campaign.user_id,
-                whatsapp_number: whatsappNumber,
-                last_message: messageToSend,
-                last_message_time: new Date().toISOString(),
-              })
-              .select('id')
-              .single();
-            
-            if (newConv) {
-              conversationId = newConv.id;
+              console.log(`Sending file ${j + 1}/${campaign.attachment_urls.length}: ${fileName} (${mimeType})`);
+              
+              const { data: fileResult, error: fileError } = await supabase.functions.invoke('waha-send-file', {
+                body: {
+                  sessionName,
+                  phoneNumber: cleanNumber,
+                  fileUrl,
+                  fileName,
+                  mimeType,
+                  message: caption,
+                  userId: campaign.user_id,
+                  conversationId,
+                }
+              });
+              
+              if (fileError) {
+                console.error(`Error sending file ${fileName}:`, fileError);
+              } else {
+                console.log(`File sent: ${fileName}`);
+                sendSuccess = true;
+              }
+              
+              // Pequeño delay entre archivos
+              if (j < campaign.attachment_urls.length - 1) {
+                await delay(500);
+              }
             }
           }
+          
+          // Si hay mensaje de texto y no se envió con caption, enviarlo separado
+          if (messageToSend && (!campaign.attachment_urls || campaign.attachment_urls.length === 0)) {
+            const wahaResponse = await fetch(`${wahaBaseUrl}/api/sendText`, {
+              method: 'POST',
+              headers: {
+                'X-Api-Key': wahaApiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                chatId: chatId,
+                text: messageToSend,
+                session: sessionName,
+                linkPreview: true,
+              }),
+            });
 
-          // Guardar mensaje en la tabla messages
-          if (conversationId) {
-            await supabase.from('messages').insert({
-              conversation_id: conversationId,
-              user_id: campaign.user_id,
-              content: messageToSend,
-              direction: 'outbound',
-              status: 'sent',
-              message_type: 'text',
-              is_bot: false,
-              metadata: {
-                waha_id: wahaResult.id,
-                campaign_id: campaign_id,
-                sent_via: 'mass_campaign'
+            const wahaResult = await wahaResponse.json();
+
+            if (wahaResponse.ok) {
+              sendSuccess = true;
+              
+              // Guardar mensaje
+              if (conversationId) {
+                await supabase.from('messages').insert({
+                  conversation_id: conversationId,
+                  user_id: campaign.user_id,
+                  content: messageToSend,
+                  direction: 'outbound',
+                  status: 'sent',
+                  message_type: 'text',
+                  is_bot: false,
+                  metadata: {
+                    waha_id: wahaResult.id,
+                    campaign_id: campaign_id,
+                    sent_via: 'mass_campaign'
+                  }
+                });
+              }
+            }
+          } else if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
+            // Los archivos ya se guardaron en waha-send-file
+            sendSuccess = true;
+          }
+
+        } else if (channelType === 'telegram') {
+          // TELEGRAM
+          // Para Telegram necesitamos el chat_id del contacto
+          // Buscar conversación existente para obtener el telegram chat_id
+          const { data: tgConv } = await supabase
+            .from('conversations')
+            .select('phone_number')
+            .eq('user_id', campaign.user_id)
+            .eq('telegram_bot_id', campaign.telegram_bot_id)
+            .ilike('phone_number', `%${cleanNumber.slice(-8)}%`)
+            .maybeSingle();
+          
+          const telegramChatId = tgConv?.phone_number || cleanNumber;
+          
+          // Enviar archivos si hay
+          if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
+            for (let j = 0; j < campaign.attachment_urls.length; j++) {
+              const fileUrl = campaign.attachment_urls[j];
+              const fileName = campaign.attachment_names?.[j] || 'archivo';
+              const mimeType = campaign.attachment_mime_types?.[j] || getMimeTypeFromFileName(fileName);
+              const caption = j === 0 ? messageToSend : '';
+              
+              const { error: fileError } = await supabase.functions.invoke('telegram-send-file', {
+                body: {
+                  chatId: telegramChatId,
+                  fileUrl,
+                  caption,
+                  mimeType,
+                  userId: campaign.user_id,
+                  conversationId,
+                  telegramBotId: campaign.telegram_bot_id,
+                }
+              });
+              
+              if (!fileError) {
+                sendSuccess = true;
+              }
+              
+              if (j < campaign.attachment_urls.length - 1) {
+                await delay(500);
+              }
+            }
+          }
+          
+          // Enviar texto si no hay archivos o si los archivos no llevaron caption
+          if (messageToSend && (!campaign.attachment_urls || campaign.attachment_urls.length === 0)) {
+            const { error: msgError } = await supabase.functions.invoke('telegram-send-message', {
+              body: {
+                chatId: telegramChatId,
+                message: messageToSend,
+                userId: campaign.user_id,
+                conversationId,
+                telegramBotId: campaign.telegram_bot_id,
               }
             });
+            
+            if (!msgError) {
+              sendSuccess = true;
+            }
+          } else if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
+            sendSuccess = true;
           }
 
-          // Registrar en campaign_sends
+        } else if (channelType === 'twilio') {
+          // TWILIO
+          // Enviar archivos si hay
+          if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
+            for (let j = 0; j < campaign.attachment_urls.length; j++) {
+              const fileUrl = campaign.attachment_urls[j];
+              const fileName = campaign.attachment_names?.[j] || 'archivo';
+              const mimeType = campaign.attachment_mime_types?.[j] || getMimeTypeFromFileName(fileName);
+              const msgBody = j === 0 ? messageToSend : '';
+              
+              const { error: fileError } = await supabase.functions.invoke('twilio-send-file', {
+                body: {
+                  twilioConnectionId: campaign.twilio_connection_id,
+                  phoneNumber: cleanNumber,
+                  fileUrl,
+                  fileName,
+                  mimeType,
+                  message: msgBody,
+                  userId: campaign.user_id,
+                  conversationId,
+                }
+              });
+              
+              if (!fileError) {
+                sendSuccess = true;
+              }
+              
+              if (j < campaign.attachment_urls.length - 1) {
+                await delay(500);
+              }
+            }
+          }
+          
+          // Enviar texto si no hay archivos
+          if (messageToSend && (!campaign.attachment_urls || campaign.attachment_urls.length === 0)) {
+            const { error: msgError } = await supabase.functions.invoke('twilio-send-message', {
+              body: {
+                twilioConnectionId: campaign.twilio_connection_id,
+                phoneNumber: cleanNumber,
+                message: messageToSend,
+                userId: campaign.user_id,
+                conversationId,
+              }
+            });
+            
+            if (!msgError) {
+              sendSuccess = true;
+            }
+          } else if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
+            sendSuccess = true;
+          }
+        }
+
+        // Actualizar conversación
+        if (conversationId) {
+          await supabase
+            .from('conversations')
+            .update({
+              last_message: messageToSend || '📎 Archivo',
+              last_message_time: new Date().toISOString(),
+            })
+            .eq('id', conversationId);
+        }
+
+        // Registrar resultado
+        if (sendSuccess) {
+          console.log(`✅ Message sent to ${contact.name}`);
+          
           await supabase.from('campaign_sends').insert({
             campaign_id: campaign_id,
             contact_id: contact.id,
             phone_number: contact.phone_number,
             contact_name: contact.name,
-            message_sent: messageToSend,
+            message_sent: messageToSend || '📎 Archivo adjunto',
             was_personalized: campaign.edit_with_ai,
             status: 'sent',
             sent_at: new Date().toISOString(),
@@ -266,24 +512,23 @@ serve(async (req) => {
 
           sentCount++;
           
-          // Actualizar progreso de la campaña
           await supabase
             .from('mass_campaigns')
             .update({ sent_count: sentCount })
             .eq('id', campaign_id);
 
         } else {
-          console.error(`❌ Failed to send to ${contact.name}:`, wahaResult);
+          console.error(`❌ Failed to send to ${contact.name}`);
           
           await supabase.from('campaign_sends').insert({
             campaign_id: campaign_id,
             contact_id: contact.id,
             phone_number: contact.phone_number,
             contact_name: contact.name,
-            message_sent: messageToSend,
+            message_sent: messageToSend || '📎 Archivo adjunto',
             was_personalized: campaign.edit_with_ai,
             status: 'failed',
-            error_message: JSON.stringify(wahaResult),
+            error_message: 'Send failed',
             user_id: campaign.user_id,
           });
           

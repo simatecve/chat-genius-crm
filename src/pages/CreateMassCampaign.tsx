@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Paperclip, Smile, Clock, Plus, Upload, X } from 'lucide-react';
+import { ArrowLeft, Paperclip, Smile, Clock, Plus, Upload, X, Mic, FileAudio, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
 import { useTelegramConnections } from '@/hooks/useTelegramConnections';
 import { useTwilioConnections } from '@/hooks/useTwilioConnections';
+
+interface AttachmentFile {
+  file: File;
+  mimeType: string;
+  isAudio: boolean;
+  previewUrl?: string;
+}
 
 export default function CreateMassCampaign() {
   const navigate = useNavigate();
@@ -32,7 +39,8 @@ export default function CreateMassCampaign() {
   const [waitTime, setWaitTime] = useState('30');
   const [waitTimeEnabled, setWaitTimeEnabled] = useState(true);
   const [editWithAi, setEditWithAi] = useState(false);
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   
   // Hooks para las conexiones
   const { activeConnections: whatsappConnections } = useWhatsAppConnections();
@@ -42,6 +50,17 @@ export default function CreateMassCampaign() {
   useEffect(() => {
     loadData();
   }, [user]);
+
+  // Cleanup preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      attachments.forEach(att => {
+        if (att.previewUrl) {
+          URL.revokeObjectURL(att.previewUrl);
+        }
+      });
+    };
+  }, [attachments]);
 
   const loadData = async () => {
     if (!user) return;
@@ -73,21 +92,72 @@ export default function CreateMassCampaign() {
     setSelectedConnection('');
   }, [channelType]);
 
+  const isAudioFile = (mimeType: string) => {
+    return mimeType.startsWith('audio/');
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setAttachments(Array.from(e.target.files));
+      const newFiles: AttachmentFile[] = Array.from(e.target.files).map(file => ({
+        file,
+        mimeType: file.type || 'application/octet-stream',
+        isAudio: isAudioFile(file.type),
+        previewUrl: isAudioFile(file.type) ? URL.createObjectURL(file) : undefined,
+      }));
+      setAttachments(prev => [...prev, ...newFiles]);
     }
+    // Reset input
+    e.target.value = '';
+  };
+
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles: AttachmentFile[] = Array.from(e.target.files).map(file => ({
+        file,
+        mimeType: file.type || 'audio/mpeg',
+        isAudio: true,
+        previewUrl: URL.createObjectURL(file),
+      }));
+      setAttachments(prev => [...prev, ...newFiles]);
+    }
+    // Reset input
+    e.target.value = '';
   };
 
   const handleRemoveAttachment = (index: number) => {
-    setAttachments(attachments.filter((_, i) => i !== index));
+    setAttachments(prev => {
+      const att = prev[index];
+      if (att.previewUrl) {
+        URL.revokeObjectURL(att.previewUrl);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const toggleAudioPlay = (previewUrl: string) => {
+    const audio = document.getElementById(`audio-${previewUrl}`) as HTMLAudioElement;
+    if (audio) {
+      if (playingAudio === previewUrl) {
+        audio.pause();
+        setPlayingAudio(null);
+      } else {
+        // Pause any currently playing audio
+        if (playingAudio) {
+          const currentAudio = document.getElementById(`audio-${playingAudio}`) as HTMLAudioElement;
+          if (currentAudio) currentAudio.pause();
+        }
+        audio.play();
+        setPlayingAudio(previewUrl);
+      }
+    }
   };
 
   const handleSubmit = async () => {
-    if (!selectedConnection || !message) {
+    // Validar que haya mensaje O audio/archivos
+    if (!selectedConnection || (!message && attachments.length === 0)) {
       toast({
         title: "Error",
-        description: "Por favor selecciona una sesión y escribe un mensaje",
+        description: "Por favor selecciona una sesión y escribe un mensaje o adjunta un archivo",
         variant: "destructive",
       });
       return;
@@ -98,24 +168,27 @@ export default function CreateMassCampaign() {
       // Upload attachments if any
       let attachmentUrls: string[] = [];
       let attachmentNames: string[] = [];
+      let attachmentMimeTypes: string[] = [];
       
       if (attachments.length > 0) {
-        for (const file of attachments) {
+        for (const attachment of attachments) {
+          const file = attachment.file;
           const fileExt = file.name.split('.').pop();
           const fileName = `${user!.id}/${Date.now()}-${Math.random()}.${fileExt}`;
           
           const { error: uploadError } = await supabase.storage
-            .from('campaign-attachments')
+            .from('chat-attachments')
             .upload(fileName, file);
 
           if (uploadError) throw uploadError;
 
           const { data: { publicUrl } } = supabase.storage
-            .from('campaign-attachments')
+            .from('chat-attachments')
             .getPublicUrl(fileName);
 
           attachmentUrls.push(publicUrl);
           attachmentNames.push(file.name);
+          attachmentMimeTypes.push(attachment.mimeType);
         }
       }
 
@@ -123,13 +196,14 @@ export default function CreateMassCampaign() {
       const campaignData: any = {
         user_id: user!.id,
         name: `Campaña ${new Date().toLocaleDateString()}`,
-        message: message,
+        message: message || '📎 Archivo adjunto',
         contact_list_id: selectedContactList || null,
         min_delay: waitTimeEnabled ? parseInt(waitTime) : 0,
         max_delay: waitTimeEnabled ? parseInt(waitTime) + 10 : 10,
         edit_with_ai: editWithAi,
         attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : null,
         attachment_names: attachmentNames.length > 0 ? attachmentNames : null,
+        attachment_mime_types: attachmentMimeTypes.length > 0 ? attachmentMimeTypes : null,
         status: 'pending',
         channel_type: channelType,
       };
@@ -169,6 +243,9 @@ export default function CreateMassCampaign() {
       setLoading(false);
     }
   };
+
+  const audioAttachments = attachments.filter(a => a.isAudio);
+  const otherAttachments = attachments.filter(a => !a.isAudio);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -299,6 +376,8 @@ export default function CreateMassCampaign() {
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-transparent">
                 <Smile className="h-5 w-5" />
               </Button>
+              
+              {/* Botón para archivos generales */}
               <label htmlFor="file-upload">
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-transparent" asChild>
                   <span>
@@ -310,23 +389,91 @@ export default function CreateMassCampaign() {
                 id="file-upload"
                 type="file"
                 multiple
+                accept="image/*,video/*,application/pdf,.doc,.docx"
                 onChange={handleFileUpload}
                 className="hidden"
               />
+              
+              {/* Botón específico para audio */}
+              <label htmlFor="audio-upload">
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-transparent" asChild>
+                  <span>
+                    <Mic className="h-5 w-5" />
+                  </span>
+                </Button>
+              </label>
+              <input
+                id="audio-upload"
+                type="file"
+                accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.webm"
+                onChange={handleAudioUpload}
+                className="hidden"
+              />
+              
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Hola [nombre], ¿cómo estás? Te escribimos para..."
+                placeholder="Hola [nombre], ¿cómo estás? Te escribimos para... (opcional si adjuntas audio)"
                 className="flex-1 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-0 resize-none min-h-[100px]"
               />
             </div>
-            {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {attachments.map((file, index) => (
-                  <div key={index} className="flex items-center gap-2 bg-background px-3 py-1 rounded-md">
-                    <span className="text-sm text-foreground">{file.name}</span>
+            
+            {/* Audio attachments preview */}
+            {audioAttachments.length > 0 && (
+              <div className="space-y-2 mt-3 border-t border-border pt-3">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <FileAudio className="h-3 w-3" /> Audios adjuntos
+                </Label>
+                {audioAttachments.map((att, index) => (
+                  <div key={`audio-${index}`} className="flex items-center gap-3 bg-background/50 px-3 py-2 rounded-lg">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-primary"
+                      onClick={() => att.previewUrl && toggleAudioPlay(att.previewUrl)}
+                    >
+                      {playingAudio === att.previewUrl ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <div className="flex-1">
+                      <span className="text-sm text-foreground">{att.file.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({(att.file.size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                    {att.previewUrl && (
+                      <audio
+                        id={`audio-${att.previewUrl}`}
+                        src={att.previewUrl}
+                        onEnded={() => setPlayingAudio(null)}
+                        className="hidden"
+                      />
+                    )}
                     <button
-                      onClick={() => handleRemoveAttachment(index)}
+                      type="button"
+                      onClick={() => handleRemoveAttachment(attachments.indexOf(att))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Other attachments */}
+            {otherAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {otherAttachments.map((att, index) => (
+                  <div key={`file-${index}`} className="flex items-center gap-2 bg-background px-3 py-1 rounded-md">
+                    <span className="text-sm text-foreground">{att.file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(attachments.indexOf(att))}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
@@ -336,6 +483,9 @@ export default function CreateMassCampaign() {
               </div>
             )}
           </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Puedes enviar solo texto, solo audio, o ambos. Los archivos adjuntos se enviarán junto con el mensaje.
+          </p>
         </div>
 
         {/* Configuración de envío */}
