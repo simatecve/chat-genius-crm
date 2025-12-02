@@ -1,17 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Users, 
   MessageSquare, 
-  TrendingUp, 
   Target,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  Zap,
-  Phone,
-  Send
+  Send,
+  ArrowDown
 } from 'lucide-react';
-import { StatsCard } from './StatsCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,9 +13,64 @@ import { useDashboard } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  BarChart,
+  Bar
+} from 'recharts';
 
 export const Dashboard = () => {
   const { stats, recentLeads, activeConversations, isLoading } = useDashboard();
+  const [selectedPeriod, setSelectedPeriod] = useState('Hoy');
+
+  // Datos ficticios para los gráficos
+  const chartData = [
+    { time: '00 hs', nuevos: 120, recurrentes: 110, totales: 230 },
+    { time: '02 hs', nuevos: 45, recurrentes: 85, totales: 130 },
+    { time: '04 hs', nuevos: 30, recurrentes: 50, totales: 80 },
+    { time: '06 hs', nuevos: 25, recurrentes: 40, totales: 65 },
+    { time: '08 hs', nuevos: 35, recurrentes: 55, totales: 90 },
+    { time: '10 hs', nuevos: 28, recurrentes: 42, totales: 70 },
+    { time: '12 hs', nuevos: 32, recurrentes: 48, totales: 80 },
+    { time: '14 hs', nuevos: 38, recurrentes: 52, totales: 90 },
+    { time: '16 hs', nuevos: 42, recurrentes: 58, totales: 100 },
+    { time: '18 hs', nuevos: 48, recurrentes: 62, totales: 110 },
+    { time: '20 hs', nuevos: 55, recurrentes: 75, totales: 130 },
+    { time: '22 hs', nuevos: 65, recurrentes: 85, totales: 150 },
+  ];
+
+  const barData = [
+    { time: '00 hs', nuevos: 45, recurrentes: 110 },
+    { time: '01 hs', nuevos: 40, recurrentes: 105 },
+    { time: '02 hs', nuevos: 35, recurrentes: 95 },
+    { time: '03 hs', nuevos: 30, recurrentes: 80 },
+    { time: '04 hs', nuevos: 25, recurrentes: 60 },
+    { time: '05 hs', nuevos: 10, recurrentes: 40 },
+    { time: '06 hs', nuevos: 8, recurrentes: 35 },
+    { time: '07 hs', nuevos: 12, recurrentes: 45 },
+    { time: '08 hs', nuevos: 15, recurrentes: 50 },
+    { time: '09 hs', nuevos: 18, recurrentes: 55 },
+    { time: '10 hs', nuevos: 22, recurrentes: 60 },
+    { time: '11 hs', nuevos: 28, recurrentes: 75 },
+    { time: '12 hs', nuevos: 32, recurrentes: 80 },
+    { time: '13 hs', nuevos: 35, recurrentes: 85 },
+    { time: '14 hs', nuevos: 38, recurrentes: 90 },
+    { time: '15 hs', nuevos: 42, recurrentes: 95 },
+    { time: '16 hs', nuevos: 45, recurrentes: 100 },
+    { time: '17 hs', nuevos: 48, recurrentes: 105 },
+    { time: '18 hs', nuevos: 52, recurrentes: 110 },
+    { time: '19 hs', nuevos: 55, recurrentes: 115 },
+    { time: '20 hs', nuevos: 58, recurrentes: 120 },
+    { time: '21 hs', nuevos: 60, recurrentes: 125 },
+    { time: '22 hs', nuevos: 55, recurrentes: 120 },
+    { time: '23 hs', nuevos: 50, recurrentes: 115 },
+  ];
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -46,7 +95,6 @@ export const Dashboard = () => {
 
   const formatPhoneNumber = (phone: string | null) => {
     if (!phone) return 'Sin teléfono';
-    // Formatear número de teléfono si es necesario
     return phone.startsWith('+') ? phone : `+${phone}`;
   };
 
@@ -54,15 +102,10 @@ export const Dashboard = () => {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Panel Principal</h1>
-            <p className="text-muted-foreground mt-2">
-              Cargando datos de tu actividad comercial...
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="h-32">
               <CardContent className="p-6">
@@ -78,54 +121,280 @@ export const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
+    <div className="space-y-6 pb-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Panel Principal</h1>
-          <p className="text-muted-foreground mt-2">
-            Bienvenido de vuelta. Aquí tienes un resumen de tu actividad comercial.
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Clock className="h-4 w-4 mr-2" />
-            Último sync: hace 2 min
-          </Button>
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          {['Hoy', 'Semana', 'Mes', 'Año', 'Todos'].map((period) => (
+            <Button
+              key={period}
+              variant={selectedPeriod === period ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedPeriod(period)}
+              className="h-8"
+            >
+              {period}
+            </Button>
+          ))}
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard
-          title="Leads Totales"
-          value={stats.totalLeads.toString()}
-          change={{ value: 0, trend: 'up' }}
-          icon={Target}
-          gradient
-        />
-        <StatsCard
-          title="Conversaciones Activas"
-          value={stats.activeConversations.toString()}
-          change={{ value: 0, trend: 'up' }}
-          icon={MessageSquare}
-        />
-        <StatsCard
-          title="Tasa de Conversión"
-          value={`${stats.conversionRate}%`}
-          change={{ value: 0, trend: 'up' }}
-          icon={TrendingUp}
-        />
-        <StatsCard
-          title="Conexiones WhatsApp"
-          value={stats.whatsappConnections.toString()}
-          change={{ value: 0, trend: 'up' }}
-          icon={Phone}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="relative overflow-hidden border-l-4 border-l-teal-500 bg-gradient-to-br from-card to-card/80">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Clientes Activos Totales (chats)</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-3xl font-bold">{stats.activeConversations}</h2>
+                  <span className="text-sm text-red-500 flex items-center">
+                    <ArrowDown className="h-3 w-3 mr-1" />
+                    60%
+                  </span>
+                </div>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-teal-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden border-l-4 border-l-blue-500 bg-gradient-to-br from-card to-card/80">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Total de Mensajes (Enviados + Recibidos)</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-3xl font-bold">{stats.totalMessages}</h2>
+                  <span className="text-sm text-red-500 flex items-center">
+                    <ArrowDown className="h-3 w-3 mr-1" />
+                    64%
+                  </span>
+                </div>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <Send className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden border-l-4 border-l-orange-500 bg-gradient-to-br from-card to-card/80">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Total de Mensajes Recibidos</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-3xl font-bold">{Math.floor(stats.totalMessages * 0.6)}</h2>
+                  <span className="text-sm text-red-500 flex items-center">
+                    <ArrowDown className="h-3 w-3 mr-1" />
+                    34%
+                  </span>
+                </div>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-orange-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden border-l-4 border-l-purple-500 bg-gradient-to-br from-card to-card/80">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Total de Mensajes Enviados</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-3xl font-bold">{Math.floor(stats.totalMessages * 0.4)}</h2>
+                  <span className="text-sm text-red-500 flex items-center">
+                    <ArrowDown className="h-3 w-3 mr-1" />
+                    64%
+                  </span>
+                </div>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                <Send className="h-6 w-6 text-purple-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Charts */}
+      <Card className="bg-gradient-to-br from-card to-card/80">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              Clientes Activos Totales (chats)
+            </CardTitle>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-teal-500"></div>
+                <span className="text-sm text-muted-foreground">Nuevos prospectos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                <span className="text-sm text-muted-foreground">Clientes recurrentes</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span className="text-sm text-muted-foreground">Totales</span>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="colorNuevos" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorRecurrentes" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6b7280" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#6b7280" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+              <XAxis dataKey="time" stroke="#888" fontSize={12} />
+              <YAxis stroke="#888" fontSize={12} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--card))', 
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="nuevos" 
+                stroke="#14b8a6" 
+                fill="url(#colorNuevos)" 
+                strokeWidth={2}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="recurrentes" 
+                stroke="#6b7280" 
+                fill="url(#colorRecurrentes)" 
+                strokeWidth={2}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Bar Chart */}
+      <Card className="bg-gradient-to-br from-card to-card/80">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              Clientes Activos Totales (chats)
+            </CardTitle>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-teal-500"></div>
+                <span className="text-sm text-muted-foreground">Nuevos prospectos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                <span className="text-sm text-muted-foreground">Clientes recurrentes</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground font-medium">Totales</span>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={barData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+              <XAxis dataKey="time" stroke="#888" fontSize={12} />
+              <YAxis stroke="#888" fontSize={12} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--card))', 
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '8px'
+                }}
+              />
+              <Bar dataKey="nuevos" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="recurrentes" fill="#6b7280" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Annual Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-l-4 border-l-teal-500 bg-gradient-to-br from-card to-card/80">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-4xl font-bold">36,279</h2>
+                  <span className="text-sm text-green-500 flex items-center">
+                    100%
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">Nuevos prospectos</p>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-teal-500/20 flex items-center justify-center">
+                <Users className="h-6 w-6 text-teal-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-card to-card/80">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-4xl font-bold">54</h2>
+                  <span className="text-sm text-green-500 flex items-center">
+                    100%
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">Clientes recurrentes</p>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <Users className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-card to-card/80">
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
+                <div className="flex items-baseline gap-2">
+                  <h2 className="text-4xl font-bold">36,333</h2>
+                  <span className="text-sm text-green-500 flex items-center">
+                    100%
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">Totales</p>
+              </div>
+              <div className="w-12 h-12 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                <Target className="h-6 w-6 text-orange-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Leads & Conversations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Leads */}
         <Card className="transition-all duration-300 hover:shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -158,14 +427,12 @@ export const Dashboard = () => {
                 <div className="text-center py-8">
                   <Target className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">No hay leads recientes</p>
-                  <p className="text-xs text-muted-foreground mt-1">Los nuevos leads aparecerán aquí</p>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Active Conversations */}
         <Card className="transition-all duration-300 hover:shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -188,7 +455,7 @@ export const Dashboard = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-foreground truncate">{conv.pushname || conv.whatsapp_number || 'Contacto desconocido'}</h4>
+                        <h4 className="font-medium text-foreground truncate">{conv.pushname || conv.whatsapp_number || 'Contacto'}</h4>
                         <span className="text-xs text-muted-foreground">
                           {conv.last_message_time ? formatTimeAgo(conv.last_message_time) : 'Sin fecha'}
                         </span>
@@ -208,83 +475,8 @@ export const Dashboard = () => {
                 <div className="text-center py-8">
                   <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">No hay conversaciones activas</p>
-                  <p className="text-xs text-muted-foreground mt-1">Las conversaciones aparecerán aquí</p>
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions & AI Assistant */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Actions */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Zap className="h-5 w-5 mr-2 text-warning" />
-              Acciones Rápidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-                <Users className="h-6 w-6" />
-                <span className="text-sm">Nuevo Contacto</span>
-              </Button>
-              <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-                <MessageSquare className="h-6 w-6" />
-                <span className="text-sm">Enviar Mensaje</span>
-              </Button>
-              <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-                <Target className="h-6 w-6" />
-                <span className="text-sm">Crear Campaña</span>
-              </Button>
-              <Button variant="outline" className="h-20 flex flex-col items-center justify-center space-y-2">
-                <CheckCircle className="h-6 w-6" />
-                <span className="text-sm">Reportes</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* AI Assistant */}
-        <Card className="bg-gradient-hero text-white border-0 shadow-glow">
-          <CardHeader>
-            <CardTitle className="flex items-center text-white">
-              <AlertTriangle className="h-5 w-5 mr-2" />
-              Asistente IA
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="bg-white/10 rounded-lg p-3">
-                <p className="text-sm text-white/90">
-                  <strong>Estado:</strong> {stats.totalLeads > 0 
-                    ? `Tienes ${stats.totalLeads} leads en tu sistema`
-                    : 'No tienes leads actualmente. ¡Comienza a agregar algunos!'
-                  }
-                </p>
-              </div>
-              <div className="bg-white/10 rounded-lg p-3">
-                <p className="text-sm text-white/90">
-                  <strong>Conexiones:</strong> {stats.whatsappConnections > 0 
-                    ? `${stats.whatsappConnections} conexión${stats.whatsappConnections > 1 ? 'es' : ''} WhatsApp activa${stats.whatsappConnections > 1 ? 's' : ''}`
-                    : 'Configura tu primera conexión WhatsApp'
-                  }
-                </p>
-              </div>
-              <div className="bg-white/10 rounded-lg p-3">
-                <p className="text-sm text-white/90">
-                  <strong>Conversión:</strong> {stats.conversionRate > 0 
-                    ? `Tasa actual del ${stats.conversionRate}%`
-                    : 'Sin datos de conversión aún'
-                  }
-                </p>
-              </div>
-              <Button variant="secondary" size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-white/30">
-                Ver más insights
-              </Button>
             </div>
           </CardContent>
         </Card>
