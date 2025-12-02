@@ -1871,6 +1871,62 @@ export type Database = {
         }
         Relationships: []
       }
+      web_chatbots: {
+        Row: {
+          ai_agent_id: string | null
+          allowed_domains: string[] | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          placeholder_text: string | null
+          position: string | null
+          primary_color: string | null
+          updated_at: string | null
+          user_id: string
+          welcome_message: string | null
+        }
+        Insert: {
+          ai_agent_id?: string | null
+          allowed_domains?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          placeholder_text?: string | null
+          position?: string | null
+          primary_color?: string | null
+          updated_at?: string | null
+          user_id: string
+          welcome_message?: string | null
+        }
+        Update: {
+          ai_agent_id?: string | null
+          allowed_domains?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          placeholder_text?: string | null
+          position?: string | null
+          primary_color?: string | null
+          updated_at?: string | null
+          user_id?: string
+          welcome_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_chatbots_ai_agent_id_fkey"
+            columns: ["ai_agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_connections: {
         Row: {
           created_at: string | null

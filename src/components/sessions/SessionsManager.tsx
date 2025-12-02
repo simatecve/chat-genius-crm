@@ -9,6 +9,7 @@ import WhatsAppConnectionForm from './WhatsAppConnectionForm';
 import TelegramConnectionForm from './TelegramConnectionForm';
 import TelegramBotConnectionForm from './TelegramBotConnectionForm';
 import TwilioConnectionForm from './TwilioConnectionForm';
+import WebChatConnectionForm from './WebChatConnectionForm';
 import { useToast } from '@/hooks/use-toast';
 
 interface Channel {
@@ -22,7 +23,7 @@ interface Channel {
 interface Session {
   id: string;
   name: string;
-  type: 'whatsapp' | 'telegram' | 'telegram-bot' | 'twilio';
+  type: 'whatsapp' | 'telegram' | 'telegram-bot' | 'twilio' | 'webchat';
   identifier: string; // phone_number or bot_username
   status: string;
   created_at: string;
@@ -36,7 +37,7 @@ const channels: Channel[] = [
   { id: 'whatsapp-api', name: 'WhatsApp API', icon: '📱', color: 'hsl(var(--muted))', enabled: false },
   { id: 'instagram', name: 'Instagram', icon: '📷', color: 'hsl(var(--muted))', enabled: false },
   { id: 'messenger', name: 'Messenger', icon: '💬', color: 'hsl(var(--muted))', enabled: false },
-  { id: 'web-chat', name: 'Web Chat', icon: '💻', color: 'hsl(var(--muted))', enabled: false },
+  { id: 'web-chat', name: 'Web Chatbot', icon: '💻', color: 'hsl(var(--primary))', enabled: true },
   { id: 'google-calendar', name: 'Google Calendar', icon: '📅', color: 'hsl(var(--muted))', enabled: false },
   { id: 'email', name: 'Email', icon: '✉️', color: 'hsl(var(--muted))', enabled: false },
 ];
@@ -128,6 +129,27 @@ const SessionsManager = () => {
         });
       }
 
+      // Fetch Web Chatbots
+      const { data: webchatData } = await supabase
+        .from('web_chatbots')
+        .select('*')
+        .eq('user_id', effectiveUserId)
+        .order('created_at', { ascending: false });
+
+      // Add Web Chatbot sessions
+      if (webchatData) {
+        webchatData.forEach(chat => {
+          allSessions.push({
+            id: chat.id,
+            name: chat.name,
+            type: 'webchat',
+            identifier: chat.id.substring(0, 8) + '...',
+            status: chat.is_active ? 'active' : 'inactive',
+            created_at: chat.created_at
+          });
+        });
+      }
+
       // Sort by creation date
       allSessions.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -177,6 +199,8 @@ const SessionsManager = () => {
         return '🤖';
       case 'twilio':
         return '📞';
+      case 'webchat':
+        return '💻';
       default:
         return '📡';
     }
@@ -191,6 +215,8 @@ const SessionsManager = () => {
         return 'hsl(var(--telegram-blue))';
       case 'twilio':
         return 'hsl(var(--twilio-red))';
+      case 'webchat':
+        return 'hsl(var(--primary))';
       default:
         return 'hsl(var(--muted))';
     }
@@ -270,6 +296,15 @@ const SessionsManager = () => {
             .delete()
             .eq('id', session.id);
           if (twilioError) throw twilioError;
+          break;
+
+        case 'webchat':
+          // Delete from database
+          const { error: webchatError } = await supabase
+            .from('web_chatbots')
+            .delete()
+            .eq('id', session.id);
+          if (webchatError) throw webchatError;
           break;
 
         default:
@@ -485,6 +520,9 @@ const SessionsManager = () => {
 
       {selectedChannel === 'twilio-whatsapp' && (
         <TwilioConnectionForm onClose={handleCloseForm} />
+      )}
+      {selectedChannel === 'web-chat' && (
+        <WebChatConnectionForm onClose={handleCloseForm} />
       )}
     </div>
   );
