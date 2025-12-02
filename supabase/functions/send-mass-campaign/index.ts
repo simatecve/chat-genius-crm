@@ -146,10 +146,12 @@ serve(async (req) => {
           }
         }
 
-        // Reemplazar placeholders básicos
+        // Reemplazar placeholders básicos (soportar ambos formatos: {nombre} y [nombre])
         messageToSend = messageToSend
           .replace(/\{nombre\}/gi, contact.name || '')
-          .replace(/\{telefono\}/gi, contact.phone_number || '');
+          .replace(/\[nombre\]/gi, contact.name || '')
+          .replace(/\{telefono\}/gi, contact.phone_number || '')
+          .replace(/\[telefono\]/gi, contact.phone_number || '');
 
         // Formatear número para WAHA
         const cleanNumber = contact.phone_number.replace(/\D/g, '');

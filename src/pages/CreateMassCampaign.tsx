@@ -264,6 +264,34 @@ export default function CreateMassCampaign() {
           </div>
         </div>
 
+        {/* Etiquetas disponibles */}
+        <div className="mb-4">
+          <Label className="text-foreground mb-2 block">Etiquetas disponibles</Label>
+          <p className="text-sm text-muted-foreground mb-2">
+            Haz clic para insertar en el mensaje. Se reemplazarán con los datos del contacto.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setMessage(prev => prev + '[nombre]')}
+              className="text-xs border-primary/50 hover:bg-primary/10"
+            >
+              [nombre]
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setMessage(prev => prev + '[telefono]')}
+              className="text-xs border-primary/50 hover:bg-primary/10"
+            >
+              [telefono]
+            </Button>
+          </div>
+        </div>
+
         {/* Área de mensaje */}
         <div className="mb-4">
           <div className="bg-gradient-to-br from-card to-card/80 border border-border rounded-xl p-3">
@@ -288,7 +316,7 @@ export default function CreateMassCampaign() {
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Escriba su mensaje"
+                placeholder="Hola [nombre], ¿cómo estás? Te escribimos para..."
                 className="flex-1 bg-transparent border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-0 resize-none min-h-[100px]"
               />
             </div>

@@ -20,8 +20,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { User, Mail, Phone, MapPin, Globe, FileText, Calendar, Link as LinkIcon, Lock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { User, Mail, Phone, MapPin, Globe, FileText, Calendar, Link as LinkIcon, Lock, Tag, X } from 'lucide-react';
 import { webhookService } from '@/services/webhookService';
+import { tagsServices, EtiquetaResponse } from '@/services/tagsServices';
 
 interface Contact {
   id: string;
@@ -48,6 +50,8 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
   const { effectiveUserId } = useEffectiveUserId();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [etiquetas, setEtiquetas] = useState<EtiquetaResponse[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -61,6 +65,17 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
     origin: '',
     is_blocked: false,
   });
+
+  useEffect(() => {
+    loadEtiquetas();
+  }, []);
+
+  const loadEtiquetas = async () => {
+    const result = await tagsServices.getAllEtiquetas();
+    if (result.success && result.data) {
+      setEtiquetas(result.data);
+    }
+  };
 
   useEffect(() => {
     if (contact) {
@@ -77,10 +92,26 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         origin: contact.origin || '',
         is_blocked: contact.is_blocked || false,
       });
+      // Cargar tags del contacto si existe
+      loadContactTags(contact.id);
     } else {
       resetForm();
     }
   }, [contact, open]);
+
+  const loadContactTags = async (contactId: string) => {
+    const { data } = await supabase
+      .from('contacts')
+      .select('tags')
+      .eq('id', contactId)
+      .single();
+    
+    if (data?.tags) {
+      setSelectedTags(data.tags);
+    } else {
+      setSelectedTags([]);
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -96,6 +127,15 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
       origin: '',
       is_blocked: false,
     });
+    setSelectedTags([]);
+  };
+
+  const toggleTag = (tagName: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tagName)
+        ? prev.filter(t => t !== tagName)
+        : [...prev, tagName]
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,6 +167,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         origin: formData.origin || null,
         is_blocked: formData.is_blocked,
         name: `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim(),
+        tags: selectedTags.length > 0 ? selectedTags : null,
       };
 
       if (contact) {
@@ -351,6 +392,38 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
                 <SelectItem value="otro">Otro</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Etiquetas */}
+          <div className="space-y-2">
+            <Label>
+              <Tag className="w-4 h-4 inline mr-2" />
+              Etiquetas
+            </Label>
+            <div className="flex flex-wrap gap-2 p-3 border rounded-lg min-h-[60px]">
+              {etiquetas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay etiquetas disponibles</p>
+              ) : (
+                etiquetas.map((etiqueta) => (
+                  <Badge
+                    key={etiqueta.id}
+                    variant={selectedTags.includes(etiqueta.nombre) ? "default" : "outline"}
+                    className="cursor-pointer transition-all"
+                    style={{
+                      backgroundColor: selectedTags.includes(etiqueta.nombre) ? etiqueta.color : 'transparent',
+                      borderColor: etiqueta.color,
+                      color: selectedTags.includes(etiqueta.nombre) ? 'white' : etiqueta.color,
+                    }}
+                    onClick={() => toggleTag(etiqueta.nombre)}
+                  >
+                    {etiqueta.nombre}
+                    {selectedTags.includes(etiqueta.nombre) && (
+                      <X className="w-3 h-3 ml-1" />
+                    )}
+                  </Badge>
+                ))
+              )}
+            </div>
           </div>
 
           <div className="flex items-center justify-between space-x-2 p-4 border rounded-lg">
