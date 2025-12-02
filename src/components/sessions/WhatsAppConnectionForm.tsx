@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
-import { Loader2, QrCode, CheckCircle } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle, X } from 'lucide-react';
 
 interface WhatsAppConnectionFormProps {
   onClose: () => void;
@@ -210,7 +210,7 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
 
       if (error) throw error;
 
-      if (data?.status === 'WORKING') {
+      if (data?.status === 'connected') {
         toast({
           title: "¡Conectado!",
           description: "WhatsApp conectado correctamente",
@@ -221,7 +221,7 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
       } else {
         toast({
           title: "Aún no conectado",
-          description: "Por favor escanea el código QR con tu teléfono",
+          description: `Estado actual: ${data?.status || 'desconocido'}. Por favor escanea el código QR con tu teléfono`,
           variant: "destructive",
         });
       }
@@ -234,6 +234,39 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
       });
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!currentSession) return;
+    
+    const confirmed = window.confirm('¿Estás seguro de que quieres eliminar esta sesión de WAHA?');
+    if (!confirmed) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('waha-delete-session', {
+        body: { 
+          session_name: currentSession,
+          connection_id: currentConnectionId 
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Sesión eliminada",
+        description: "La sesión de WAHA ha sido eliminada correctamente",
+      });
+
+      setQrModalOpen(false);
+      handleClose();
+    } catch (error: any) {
+      console.error('Error deleting session:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar la sesión",
+        variant: "destructive",
+      });
     }
   };
 
@@ -359,23 +392,35 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
               </p>
             </div>
 
-            <Button 
-              onClick={handleQRConnected} 
-              disabled={verifying}
-              className="w-full"
-            >
-              {verifying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verificando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Verificar Conexión
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleQRConnected} 
+                disabled={verifying}
+                className="flex-1"
+              >
+                {verifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verificando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Verificar Conexión
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                onClick={handleDeleteSession} 
+                variant="destructive"
+                disabled={verifying}
+                className="flex-1"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Eliminar Sesión
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
