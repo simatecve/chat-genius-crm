@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.telegram-send-message]
 verify_jwt = true
 
+[functions.telegram-send-file]
+verify_jwt = true
+
 [functions.waha-create-session]
 verify_jwt = true
 

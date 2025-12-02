@@ -193,25 +193,40 @@ const Conversations = () => {
           return;
         }
 
-        // Telegram no soporta archivos aún
+        // Si hay archivo adjunto
         if (attachment) {
-          toast({
-            title: 'No soportado',
-            description: 'El envío de archivos por Telegram aún no está implementado',
-            variant: 'destructive',
-          });
-          return;
-        }
+          // Subir archivo a Storage
+          const FileUploadService = (await import('@/services/fileUploadService')).FileUploadService;
+          const { url, path } = await FileUploadService.uploadFile(
+            attachment,
+            effectiveUserId,
+            selectedConversation.id
+          );
 
-        await sendMessage({
-          conversationId: selectedConversation.id,
-          userId: effectiveUserId,
-          message: messageText.trim(),
-          sessionName: '', // No usado en Telegram
-          phoneNumber: chatId,
-          channelType: 'telegram',
-          telegramBotId: telegramBotId
-        });
+          await sendMessageWithAttachment({
+            conversationId: selectedConversation.id,
+            userId: effectiveUserId,
+            message: messageText.trim(),
+            sessionName: '',
+            phoneNumber: chatId,
+            fileUrl: url,
+            fileName: attachment.name,
+            mimeType: attachment.type,
+            channelType: 'telegram',
+            telegramBotId: telegramBotId,
+            twilioConnectionId: null
+          });
+        } else {
+          await sendMessage({
+            conversationId: selectedConversation.id,
+            userId: effectiveUserId,
+            message: messageText.trim(),
+            sessionName: '', // No usado en Telegram
+            phoneNumber: chatId,
+            channelType: 'telegram',
+            telegramBotId: telegramBotId
+          });
+        }
         
         return;
       }
