@@ -11,7 +11,7 @@ export interface DefaultAgentResponse {
   comprobanteDetectado: boolean;
   respuesta: string;
   actionExecuted?: {
-    type: 'crear_jugador' | 'depositar_saldo' | 'retirar_saldo';
+    type: 'crear_jugador';
     success: boolean;
     result?: any;
   };

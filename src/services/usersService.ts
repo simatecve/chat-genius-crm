@@ -112,14 +112,22 @@ export const usersService = {
   },
 
   /**
-   * Delete user
+   * Delete user via Edge Function
    */
   async deleteUser(userId: string) {
-    if (!supabaseAdmin) {
-      throw new Error('No se puede eliminar usuario: falta configuración de admin');
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: { userId }
+    });
+
+    if (error) {
+      console.error('Error deleting user:', error);
+      throw new Error(error.message || 'Error al eliminar usuario');
     }
 
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (error) throw error;
+    if (!data.success) {
+      throw new Error(data.error || 'Error al eliminar usuario');
+    }
+
+    return data;
   }
 };
