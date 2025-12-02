@@ -330,13 +330,13 @@ const AIAgents = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Agentes de IA</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold text-foreground">Agentes de IA</h1>
+            <p className="text-muted-foreground mt-1">
               Gestiona tus asistentes de inteligencia artificial para WhatsApp
             </p>
           </div>
           
-          <Button onClick={navigateToCreateAgent}>
+          <Button onClick={navigateToCreateAgent} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Agente
           </Button>
@@ -474,14 +474,16 @@ const AIAgents = () => {
 
         {/* Lista de Agentes */}
         {agents.length === 0 ? (
-          <Card>
+          <Card className="bg-gradient-to-br from-card to-card/80 border-border">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Bot className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No hay agentes de IA</h3>
+              <div className="w-16 h-16 rounded-lg bg-primary/20 flex items-center justify-center mb-4">
+                <Bot className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">No hay agentes de IA</h3>
               <p className="text-muted-foreground text-center mb-4">
                 Crea tu primer agente de IA para automatizar respuestas en WhatsApp
               </p>
-              <Button onClick={navigateToCreateAgent}>
+              <Button onClick={navigateToCreateAgent} className="bg-gradient-primary hover:opacity-90">
                 <Plus className="h-4 w-4 mr-2" />
                 Crear Primer Agente
               </Button>
@@ -490,12 +492,14 @@ const AIAgents = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {agents.map((agent) => (
-              <Card key={agent.id} className="relative">
+              <Card key={agent.id} className={`bg-gradient-to-br from-card to-card/80 border-l-4 transition-all duration-200 hover:shadow-lg ${
+                agent.is_active ? 'border-l-primary' : 'border-l-muted'
+              }`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-lg ${
-                        agent.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        agent.is_active ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
                       }`}>
                         <Bot className="h-5 w-5" />
                       </div>

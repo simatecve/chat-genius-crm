@@ -689,22 +689,29 @@ const Leads = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
 
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Gestión de Embudos</h1>
+            <p className="text-muted-foreground mt-1">Organiza y gestiona tus leads en diferentes etapas</p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
           <Select value={selectedWorkspace || ''} onValueChange={setSelectedWorkspace}>
-            <SelectTrigger className="w-[280px] bg-card/50 border-border/50 text-lg font-semibold uppercase">
+            <SelectTrigger className="w-[280px] bg-card border-border">
               <SelectValue placeholder="Seleccionar espacio" />
             </SelectTrigger>
             <SelectContent>
               {workspaces.map(workspace => <SelectItem key={workspace.id} value={workspace.id}>
-                  {workspace.name.toUpperCase()}
+                  {workspace.name}
                 </SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
 
-        <Button onClick={openCreateColumnDialog} className="bg-primary hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Columna
-        </Button>
+          <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Columna
+          </Button>
+        </div>
       </div>
 
       {/* Search Filter */}

@@ -198,21 +198,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col bg-background">
       {/* Header del chat */}
-      <div className="p-3 border-b border-border bg-card flex items-center gap-3">
+      <div className="p-3 border-b border-border bg-card flex items-center gap-3 shadow-sm">
         {isMobile && onBack && (
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
         )}
         
-        <Avatar className="h-9 w-9">
-          <AvatarFallback className="bg-primary/10 text-primary font-medium text-sm">
+        <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
             {getInitials(selectedUser)}
           </AvatarFallback>
         </Avatar>
         
         <div className="flex-1 min-w-0">
-          <h2 className="font-medium text-sm">{getDisplayName(selectedUser)}</h2>
+          <h2 className="font-semibold text-foreground">{getDisplayName(selectedUser)}</h2>
           <p className="text-xs text-muted-foreground truncate">{selectedUser.email}</p>
         </div>
       </div>
@@ -253,10 +253,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
                   
                   <div className={cn(
-                    "max-w-[70%] rounded-lg px-4 py-2",
+                    "max-w-[70%] rounded-2xl px-4 py-2.5 shadow-sm",
                     isOwn 
                       ? "bg-primary text-primary-foreground" 
-                      : "bg-muted"
+                      : "bg-card border border-border"
                   )}>
                     <p className="text-sm whitespace-pre-wrap break-words">
                       {message.content}
@@ -277,19 +277,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       </ScrollArea>
 
       {/* Input Area */}
-      <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-card">
+      <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-card shadow-sm">
         <div className="flex gap-2">
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Escribe un mensaje..."
             disabled={isSending}
-            className="flex-1"
+            className="flex-1 bg-background border-border"
           />
           <Button 
             type="submit" 
             disabled={!newMessage.trim() || isSending}
             size="icon"
+            className="bg-gradient-primary hover:opacity-90 shadow-glow"
           >
             <Send className="h-4 w-4" />
           </Button>

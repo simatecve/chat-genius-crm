@@ -134,9 +134,9 @@ export const UserList: React.FC<UserListProps> = ({
       isMobile ? "w-full" : "w-80"
     )}>
       {/* Search y Badge */}
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border bg-card">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-muted-foreground">Usuarios</h3>
+          <h3 className="text-sm font-semibold text-foreground">Usuarios</h3>
           {Object.values(unreadCounts).reduce((a, b) => a + b, 0) > 0 && (
             <Badge variant="default" className="bg-primary">
               {Object.values(unreadCounts).reduce((a, b) => a + b, 0)}
@@ -174,21 +174,22 @@ export const UserList: React.FC<UserListProps> = ({
                 key={user.id}
                 onClick={() => onSelectUser(user)}
                 className={cn(
-                  "w-full flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-accent",
-                  selectedUser?.id === user.id && "bg-accent"
+                  "w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200",
+                  "hover:bg-accent/80",
+                  selectedUser?.id === user.id && "bg-accent shadow-sm"
                 )}
               >
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                <Avatar className="h-10 w-10 ring-2 ring-border">
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                     {getInitials(user)}
                   </AvatarFallback>
                 </Avatar>
                 
                 <div className="flex-1 text-left min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium truncate">{getDisplayName(user)}</p>
+                    <p className="font-semibold text-foreground truncate">{getDisplayName(user)}</p>
                     {unreadCounts[user.id] > 0 && (
-                      <Badge variant="default" className="ml-2 h-5 min-w-[20px] px-1.5">
+                      <Badge variant="default" className="ml-2 h-5 min-w-[20px] px-1.5 bg-primary">
                         {unreadCounts[user.id]}
                       </Badge>
                     )}
