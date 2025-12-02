@@ -194,9 +194,9 @@ serve(async (req) => {
           
           const cajas = cashierNumbersText?.trim() || '';
           const mensajesMultiples = [
-            '¡Gracias por enviar tu comprobante! 📄',
-            'Ahora envía este comprobante al siguiente número de atención para acreditar tu saldo ↓',
-            cajas || 'Contacta a soporte para obtener el número de atención'
+            '¡Perfecto! Recibí tu comprobante 📄',
+            'Para completar tu recarga de saldo, enviá este comprobante al siguiente número de nuestro cajero ↓',
+            cajas || 'Contacta a soporte para obtener el número del cajero'
           ];
 
           const payload: DefaultAgentResponse = {
@@ -245,8 +245,8 @@ serve(async (req) => {
       const mensajesMultiples = [
         'Para transferir te dejo el CBU a continuación ↓',
         cbu,
-        'Ahora envia el comprobante al siguiente número de atención ↓',
-        cajas || 'Contacta a soporte para obtener el número de atención'
+        'Una vez realizada la transferencia, enviá el comprobante al cajero para acreditar tu saldo ↓',
+        cajas || 'Contacta a soporte para obtener el número del cajero'
       ];
 
       const payload: DefaultAgentResponse = {
@@ -313,12 +313,18 @@ serve(async (req) => {
 
 🎰 **TUS CAPACIDADES:**
 1. Podés crear cuentas de jugadores usando la función crear_jugador
-2. Para consultas sobre depósitos/cargas o retiros, debés derivar a un asesor humano
+2. Para consultas sobre depósitos/cargas o retiros, debés proporcionar el CBU y derivar al cajero
 
 **INFORMACIÓN DEL CASINO:**
 - Link del casino: http://capibet.fun/
 - CBU para cargas: ${cbu || '[no configurado]'}
-- Números de cajeros: ${cashierNumbersText || '[no configurados]'}
+- Número de cajero: ${cashierNumbersText || '[no configurado]'}
+
+**NÚMERO DEL CAJERO - MUY IMPORTANTE:**
+- El número del cajero es: ${cashierNumbersText || '[no configurado]'}
+- SIEMPRE que un usuario necesite soporte, ayuda avanzada, verificar pagos, recargar saldo, retirar saldo, o cualquier operación que requiera asistencia humana, debés proporcionar el número del cajero
+- El cajero es el contacto para: recargas de saldo, retiros, verificación de pagos, comprobantes, y soporte técnico avanzado
+- Formato: "Para eso contactá con nuestro cajero al: ${cashierNumbersText || '[número]'}"
 
 **CREACIÓN DE CUENTAS:**
 - Contraseña por defecto: "Capibet1234" (si el usuario no especifica una)
@@ -327,9 +333,9 @@ serve(async (req) => {
 - SIEMPRE incluí el link http://capibet.fun/ cuando crees una cuenta o cuando pregunten cómo acceder al casino
 
 **REGLAS IMPORTANTES:**
-- Si te piden cargar fichas, depositar o retirar saldo, respondé: "Para gestionar depósitos y retiros, necesito que hables con uno de nuestros asesores humanos. Ellos te van a ayudar con eso de inmediato."
-- NUNCA inventes información. Si no sabés algo, decilo claramente y recomendá contactar a un asesor
-- Si te preguntan por juegos específicos, promociones, o detalles técnicos que no conocés, recomendá que contacten a un asesor humano
+- Si te piden cargar fichas, depositar o retirar saldo, primero dales el CBU si lo piden, y SIEMPRE indicá que deben enviar el comprobante al cajero: ${cashierNumbersText || '[número del cajero]'}
+- NUNCA inventes información. Si no sabés algo, decilo claramente y recomendá contactar al cajero
+- Si te preguntan por juegos específicos, promociones, o detalles técnicos que no conocés, recomendá que contacten al cajero
 - Si preguntan el link o cómo entrar al casino, respondé: http://capibet.fun/
 
 Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en cada respuesta.`;
