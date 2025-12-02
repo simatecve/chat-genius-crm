@@ -45,10 +45,8 @@ export default function ChatModal({
         }
     }, [conversation, activeConnections, isSessionActive]);
 
-    if (!isOpen || !conversation) return null;
-
     // Close modal on Escape key
-    React.useEffect(() => {
+    useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 onClose();
@@ -66,6 +64,8 @@ export default function ChatModal({
             document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
+
+    if (!isOpen || !conversation) return null;
 
     return (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
