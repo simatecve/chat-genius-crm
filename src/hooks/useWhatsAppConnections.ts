@@ -35,7 +35,7 @@ export const useWhatsAppConnections = () => {
   });
 
   const activeConnections = connections.filter(
-    conn => conn.status === 'WORKING'
+    conn => conn.status === 'WORKING' || conn.status === 'connected'
   );
 
   const getConnectionByName = (name: string | null) => {
@@ -46,7 +46,7 @@ export const useWhatsAppConnections = () => {
   const isSessionActive = (sessionName: string | null) => {
     if (!sessionName) return false;
     const connection = getConnectionByName(sessionName);
-    return connection?.status === 'WORKING';
+    return connection?.status === 'WORKING' || connection?.status === 'connected';
   };
 
   return {
