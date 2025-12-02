@@ -233,59 +233,59 @@ const ContactLists = () => {
   }
 
   return (
-    
-      <div className="space-y-6">
+    <div className="min-h-screen bg-[#1f2c34] p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Listas de Contactos</h1>
-            <p className="text-muted-foreground mt-2">Gestiona tus listas de contactos para campañas y comunicaciones</p>
+            <h1 className="text-3xl font-bold text-white">Listas de Contactos</h1>
+            <p className="text-gray-400 mt-2">Gestiona tus listas de contactos para campañas y comunicaciones</p>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90">
+              <Button className="bg-[#00a884] hover:bg-[#00a884]/90 text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Nueva Lista
               </Button>
             </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] bg-[#2a3942] border-[#3d4d57]">
             <DialogHeader>
-              <DialogTitle>Crear Nueva Lista de Contactos</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-white">Crear Nueva Lista de Contactos</DialogTitle>
+              <DialogDescription className="text-gray-400">
                 Crea una nueva lista para organizar tus contactos
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
+                <Label htmlFor="name" className="text-right text-white">
                   Nombre *
                 </Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="col-span-3"
+                  className="col-span-3 bg-[#1f2c34] border-[#3d4d57] text-white"
                   placeholder="Ej: Clientes VIP"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
+                <Label htmlFor="description" className="text-right text-white">
                   Descripción
                 </Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="col-span-3"
+                  className="col-span-3 bg-[#1f2c34] border-[#3d4d57] text-white"
                   placeholder="Descripción opcional de la lista"
                   rows={3}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={handleCancel}>
+              <Button variant="outline" onClick={handleCancel} className="border-[#3d4d57] text-white hover:bg-[#3d4d57]">
                 Cancelar
               </Button>
-              <Button onClick={handleCreateList} className="bg-primary hover:bg-primary/90">
+              <Button onClick={handleCreateList} className="bg-[#00a884] hover:bg-[#00a884]/90 text-white">
                 Crear Lista
               </Button>
             </DialogFooter>
@@ -295,12 +295,12 @@ const ContactLists = () => {
 
         {contactLists.length === 0 ? (
           <div className="text-center py-12">
-            <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">No tienes listas de contactos</h3>
-            <p className="text-muted-foreground mb-6">Crea tu primera lista para comenzar a organizar tus contactos</p>
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">No tienes listas de contactos</h3>
+            <p className="text-gray-400 mb-6">Crea tu primera lista para comenzar a organizar tus contactos</p>
             <Button 
               onClick={() => setIsCreateDialogOpen(true)}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-[#00a884] hover:bg-[#00a884]/90 text-white"
             >
               <Plus className="w-4 h-4 mr-2" />
               Crear Primera Lista
@@ -309,18 +309,18 @@ const ContactLists = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {contactLists.map((list) => (
-              <Card key={list.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+              <Card key={list.id} className="bg-[#2a3942] border-[#3d4d57] hover:shadow-lg transition-shadow cursor-pointer">
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <CardTitle 
-                        className="text-lg font-semibold text-foreground hover:text-primary transition-colors"
+                        className="text-lg font-semibold text-white hover:text-[#00a884] transition-colors"
                         onClick={() => navigate(`/contactos/${list.id}`)}
                       >
                         {list.name}
                       </CardTitle>
                       {list.description && (
-                        <CardDescription className="mt-2">
+                        <CardDescription className="mt-2 text-gray-400">
                           {list.description}
                         </CardDescription>
                       )}
@@ -330,7 +330,7 @@ const ContactLists = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => openEditDialog(list)}
-                        className="text-muted-foreground hover:text-primary"
+                        className="text-gray-400 hover:text-[#00a884]"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -338,7 +338,7 @@ const ContactLists = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteList(list.id, list.name)}
-                        className="text-muted-foreground hover:text-destructive"
+                        className="text-gray-400 hover:text-red-500"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -346,7 +346,7 @@ const ContactLists = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between text-sm text-gray-400">
                     <div className="flex items-center">
                       <Users className="w-4 h-4 mr-1" />
                       <span>{list.contact_count || 0} contactos</span>
@@ -364,52 +364,52 @@ const ContactLists = () => {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] bg-[#2a3942] border-[#3d4d57]">
           <DialogHeader>
-            <DialogTitle>Editar Lista de Contactos</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-white">Editar Lista de Contactos</DialogTitle>
+            <DialogDescription className="text-gray-400">
               Modifica los detalles de tu lista de contactos
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right">
+              <Label htmlFor="edit-name" className="text-right text-white">
                 Nombre *
               </Label>
               <Input
                 id="edit-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="col-span-3"
+                className="col-span-3 bg-[#1f2c34] border-[#3d4d57] text-white"
                 placeholder="Ej: Clientes VIP"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right">
+              <Label htmlFor="edit-description" className="text-right text-white">
                 Descripción
               </Label>
               <Textarea
                 id="edit-description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="col-span-3"
+                className="col-span-3 bg-[#1f2c34] border-[#3d4d57] text-white"
                 placeholder="Descripción opcional de la lista"
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handleCancel}>
+            <Button variant="outline" onClick={handleCancel} className="border-[#3d4d57] text-white hover:bg-[#3d4d57]">
               Cancelar
             </Button>
-            <Button onClick={handleEditList} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleEditList} className="bg-[#00a884] hover:bg-[#00a884]/90 text-white">
               Guardar Cambios
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       </div>
-    
+    </div>
   );
 };
 
