@@ -343,47 +343,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
-      {/* Selector de conexión WhatsApp si la original no está activa */}
-      {conversation.channel_type === 'whatsapp' && originalSessionStatus !== 'active' && whatsappConnections.length > 0 && (
-        <div className="mx-3 mt-3">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <Select value={selectedSession || ''} onValueChange={onSessionChange}>
-                <SelectTrigger className="w-full mt-2">
-                  <SelectValue placeholder="Seleccionar conexión WhatsApp" />
-                </SelectTrigger>
-                <SelectContent>
-                  {whatsappConnections.map((conn) => (
-                    <SelectItem key={conn.id} value={conn.name || ''}>{conn.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
-
-      {/* Selector de conexión Twilio */}
-      {conversation.channel_type === 'twilio' && originalSessionStatus !== 'active' && twilioConnections.length > 0 && (
-        <div className="mx-3 mt-3">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <Select value={selectedTwilioConnection || ''} onValueChange={onTwilioConnectionChange}>
-                <SelectTrigger className="w-full mt-2">
-                  <SelectValue placeholder="Seleccionar conexión Twilio" />
-                </SelectTrigger>
-                <SelectContent>
-                  {twilioConnections.map((conn) => (
-                    <SelectItem key={conn.id} value={conn.id}>{conn.connection_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
 
       {/* Área de mensajes */}
       <ScrollArea 
@@ -426,40 +385,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Input de mensaje */}
       <div className="p-3 border-t border-border bg-card">
-        {/* Alerta de sesión desconectada */}
-        {conversation.channel_type === 'whatsapp' && originalSessionStatus === 'disconnected' && (
-          <Alert className="mb-3">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              La sesión original de WhatsApp está desconectada. Selecciona una conexión activa para enviar mensajes.
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        {/* Selector de sesión WhatsApp */}
-        {conversation.channel_type === 'whatsapp' && whatsappConnections.length > 0 && (
-          <div className="mb-3">
-            <Select value={selectedSession || undefined} onValueChange={onSessionChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar conexión de WhatsApp" />
-              </SelectTrigger>
-              <SelectContent>
-                {whatsappConnections.map((conn) => (
-                  <SelectItem key={conn.id} value={conn.name || conn.phone_number}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {conn.name || conn.phone_number}
-                      </span>
-                      {conn.name === conversation.whatsapp_number && (
-                        <span className="text-xs text-muted-foreground">(Original)</span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
 
         {/* Preview de archivo seleccionado */}
         {selectedFile && (
