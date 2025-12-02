@@ -26,51 +26,29 @@ import {
 } from 'recharts';
 
 export const Dashboard = () => {
-  const { stats, recentLeads, activeConversations, isLoading } = useDashboard();
-  const [selectedPeriod, setSelectedPeriod] = useState('Hoy');
+  const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
+  const { stats, recentLeads, activeConversations, messagesByHour, conversationsByHour, isLoading } = useDashboard(selectedPeriod);
 
-  // Datos ficticios para los gráficos
-  const chartData = [
-    { time: '00 hs', nuevos: 120, recurrentes: 110, totales: 230 },
-    { time: '02 hs', nuevos: 45, recurrentes: 85, totales: 130 },
-    { time: '04 hs', nuevos: 30, recurrentes: 50, totales: 80 },
-    { time: '06 hs', nuevos: 25, recurrentes: 40, totales: 65 },
-    { time: '08 hs', nuevos: 35, recurrentes: 55, totales: 90 },
-    { time: '10 hs', nuevos: 28, recurrentes: 42, totales: 70 },
-    { time: '12 hs', nuevos: 32, recurrentes: 48, totales: 80 },
-    { time: '14 hs', nuevos: 38, recurrentes: 52, totales: 90 },
-    { time: '16 hs', nuevos: 42, recurrentes: 58, totales: 100 },
-    { time: '18 hs', nuevos: 48, recurrentes: 62, totales: 110 },
-    { time: '20 hs', nuevos: 55, recurrentes: 75, totales: 130 },
-    { time: '22 hs', nuevos: 65, recurrentes: 85, totales: 150 },
-  ];
+  const periodMap: { [key: string]: 'today' | 'week' | 'month' | 'year' } = {
+    'Hoy': 'today',
+    'Semana': 'week',
+    'Mes': 'month',
+    'Año': 'year'
+  };
 
-  const barData = [
-    { time: '00 hs', nuevos: 45, recurrentes: 110 },
-    { time: '01 hs', nuevos: 40, recurrentes: 105 },
-    { time: '02 hs', nuevos: 35, recurrentes: 95 },
-    { time: '03 hs', nuevos: 30, recurrentes: 80 },
-    { time: '04 hs', nuevos: 25, recurrentes: 60 },
-    { time: '05 hs', nuevos: 10, recurrentes: 40 },
-    { time: '06 hs', nuevos: 8, recurrentes: 35 },
-    { time: '07 hs', nuevos: 12, recurrentes: 45 },
-    { time: '08 hs', nuevos: 15, recurrentes: 50 },
-    { time: '09 hs', nuevos: 18, recurrentes: 55 },
-    { time: '10 hs', nuevos: 22, recurrentes: 60 },
-    { time: '11 hs', nuevos: 28, recurrentes: 75 },
-    { time: '12 hs', nuevos: 32, recurrentes: 80 },
-    { time: '13 hs', nuevos: 35, recurrentes: 85 },
-    { time: '14 hs', nuevos: 38, recurrentes: 90 },
-    { time: '15 hs', nuevos: 42, recurrentes: 95 },
-    { time: '16 hs', nuevos: 45, recurrentes: 100 },
-    { time: '17 hs', nuevos: 48, recurrentes: 105 },
-    { time: '18 hs', nuevos: 52, recurrentes: 110 },
-    { time: '19 hs', nuevos: 55, recurrentes: 115 },
-    { time: '20 hs', nuevos: 58, recurrentes: 120 },
-    { time: '21 hs', nuevos: 60, recurrentes: 125 },
-    { time: '22 hs', nuevos: 55, recurrentes: 120 },
-    { time: '23 hs', nuevos: 50, recurrentes: 115 },
-  ];
+  // Transformar datos para los gráficos
+  const chartData = conversationsByHour.map(item => ({
+    time: item.hour,
+    nuevos: item.new,
+    recurrentes: item.recurring,
+    totales: item.total
+  }));
+
+  const barData = messagesByHour.map(item => ({
+    time: item.hour,
+    recibidos: item.incoming,
+    enviados: item.outgoing
+  }));
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -126,12 +104,12 @@ export const Dashboard = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <div className="flex items-center gap-2">
-          {['Hoy', 'Semana', 'Mes', 'Año', 'Todos'].map((period) => (
+          {Object.keys(periodMap).map((period) => (
             <Button
               key={period}
-              variant={selectedPeriod === period ? 'default' : 'outline'}
+              variant={selectedPeriod === periodMap[period] ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setSelectedPeriod(period)}
+              onClick={() => setSelectedPeriod(periodMap[period])}
               className="h-8"
             >
               {period}
@@ -298,14 +276,11 @@ export const Dashboard = () => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-teal-500"></div>
-                <span className="text-sm text-muted-foreground">Nuevos prospectos</span>
+                <span className="text-sm text-muted-foreground">Mensajes Recibidos</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                <span className="text-sm text-muted-foreground">Clientes recurrentes</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground font-medium">Totales</span>
+                <span className="text-sm text-muted-foreground">Mensajes Enviados</span>
               </div>
             </div>
           </div>
@@ -323,8 +298,8 @@ export const Dashboard = () => {
                   borderRadius: '8px'
                 }}
               />
-              <Bar dataKey="nuevos" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="recurrentes" fill="#6b7280" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="recibidos" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="enviados" fill="#6b7280" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
