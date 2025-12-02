@@ -494,6 +494,36 @@ export class ConversationService {
         mimeType
       });
 
+      // Si es Telegram, usar telegram-send-file
+      if (channelType === 'telegram' && telegramBotId) {
+        console.log('[ConversationService] Sending via Telegram with file...');
+        
+        const { data, error } = await supabase.functions.invoke('telegram-send-file', {
+          body: {
+            chatId: phoneNumber,
+            fileUrl,
+            caption: message,
+            mimeType,
+            userId,
+            conversationId,
+            telegramBotId,
+            isBot: false
+          }
+        });
+
+        if (error) {
+          console.error('[ConversationService] Error calling telegram-send-file:', error);
+          throw error;
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to send Telegram file');
+        }
+
+        console.log('[ConversationService] Telegram file sent successfully');
+        return data.savedMessage;
+      }
+
       // Si es Twilio, usar twilio-send-file
       if (channelType === 'twilio' && twilioConnectionId) {
         console.log('[ConversationService] Sending via Twilio with file...');
