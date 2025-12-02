@@ -211,15 +211,15 @@ serve(async (req) => {
     console.log('[process-ai-buffer] Checking for pending buffers...');
 
     // Buscar buffers pendientes que cumplan las condiciones:
-    // - 4 o más mensajes acumulados
-    // - O primer mensaje con más de 20 segundos
-    const twentySecondsAgo = new Date(Date.now() - 20000).toISOString();
+    // - 2 o más mensajes acumulados
+    // - O primer mensaje con más de 10 segundos
+    const tenSecondsAgo = new Date(Date.now() - 10000).toISOString();
 
     const { data: pendingBuffers, error } = await supabase
       .from('ai_response_buffer')
       .select('*')
       .eq('processed', false)
-      .or(`message_count.gte.4,first_message_at.lt.${twentySecondsAgo}`)
+      .or(`message_count.gte.2,first_message_at.lt.${tenSecondsAgo}`)
       .limit(10); // Procesar máximo 10 buffers por ejecución
 
     if (error) {

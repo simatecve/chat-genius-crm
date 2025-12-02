@@ -2,6 +2,9 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 
+// Declarar EdgeRuntime para TypeScript
+declare const EdgeRuntime: { waitUntil: (promise: Promise<any>) => void };
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -572,14 +575,14 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
 
           console.log(`Buffer updated: ${existingBuffer.message_count + 1} messages`);
 
-          // Si alcanzó 4 mensajes, procesar inmediatamente
-          if (existingBuffer.message_count + 1 >= 4) {
-            console.log('Buffer reached 4 messages, processing immediately...');
+          // Si alcanzó 2 mensajes, procesar inmediatamente
+          if (existingBuffer.message_count + 1 >= 2) {
+            console.log('Buffer reached 2 messages, processing immediately...');
             await supabase.functions.invoke('process-ai-buffer', { body: {} });
           }
         } else {
           // Crear nuevo buffer
-          await supabase
+          const { data: newBuffer } = await supabase
             .from('ai_response_buffer')
             .insert({
               conversation_id: conversation.id,
@@ -590,9 +593,30 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
               session_name: session,
               phone_number: conversation.phone_number,
               processed: false
-            });
+            })
+            .select()
+            .single();
 
-          console.log('New buffer created');
+          console.log('New buffer created, scheduling processing in 10 seconds...');
+
+          // Programar procesamiento después de 10 segundos usando EdgeRuntime.waitUntil
+          EdgeRuntime.waitUntil((async () => {
+            // Esperar 10 segundos
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
+            // Verificar si el buffer aún no fue procesado
+            const { data: currentBuffer } = await supabase
+              .from('ai_response_buffer')
+              .select('processed')
+              .eq('conversation_id', conversation.id)
+              .eq('processed', false)
+              .maybeSingle();
+            
+            if (currentBuffer) {
+              console.log('10 seconds passed, processing buffer...');
+              await supabase.functions.invoke('process-ai-buffer', { body: {} });
+            }
+          })());
         }
       } catch (aiError) {
         console.error('Exception calling AI agent:', aiError);
