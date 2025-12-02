@@ -126,49 +126,63 @@ async function processBuffer(supabase: any, buffer: any) {
           }
         });
 
-        if (defaultResult?.respuesta) {
-          // Enviar respuesta según el canal
-          if (channelType === 'telegram') {
-            // Obtener bot info
-            const { data: bot } = await supabase
-              .from('telegram_bots')
-              .select('bot_token')
-              .eq('id', buffer.telegram_bot_id)
-              .single();
+        // Determinar los mensajes a enviar (múltiples o único)
+        const mensajesToSend = defaultResult.mensajesMultiples && defaultResult.mensajesMultiples.length > 0
+          ? defaultResult.mensajesMultiples
+          : (defaultResult.respuesta ? [defaultResult.respuesta] : []);
 
-            if (bot) {
-              await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id: conversation.phone_number,
-                  text: defaultResult.respuesta
-                })
+        if (mensajesToSend.length > 0) {
+          // Enviar cada mensaje según el canal con pequeño delay entre ellos
+          for (let i = 0; i < mensajesToSend.length; i++) {
+            const mensaje = mensajesToSend[i];
+            
+            if (channelType === 'telegram') {
+              // Obtener bot info
+              const { data: bot } = await supabase
+                .from('telegram_bots')
+                .select('bot_token')
+                .eq('id', buffer.telegram_bot_id)
+                .single();
+
+              if (bot) {
+                await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: conversation.phone_number,
+                    text: mensaje
+                  })
+                });
+              }
+            } else if (channelType === 'twilio') {
+              await supabase.functions.invoke('twilio-send-message', {
+                body: {
+                  twilioConnectionId: buffer.twilio_connection_id,
+                  toNumber: conversation.phone_number,
+                  message: mensaje,
+                  userId,
+                  conversationId,
+                  isBot: true
+                }
+              });
+            } else {
+              // WhatsApp
+              await supabase.functions.invoke('waha-send-message', {
+                body: {
+                  sessionName: buffer.session_name,
+                  phoneNumber: conversation.phone_number,
+                  message: mensaje,
+                  userId,
+                  conversationId,
+                  isBot: true
+                }
               });
             }
-          } else if (channelType === 'twilio') {
-            await supabase.functions.invoke('twilio-send-message', {
-              body: {
-                twilioConnectionId: buffer.twilio_connection_id,
-                toNumber: conversation.phone_number,
-                message: defaultResult.respuesta,
-                userId,
-                conversationId,
-                isBot: true
-              }
-            });
-          } else {
-            // WhatsApp
-            await supabase.functions.invoke('waha-send-message', {
-              body: {
-                sessionName: buffer.session_name,
-                phoneNumber: conversation.phone_number,
-                message: defaultResult.respuesta,
-                userId,
-                conversationId,
-                isBot: true
-              }
-            });
+
+            // Pequeño delay entre mensajes (1.5 segundos) para que se vean separados
+            if (i < mensajesToSend.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
           }
         }
       }
