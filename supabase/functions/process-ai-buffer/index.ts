@@ -274,6 +274,7 @@ serve(async (req) => {
       .select('*')
       .eq('processed', false)
       .or(`message_count.gte.2,first_message_at.lt.${tenSecondsAgo}`)
+      .order('first_message_at', { ascending: true })
       .limit(10); // Procesar máximo 10 buffers por ejecución
 
     if (error) {
