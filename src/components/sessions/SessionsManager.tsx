@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { supabase } from '@/integrations/supabase/client';
 import WhatsAppConnectionForm from './WhatsAppConnectionForm';
 import TelegramConnectionForm from './TelegramConnectionForm';
 import TelegramBotConnectionForm from './TelegramBotConnectionForm';
 import TwilioConnectionForm from './TwilioConnectionForm';
+import { useToast } from '@/hooks/use-toast';
 
 interface Channel {
   id: string;
@@ -45,7 +46,10 @@ const SessionsManager = () => {
   const [loading, setLoading] = useState(true);
   const [channelSelectorOpen, setChannelSelectorOpen] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [deletingSession, setDeletingSession] = useState<string | null>(null);
+  const [verifyingSession, setVerifyingSession] = useState<string | null>(null);
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!userIdLoading && effectiveUserId) {
@@ -192,6 +196,105 @@ const SessionsManager = () => {
     }
   };
 
+  const handleVerifyStatus = async (session: Session) => {
+    if (session.type !== 'whatsapp') {
+      toast({
+        title: "No disponible",
+        description: "La verificación de estatus solo está disponible para WhatsApp",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setVerifyingSession(session.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('waha-session-status', {
+        body: { 
+          session_name: session.name,
+          connection_id: session.id 
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Estado de sesión",
+        description: `Estado actual: ${data?.status || 'desconocido'}`,
+      });
+
+      // Refresh sessions to update status
+      fetchAllSessions();
+    } catch (error: any) {
+      console.error('Error verifying status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo verificar el estado de la sesión",
+        variant: "destructive",
+      });
+    } finally {
+      setVerifyingSession(null);
+    }
+  };
+
+  const handleDeleteSession = async (session: Session) => {
+    const confirmed = window.confirm(`¿Estás seguro de que quieres eliminar la sesión "${session.name}"?`);
+    if (!confirmed) return;
+
+    setDeletingSession(session.id);
+    try {
+      switch (session.type) {
+        case 'whatsapp':
+          // Delete from WAHA and database
+          const { error: wahaError } = await supabase.functions.invoke('waha-delete-session', {
+            body: { 
+              session_name: session.name,
+              connection_id: session.id 
+            }
+          });
+          if (wahaError) throw wahaError;
+          break;
+
+        case 'telegram-bot':
+          // Delete from database
+          const { error: telegramError } = await supabase
+            .from('telegram_bots')
+            .delete()
+            .eq('id', session.id);
+          if (telegramError) throw telegramError;
+          break;
+
+        case 'twilio':
+          // Delete from database
+          const { error: twilioError } = await supabase
+            .from('twilio_connections')
+            .delete()
+            .eq('id', session.id);
+          if (twilioError) throw twilioError;
+          break;
+
+        default:
+          throw new Error('Tipo de sesión no soportado');
+      }
+
+      toast({
+        title: "Sesión eliminada",
+        description: "La sesión ha sido eliminada correctamente",
+      });
+
+      // Refresh sessions list
+      fetchAllSessions();
+    } catch (error: any) {
+      console.error('Error deleting session:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar la sesión",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingSession(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -265,7 +368,7 @@ const SessionsManager = () => {
                   {getStatusIcon(session.status)}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 <div className="text-sm text-muted-foreground">
                   <span className="font-medium">ID:</span> {session.identifier}
                 </div>
@@ -280,6 +383,38 @@ const SessionsManager = () => {
                   }`}>
                     {session.status === 'connected' || session.status === 'active' ? 'Conectado' : 'Desconectado'}
                   </span>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  {session.type === 'whatsapp' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleVerifyStatus(session)}
+                      disabled={verifyingSession === session.id}
+                      className="flex-1"
+                    >
+                      {verifyingSession === session.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      <span className="ml-1 text-xs">Verificar</span>
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteSession(session)}
+                    disabled={deletingSession === session.id}
+                    className="flex-1 hover:bg-destructive hover:text-destructive-foreground"
+                  >
+                    {deletingSession === session.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3 w-3" />
+                    )}
+                    <span className="ml-1 text-xs">Eliminar</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
