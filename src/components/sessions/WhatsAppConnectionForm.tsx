@@ -126,36 +126,40 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
     try {
       const cleanPhoneNumber = formData.phone_number.replace(/\D/g, '');
       
-      const { data: connection, error: insertError } = await supabase
-        .from('whatsapp_connections')
-        .insert({
+      // Crear sesión en WAHA primero
+      const { data: sessionData, error: sessionError } = await supabase.functions.invoke('waha-create-session', {
+        body: {
           user_id: effectiveUserId,
-          name: formData.name,
+          session_name: formData.name,
           phone_number: cleanPhoneNumber,
-          status: 'disconnected',
           workspace_id: formData.workspace_id || null,
           default_column_id: formData.default_column_id || null,
-        })
-        .select()
-        .single();
+        }
+      });
 
-      if (insertError) throw insertError;
+      if (sessionError) throw sessionError;
+
+      if (!sessionData?.success) {
+        throw new Error(sessionData?.error || 'Error al crear la sesión');
+      }
 
       await incrementUsage('whatsapp_connections');
 
       toast({
         title: "Éxito",
-        description: "Conexión creada correctamente",
+        description: "Sesión creada correctamente",
       });
 
-      setCurrentSession(cleanPhoneNumber);
-      handleQRConnect(cleanPhoneNumber);
+      // Usar el session_name sanitizado devuelto por el backend
+      const sessionName = sessionData.connection?.name || formData.name;
+      setCurrentSession(sessionName);
+      handleQRConnect(sessionName);
       
     } catch (error: any) {
-      console.error('Error creating connection:', error);
+      console.error('Error creating session:', error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear la conexión",
+        description: error.message || "No se pudo crear la sesión",
         variant: "destructive",
       });
     } finally {
