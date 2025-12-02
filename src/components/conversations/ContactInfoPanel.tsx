@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Calendar, MapPin, Users, Filter, FileText, DollarSign, ChevronDown, ChevronUp, Plus, Edit2, Coins, TrendingUp, TrendingDown, UserPlus, Key, RefreshCw, Bot, BotOff, Eye, EyeOff } from 'lucide-react';
+import { User, Calendar, MapPin, Users, Filter, FileText, DollarSign, ChevronDown, ChevronUp, Plus, Edit2, Coins, TrendingUp, TrendingDown, UserPlus, Key, RefreshCw, Bot, BotOff, Eye, EyeOff, Tag, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,8 @@ import { useBotBlock } from '@/hooks/useBotBlock';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
 import { useProfile } from '@/hooks/useProfile';
 import { useQueryClient } from '@tanstack/react-query';
+import { tagsServices, EtiquetaResponse } from '@/services/tagsServices';
+import { Badge } from '@/components/ui/badge';
 
 interface ContactInfoPanelProps {
   conversationId: string;
@@ -58,7 +60,13 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
     notes: true,
     sales: true,
     casino: true,
+    tags: true,
   });
+
+  // Tags state
+  const [etiquetas, setEtiquetas] = useState<EtiquetaResponse[]>([]);
+  const [contactTags, setContactTags] = useState<string[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
 
   // Casino states
   const [casinoPlayer, setCasinoPlayer] = useState<any>(null);
@@ -98,7 +106,100 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   useEffect(() => {
     loadContactDetails();
     loadEmbudos();
+    loadEtiquetas();
+    loadContactTags();
   }, [conversationId]);
+
+  const loadEtiquetas = async () => {
+    const result = await tagsServices.getAllEtiquetas();
+    if (result.success && result.data) {
+      setEtiquetas(result.data);
+    }
+  };
+
+  const loadContactTags = async () => {
+    // Buscar contacto por número de teléfono
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('tags')
+      .eq('phone_number', cleanPhone)
+      .maybeSingle();
+    
+    if (!contact) {
+      // Intentar con el número original
+      const { data: contact2 } = await supabase
+        .from('contacts')
+        .select('tags')
+        .eq('phone_number', phoneNumber)
+        .maybeSingle();
+      
+      if (contact2?.tags) {
+        setContactTags(contact2.tags);
+      } else {
+        setContactTags([]);
+      }
+    } else if (contact.tags) {
+      setContactTags(contact.tags);
+    } else {
+      setContactTags([]);
+    }
+  };
+
+  const toggleContactTag = async (tagName: string) => {
+    setTagsLoading(true);
+    try {
+      const cleanPhone = phoneNumber.replace(/\D/g, '');
+      const newTags = contactTags.includes(tagName)
+        ? contactTags.filter(t => t !== tagName)
+        : [...contactTags, tagName];
+      
+      // Buscar contacto por número
+      let { data: contact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('phone_number', cleanPhone)
+        .maybeSingle();
+      
+      if (!contact) {
+        const { data: contact2 } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('phone_number', phoneNumber)
+          .maybeSingle();
+        contact = contact2;
+      }
+      
+      if (contact) {
+        await supabase
+          .from('contacts')
+          .update({ tags: newTags.length > 0 ? newTags : null })
+          .eq('id', contact.id);
+        
+        setContactTags(newTags);
+        toast({
+          title: 'Etiquetas actualizadas',
+          description: `Se ${contactTags.includes(tagName) ? 'quitó' : 'agregó'} la etiqueta "${tagName}"`,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'No se encontró el contacto para actualizar',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating tags:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron actualizar las etiquetas',
+        variant: 'destructive',
+      });
+    } finally {
+      setTagsLoading(false);
+    }
+  };
 
   const loadEmbudos = async () => {
     try {
@@ -639,6 +740,81 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
             <Edit2 className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* ETIQUETAS */}
+        <Card className="p-3 bg-card border-border">
+          <button
+            onClick={() => toggleSection('tags')}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <div className="flex items-center space-x-2">
+              <Tag className="h-4 w-4 text-primary" />
+              <h3 className="font-medium text-sm text-foreground">ETIQUETAS</h3>
+              {contactTags.length > 0 && (
+                <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                  {contactTags.length}
+                </span>
+              )}
+            </div>
+            {expandedSections.tags ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+
+          {expandedSections.tags && (
+            <div className="mt-3 space-y-3">
+              {/* Etiquetas asignadas */}
+              {contactTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {contactTags.map((tag) => {
+                    const etiqueta = etiquetas.find(e => e.nombre === tag);
+                    return (
+                      <Badge
+                        key={tag}
+                        className="cursor-pointer"
+                        style={{
+                          backgroundColor: etiqueta?.color || 'hsl(var(--primary))',
+                          color: 'white',
+                        }}
+                        onClick={() => toggleContactTag(tag)}
+                      >
+                        {tag}
+                        <X className="w-3 h-3 ml-1" />
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Agregar etiquetas */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Agregar etiqueta:</Label>
+                <div className="flex flex-wrap gap-2">
+                  {etiquetas
+                    .filter(e => !contactTags.includes(e.nombre))
+                    .map((etiqueta) => (
+                      <Badge
+                        key={etiqueta.id}
+                        variant="outline"
+                        className="cursor-pointer transition-all hover:opacity-80"
+                        style={{
+                          borderColor: etiqueta.color,
+                          color: etiqueta.color,
+                        }}
+                        onClick={() => toggleContactTag(etiqueta.nombre)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {etiqueta.nombre}
+                      </Badge>
+                    ))}
+                </div>
+                {etiquetas.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No hay etiquetas disponibles. Créalas en Configuración &gt; Etiquetas.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
 
         {/* CASINO */}
         <Card className="p-3 bg-card border-success">

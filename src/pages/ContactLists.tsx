@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Edit, Plus, Users, Calendar, UserPlus } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Trash2, Edit, Plus, Users, Calendar, UserPlus, Upload, FileText, User } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
 
@@ -19,6 +20,11 @@ type ContactList = Tables<'contact_lists'>;
 
 interface ContactListWithCount extends ContactList {
   contact_count?: number;
+}
+
+interface ParsedContact {
+  name: string;
+  phone_number: string;
 }
 
 const ContactLists = () => {
@@ -38,6 +44,15 @@ const ContactLists = () => {
     description: ''
   });
 
+  // Estados para importación CSV/TXT
+  const [importedContacts, setImportedContacts] = useState<ParsedContact[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+
+  // Estados para entrada manual
+  const [manualName, setManualName] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualContacts, setManualContacts] = useState<ParsedContact[]>([]);
+
   useEffect(() => {
     if (user) {
       fetchContactLists();
@@ -48,7 +63,6 @@ const ContactLists = () => {
     try {
       setLoading(true);
       
-      // Fetch contact lists with contact count
       const { data: lists, error } = await supabase
         .from('contact_lists')
         .select(`
@@ -60,7 +74,6 @@ const ContactLists = () => {
 
       if (error) throw error;
 
-      // Transform data to include contact count
       const listsWithCount = lists?.map(list => ({
         ...list,
         contact_count: list.contact_list_members?.[0]?.count || 0
@@ -165,13 +178,11 @@ const ContactLists = () => {
     }
 
     try {
-      // First delete all contact list members
       await supabase
         .from('contact_list_members')
         .delete()
         .eq('contact_list_id', listId);
 
-      // Then delete the contact list
       const { error } = await supabase
         .from('contact_lists')
         .delete()
@@ -218,13 +229,16 @@ const ContactLists = () => {
     setEditingList(null);
     setAddingToList(null);
     setSelectedContacts([]);
+    setImportedContacts([]);
+    setManualContacts([]);
+    setManualName('');
+    setManualPhone('');
     resetForm();
   };
 
   const openAddContactsDialog = async (list: ContactList) => {
     setAddingToList(list);
     
-    // Fetch contacts that are NOT in this list
     try {
       const { data: existingMembers } = await supabase
         .from('contact_list_members')
@@ -241,7 +255,6 @@ const ContactLists = () => {
       
       if (error) throw error;
       
-      // Filter out contacts already in the list
       const available = allContacts?.filter(c => !existingContactIds.includes(c.id)) || [];
       setAvailableContacts(available);
       setIsAddContactsDialogOpen(true);
@@ -297,6 +310,239 @@ const ContactLists = () => {
     );
   };
 
+  // Manejar subida de archivo CSV/TXT
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      
+      const parsed: ParsedContact[] = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        
+        // Intentar parsear como CSV (nombre,telefono) o solo telefono
+        const parts = trimmed.split(/[,;\t]/).map(p => p.trim());
+        
+        if (parts.length >= 2) {
+          parsed.push({ name: parts[0], phone_number: parts[1].replace(/\D/g, '') });
+        } else if (parts.length === 1 && parts[0]) {
+          // Solo número, usar como nombre también
+          const cleanPhone = parts[0].replace(/\D/g, '');
+          if (cleanPhone) {
+            parsed.push({ name: cleanPhone, phone_number: cleanPhone });
+          }
+        }
+      }
+      
+      setImportedContacts(parsed);
+      
+      if (parsed.length === 0) {
+        toast({
+          title: 'Archivo vacío',
+          description: 'No se encontraron contactos válidos en el archivo',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Archivo procesado',
+          description: `Se encontraron ${parsed.length} contactos`
+        });
+      }
+    } catch (error) {
+      console.error('Error parsing file:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo procesar el archivo',
+        variant: 'destructive'
+      });
+    }
+    
+    // Reset input
+    e.target.value = '';
+  };
+
+  // Agregar contactos importados a la lista
+  const handleAddImportedContacts = async () => {
+    if (!addingToList || importedContacts.length === 0) return;
+
+    setImportLoading(true);
+    try {
+      let addedCount = 0;
+      
+      for (const contact of importedContacts) {
+        // Buscar o crear contacto
+        let { data: existing } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('user_id', user?.id)
+          .eq('phone_number', contact.phone_number)
+          .maybeSingle();
+        
+        let contactId = existing?.id;
+        
+        if (!contactId) {
+          const { data: created } = await supabase
+            .from('contacts')
+            .insert({
+              user_id: user?.id!,
+              phone_number: contact.phone_number,
+              name: contact.name,
+              first_name: contact.name,
+              origin: 'import'
+            })
+            .select('id')
+            .single();
+          contactId = created?.id;
+        }
+        
+        if (contactId) {
+          // Verificar si ya está en la lista
+          const { data: existing_member } = await supabase
+            .from('contact_list_members')
+            .select('id')
+            .eq('contact_list_id', addingToList.id)
+            .eq('contact_id', contactId)
+            .maybeSingle();
+          
+          if (!existing_member) {
+            await supabase.from('contact_list_members').insert({
+              contact_list_id: addingToList.id,
+              contact_id: contactId
+            });
+            addedCount++;
+          }
+        }
+      }
+
+      toast({
+        title: 'Éxito',
+        description: `${addedCount} contacto(s) agregado(s) a la lista`
+      });
+
+      setImportedContacts([]);
+      fetchContactLists();
+    } catch (error) {
+      console.error('Error adding imported contacts:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron agregar los contactos',
+        variant: 'destructive'
+      });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // Agregar contacto manual a la lista temporal
+  const handleAddManualContact = () => {
+    if (!manualPhone.trim()) {
+      toast({
+        title: 'Error',
+        description: 'El teléfono es requerido',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const cleanPhone = manualPhone.replace(/\D/g, '');
+    const name = manualName.trim() || cleanPhone;
+    
+    // Verificar duplicados
+    if (manualContacts.some(c => c.phone_number === cleanPhone)) {
+      toast({
+        title: 'Duplicado',
+        description: 'Este número ya está en la lista',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setManualContacts(prev => [...prev, { name, phone_number: cleanPhone }]);
+    setManualName('');
+    setManualPhone('');
+  };
+
+  // Eliminar contacto de lista temporal
+  const removeManualContact = (phone: string) => {
+    setManualContacts(prev => prev.filter(c => c.phone_number !== phone));
+  };
+
+  // Agregar contactos manuales a la lista
+  const handleAddManualContacts = async () => {
+    if (!addingToList || manualContacts.length === 0) return;
+
+    setImportLoading(true);
+    try {
+      let addedCount = 0;
+      
+      for (const contact of manualContacts) {
+        // Buscar o crear contacto
+        let { data: existing } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('user_id', user?.id)
+          .eq('phone_number', contact.phone_number)
+          .maybeSingle();
+        
+        let contactId = existing?.id;
+        
+        if (!contactId) {
+          const { data: created } = await supabase
+            .from('contacts')
+            .insert({
+              user_id: user?.id!,
+              phone_number: contact.phone_number,
+              name: contact.name,
+              first_name: contact.name,
+              origin: 'manual'
+            })
+            .select('id')
+            .single();
+          contactId = created?.id;
+        }
+        
+        if (contactId) {
+          // Verificar si ya está en la lista
+          const { data: existing_member } = await supabase
+            .from('contact_list_members')
+            .select('id')
+            .eq('contact_list_id', addingToList.id)
+            .eq('contact_id', contactId)
+            .maybeSingle();
+          
+          if (!existing_member) {
+            await supabase.from('contact_list_members').insert({
+              contact_list_id: addingToList.id,
+              contact_id: contactId
+            });
+            addedCount++;
+          }
+        }
+      }
+
+      toast({
+        title: 'Éxito',
+        description: `${addedCount} contacto(s) agregado(s) a la lista`
+      });
+
+      setManualContacts([]);
+      fetchContactLists();
+    } catch (error) {
+      console.error('Error adding manual contacts:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron agregar los contactos',
+        variant: 'destructive'
+      });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
@@ -307,12 +553,12 @@ const ContactLists = () => {
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Cargando listas de contactos...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando listas de contactos...</p>
         </div>
+      </div>
     );
   }
 
@@ -331,51 +577,51 @@ const ContactLists = () => {
                 Nueva Lista
               </Button>
             </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">Crear Nueva Lista de Contactos</DialogTitle>
-              <DialogDescription className="text-muted-foreground">
-                Crea una nueva lista para organizar tus contactos
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right text-foreground">
-                  Nombre *
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="col-span-3 bg-background border-border text-foreground"
-                  placeholder="Ej: Clientes VIP"
-                />
+            <DialogContent className="sm:max-w-[425px] bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Crear Nueva Lista de Contactos</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Crea una nueva lista para organizar tus contactos
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right text-foreground">
+                    Nombre *
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="col-span-3 bg-background border-border text-foreground"
+                    placeholder="Ej: Clientes VIP"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="description" className="text-right text-foreground">
+                    Descripción
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="col-span-3 bg-background border-border text-foreground"
+                    placeholder="Descripción opcional de la lista"
+                    rows={3}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right text-foreground">
-                  Descripción
-                </Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="col-span-3 bg-background border-border text-foreground"
-                  placeholder="Descripción opcional de la lista"
-                  rows={3}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={handleCancel} className="border-border hover:bg-muted">
-                Cancelar
-              </Button>
-              <Button onClick={handleCreateList} className="bg-gradient-to-r from-primary to-primary/90">
-                Crear Lista
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={handleCancel} className="border-border hover:bg-muted">
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreateList} className="bg-gradient-to-r from-primary to-primary/90">
+                  Crear Lista
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
 
         {contactLists.length === 0 ? (
           <div className="text-center py-12">
@@ -455,106 +701,236 @@ const ContactLists = () => {
           </div>
         )}
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Editar Lista de Contactos</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Modifica los detalles de tu lista de contactos
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-name" className="text-right text-foreground">
-                Nombre *
-              </Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="col-span-3 bg-background border-border text-foreground"
-                placeholder="Ej: Clientes VIP"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-description" className="text-right text-foreground">
-                Descripción
-              </Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="col-span-3 bg-background border-border text-foreground"
-                placeholder="Descripción opcional de la lista"
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancel} className="border-border hover:bg-muted">
-              Cancelar
-            </Button>
-            <Button onClick={handleEditList} className="bg-gradient-to-r from-primary to-primary/90">
-              Guardar Cambios
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Contacts Dialog */}
-      <Dialog open={isAddContactsDialogOpen} onOpenChange={setIsAddContactsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Agregar Contactos a "{addingToList?.name}"</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Selecciona los contactos que deseas agregar a esta lista
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[400px] overflow-y-auto">
-            {availableContacts.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">No hay contactos disponibles para agregar</p>
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[425px] bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">Editar Lista de Contactos</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Modifica los detalles de tu lista de contactos
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-name" className="text-right text-foreground">
+                  Nombre *
+                </Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="col-span-3 bg-background border-border text-foreground"
+                  placeholder="Ej: Clientes VIP"
+                />
               </div>
-            ) : (
-              <div className="space-y-2">
-                {availableContacts.map((contact) => (
-                  <div 
-                    key={contact.id} 
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                    onClick={() => toggleContactSelection(contact.id)}
-                  >
-                    <Checkbox 
-                      checked={selectedContacts.includes(contact.id)}
-                      onCheckedChange={() => toggleContactSelection(contact.id)}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{contact.name}</p>
-                      <p className="text-sm text-muted-foreground">{contact.phone_number}</p>
-                      {contact.email && (
-                        <p className="text-xs text-muted-foreground">{contact.email}</p>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-description" className="text-right text-foreground">
+                  Descripción
+                </Label>
+                <Textarea
+                  id="edit-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="col-span-3 bg-background border-border text-foreground"
+                  placeholder="Descripción opcional de la lista"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancel} className="border-border hover:bg-muted">
+                Cancelar
+              </Button>
+              <Button onClick={handleEditList} className="bg-gradient-to-r from-primary to-primary/90">
+                Guardar Cambios
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Contacts Dialog with Tabs */}
+        <Dialog open={isAddContactsDialogOpen} onOpenChange={setIsAddContactsDialogOpen}>
+          <DialogContent className="sm:max-w-[600px] bg-card border-border max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">
+                Agregar Contactos a "{addingToList?.name}"
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Selecciona cómo deseas agregar contactos a esta lista
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Tabs defaultValue="existing" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="existing" className="flex items-center gap-1">
+                  <Users className="w-4 h-4" />
+                  Existentes
+                </TabsTrigger>
+                <TabsTrigger value="import" className="flex items-center gap-1">
+                  <Upload className="w-4 h-4" />
+                  CSV/TXT
+                </TabsTrigger>
+                <TabsTrigger value="manual" className="flex items-center gap-1">
+                  <User className="w-4 h-4" />
+                  Manual
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Tab: Contactos Existentes */}
+              <TabsContent value="existing" className="space-y-4">
+                {availableContacts.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">
+                    No hay contactos disponibles para agregar
+                  </p>
+                ) : (
+                  <>
+                    <div className="max-h-[300px] overflow-y-auto space-y-2">
+                      {availableContacts.map((contact) => (
+                        <div
+                          key={contact.id}
+                          className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted cursor-pointer"
+                          onClick={() => toggleContactSelection(contact.id)}
+                        >
+                          <Checkbox
+                            checked={selectedContacts.includes(contact.id)}
+                            onCheckedChange={() => toggleContactSelection(contact.id)}
+                          />
+                          <div className="flex-1">
+                            <p className="text-foreground font-medium">{contact.name}</p>
+                            <p className="text-sm text-muted-foreground">{contact.phone_number}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={handleAddContactsToList}
+                      disabled={selectedContacts.length === 0}
+                      className="w-full bg-gradient-to-r from-primary to-primary/90"
+                    >
+                      Agregar {selectedContacts.length} Contacto(s)
+                    </Button>
+                  </>
+                )}
+              </TabsContent>
+
+              {/* Tab: Importar CSV/TXT */}
+              <TabsContent value="import" className="space-y-4">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                  <FileText className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Sube un archivo CSV o TXT
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Formato: nombre,telefono (uno por línea)
+                  </p>
+                  <label htmlFor="file-import">
+                    <Button variant="outline" asChild className="cursor-pointer">
+                      <span>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Seleccionar Archivo
+                      </span>
+                    </Button>
+                  </label>
+                  <input
+                    id="file-import"
+                    type="file"
+                    accept=".csv,.txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </div>
+
+                {importedContacts.length > 0 && (
+                  <>
+                    <div className="max-h-[200px] overflow-y-auto space-y-1">
+                      <p className="text-sm font-medium text-foreground mb-2">
+                        Vista previa ({importedContacts.length} contactos):
+                      </p>
+                      {importedContacts.slice(0, 10).map((contact, idx) => (
+                        <div key={idx} className="flex justify-between text-sm p-2 bg-muted rounded">
+                          <span className="text-foreground">{contact.name}</span>
+                          <span className="text-muted-foreground">{contact.phone_number}</span>
+                        </div>
+                      ))}
+                      {importedContacts.length > 10 && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          ... y {importedContacts.length - 10} más
+                        </p>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancel} className="border-border hover:bg-muted">
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleAddContactsToList} 
-              disabled={selectedContacts.length === 0}
-              className="bg-gradient-to-r from-primary to-primary/90"
-            >
-              Agregar {selectedContacts.length > 0 && `(${selectedContacts.length})`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                    <Button
+                      onClick={handleAddImportedContacts}
+                      disabled={importLoading}
+                      className="w-full bg-gradient-to-r from-primary to-primary/90"
+                    >
+                      {importLoading ? 'Importando...' : `Importar ${importedContacts.length} Contacto(s)`}
+                    </Button>
+                  </>
+                )}
+              </TabsContent>
+
+              {/* Tab: Agregar Manual */}
+              <TabsContent value="manual" className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nombre"
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    className="flex-1 bg-background border-border"
+                  />
+                  <Input
+                    placeholder="Teléfono *"
+                    value={manualPhone}
+                    onChange={(e) => setManualPhone(e.target.value)}
+                    className="flex-1 bg-background border-border"
+                  />
+                  <Button onClick={handleAddManualContact} size="icon" variant="outline">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {manualContacts.length > 0 && (
+                  <>
+                    <div className="max-h-[200px] overflow-y-auto space-y-1">
+                      <p className="text-sm font-medium text-foreground mb-2">
+                        Contactos a agregar ({manualContacts.length}):
+                      </p>
+                      {manualContacts.map((contact, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-sm p-2 bg-muted rounded">
+                          <div>
+                            <span className="text-foreground">{contact.name}</span>
+                            <span className="text-muted-foreground ml-2">{contact.phone_number}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeManualContact(contact.phone_number)}
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={handleAddManualContacts}
+                      disabled={importLoading}
+                      className="w-full bg-gradient-to-r from-primary to-primary/90"
+                    >
+                      {importLoading ? 'Agregando...' : `Agregar ${manualContacts.length} Contacto(s)`}
+                    </Button>
+                  </>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancel} className="border-border hover:bg-muted">
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -325,6 +325,70 @@ async function linkConversationToLead(
   return true;
 }
 
+// Buscar o crear contacto
+async function getOrCreateContact(
+  supabase: any,
+  userId: string,
+  phoneNumber: string,
+  pushName: string | null
+) {
+  // Buscar contacto existente
+  const { data: existingContact, error: searchError } = await supabase
+    .from('contacts')
+    .select('id, name')
+    .eq('user_id', userId)
+    .eq('phone_number', phoneNumber)
+    .maybeSingle();
+
+  if (searchError && searchError.code !== 'PGRST116') {
+    console.error('Error searching contact:', searchError);
+    return null;
+  }
+
+  if (existingContact) {
+    // Si existe y tenemos pushName diferente, actualizar
+    if (pushName && existingContact.name !== pushName && existingContact.name === phoneNumber) {
+      const { error: updateError } = await supabase
+        .from('contacts')
+        .update({ 
+          name: pushName, 
+          first_name: pushName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingContact.id);
+      
+      if (updateError) {
+        console.error('Error updating contact name:', updateError);
+      } else {
+        console.log('Contact name updated to:', pushName);
+      }
+    }
+    console.log('Contact already exists:', existingContact.id);
+    return existingContact;
+  }
+
+  // Crear nuevo contacto
+  const { data: newContact, error: createError } = await supabase
+    .from('contacts')
+    .insert({
+      user_id: userId,
+      phone_number: phoneNumber,
+      name: pushName || phoneNumber,
+      first_name: pushName || null,
+      origin: 'whatsapp',
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error('Error creating contact:', createError);
+    return null;
+  }
+
+  console.log('New contact created:', newContact.id);
+  return newContact;
+}
+
 // Procesar evento de mensaje
 async function processMessageEvent(supabase: any, payload: any, session: string, rawPayload?: any) {
   try {
@@ -464,8 +528,11 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     // Guardar mensaje
     await saveMessage(supabase, conversation.id, userId, messageData, mediaUrl, mediaType);
 
-    // Solo crear lead para mensajes entrantes (!fromMe)
+    // Solo crear lead y contacto para mensajes entrantes (!fromMe)
     if (!fromMe) {
+      // Crear o actualizar contacto
+      await getOrCreateContact(supabase, userId, phoneNumber, pushName);
+      
       const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, pushName, session);
       
       if (lead && !conversation.lead_id) {
