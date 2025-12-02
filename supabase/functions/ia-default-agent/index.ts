@@ -44,7 +44,7 @@ const casinoTools = [
     type: "function",
     function: {
       name: "crear_jugador",
-      description: "Crear un nuevo jugador en el casino. Usar cuando el usuario quiera registrarse o crear una cuenta. IMPORTANTE: Siempre confirmar con el usuario antes de crear la cuenta.",
+      description: "Crear un nuevo jugador en el casino. Usar cuando el usuario quiera registrarse o crear una cuenta. Si no especifica contraseña, usar 'Capibet1234' como contraseña por defecto.",
       parameters: {
         type: "object",
         properties: {
@@ -54,10 +54,11 @@ const casinoTools = [
           },
           password: { 
             type: "string", 
-            description: "Contraseña del usuario (mínimo 6 caracteres)" 
+            description: "Contraseña del usuario. Si no se proporciona, usar 'Capibet1234' por defecto",
+            default: "Capibet1234"
           }
         },
-        required: ["userName", "password"]
+        required: ["userName"]
       }
     }
   }
@@ -209,11 +210,15 @@ serve(async (req) => {
 - CBU para cargas: ${cbu || '[no configurado]'}
 - Números de cajeros: ${cashierNumbersText || '[no configurados]'}
 
+**CREACIÓN DE CUENTAS:**
+- Contraseña por defecto: "Capibet1234" (si el usuario no especifica una)
+- Después de crear la cuenta, SIEMPRE enviá las credenciales completas: usuario y contraseña
+- Formato de respuesta: "¡Listo! Tu cuenta fue creada. Usuario: [usuario] - Contraseña: [contraseña]"
+
 **REGLAS IMPORTANTES:**
 - Si te piden cargar fichas, depositar o retirar saldo, respondé: "Para gestionar depósitos y retiros, necesito que hables con uno de nuestros asesores humanos. Ellos te van a ayudar con eso de inmediato."
 - NUNCA inventes información. Si no sabés algo, decilo claramente y recomendá contactar a un asesor
 - Si te preguntan por juegos específicos, promociones, o detalles técnicos que no conocés, recomendá que contacten a un asesor humano
-- Antes de ejecutar crear_jugador, SIEMPRE confirmá los datos con el usuario
 
 Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en cada respuesta.`;
 
@@ -267,12 +272,21 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
               switch (toolCall.function.name) {
                 case 'crear_jugador':
                   actionType = 'crear_jugador';
+                  // Usar contraseña por defecto si no se proporciona
+                  const password = args.password || 'Capibet1234';
                   toolResult = await crearJugador(
                     args.userName, 
-                    args.password, 
+                    password, 
                     contactName || 'Usuario', 
                     phoneNumber || ''
                   );
+                  // Incluir credenciales en el resultado para la IA
+                  if (toolResult.success && toolResult.data) {
+                    toolResult.data.credentials = {
+                      userName: args.userName,
+                      password: password
+                    };
+                  }
                   break;
                 default:
                   console.error('Tool no permitida:', toolCall.function.name);
