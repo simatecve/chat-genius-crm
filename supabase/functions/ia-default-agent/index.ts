@@ -39,6 +39,58 @@ async function crearJugador(userName: string, password: string, contactName: str
   }
 }
 
+// Función para analizar si una imagen es un comprobante de pago usando visión
+async function analyzeImageForPaymentReceipt(imageUrl: string, LOVABLE_API_KEY: string): Promise<boolean> {
+  try {
+    console.log('Analyzing image for payment receipt:', imageUrl);
+    
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Analiza esta imagen y responde ÚNICAMENTE con "SI" o "NO":
+¿Es esta imagen un comprobante de pago, transferencia bancaria, voucher de depósito, 
+captura de pantalla de una transferencia realizada, recibo de pago, ticket de depósito,
+o cualquier documento/captura que demuestre que se realizó una transacción financiera o pago?
+
+Responde SOLO "SI" o "NO", sin explicaciones.`
+            },
+            {
+              type: 'image_url',
+              image_url: { url: imageUrl }
+            }
+          ]
+        }],
+        max_tokens: 10,
+        temperature: 0.1
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      const answer = (result.choices?.[0]?.message?.content || '').toUpperCase().trim();
+      console.log('Image analysis result:', answer);
+      return answer.includes('SI') || answer.includes('SÍ') || answer === 'YES';
+    } else {
+      const errorText = await response.text();
+      console.error('Error analyzing image:', errorText);
+      return false;
+    }
+  } catch (error) {
+    console.error('Exception analyzing image:', error);
+    return false;
+  }
+}
+
 // Definición de herramientas (tools) para function calling
 const casinoTools = [
   {
@@ -81,7 +133,7 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { userId, messageContent, contactName, phoneNumber, conversationId } = await req.json();
+    const { userId, messageContent, imageUrls, contactName, phoneNumber, conversationId } = await req.json();
 
     if (!userId || typeof messageContent !== 'string') {
       return new Response(
@@ -90,7 +142,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Processing message:', { userId, contactName, phoneNumber, conversationId });
+    console.log('Processing message:', { userId, contactName, phoneNumber, conversationId, hasImages: !!(imageUrls?.length) });
 
     // Obtener configuración global de IA
     const { data: settings, error: settingsError } = await supabase
@@ -122,6 +174,41 @@ serve(async (req) => {
       });
     }
 
+    // ANÁLISIS DE IMÁGENES: Si hay imágenes, verificar si alguna es comprobante de pago
+    if (imageUrls && imageUrls.length > 0 && LOVABLE_API_KEY) {
+      console.log(`Analyzing ${imageUrls.length} images for payment receipts...`);
+      
+      for (const imageUrl of imageUrls) {
+        const isReceipt = await analyzeImageForPaymentReceipt(imageUrl, LOVABLE_API_KEY);
+        
+        if (isReceipt) {
+          console.log('Payment receipt detected in image:', imageUrl);
+          
+          const cajas = cashierNumbersText?.trim() || '';
+          const mensajesMultiples = [
+            '¡Gracias por enviar tu comprobante! 📄',
+            'Ahora envía este comprobante al siguiente número de atención para acreditar tu saldo ↓',
+            cajas || 'Contacta a soporte para obtener el número de atención'
+          ];
+
+          const payload: DefaultAgentResponse = {
+            isActivated: true,
+            intencionCargaFichas: true,
+            comprobanteDetectado: true,
+            respuesta: mensajesMultiples[0],
+            mensajesMultiples
+          };
+
+          return new Response(JSON.stringify(payload), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          });
+        }
+      }
+      
+      console.log('No payment receipts detected in images');
+    }
+
     const text = (messageContent || '').toLowerCase();
 
     // Detección de intención real de carga
@@ -132,7 +219,7 @@ serve(async (req) => {
     ];
     const intencionCargaFichas = cargaPatterns.some(p => text.includes(p));
 
-    // Detección de comprobante
+    // Detección de comprobante por texto (fallback si no hay imágenes)
     const comprobantePatterns = [
       'comprobante','voucher','recibo','captura','screenshot','foto del pago','ticket'
     ];
