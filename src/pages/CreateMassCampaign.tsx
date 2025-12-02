@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Paperclip, Smile, Clock, Plus } from 'lucide-react';
+import { ArrowLeft, Paperclip, Smile, Clock, Plus, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,15 +19,19 @@ export default function CreateMassCampaign() {
   
   const [loading, setLoading] = useState(false);
   const [connections, setConnections] = useState<any[]>([]);
-  const [contacts, setContacts] = useState<any[]>([]);
+  const [contactLists, setContactLists] = useState<any[]>([]);
+  const [aiAgents, setAiAgents] = useState<any[]>([]);
   
   const [selectedConnection, setSelectedConnection] = useState('');
-  const [selectedContact, setSelectedContact] = useState('');
+  const [selectedContactList, setSelectedContactList] = useState('');
+  const [selectedAiAgent, setSelectedAiAgent] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [message, setMessage] = useState('');
   const [messagesPerRound, setMessagesPerRound] = useState('10');
   const [waitTime, setWaitTime] = useState('30');
   const [waitTimeEnabled, setWaitTimeEnabled] = useState(true);
+  const [editWithAi, setEditWithAi] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   useEffect(() => {
     loadData();
@@ -45,25 +50,45 @@ export default function CreateMassCampaign() {
       
       setConnections(conns || []);
 
-      // Cargar contactos
-      const { data: contactsData } = await supabase
-        .from('contacts')
-        .select('id, name, phone_number')
+      // Cargar listas de contactos
+      const { data: lists } = await supabase
+        .from('contact_lists')
+        .select('id, name')
         .eq('user_id', user.id)
         .order('name');
       
-      setContacts(contactsData || []);
+      setContactLists(lists || []);
+
+      // Cargar AI Agents
+      const { data: agents } = await supabase
+        .from('ai_agents')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('name');
+      
+      setAiAgents(agents || []);
 
     } catch (error) {
       console.error('Error loading data:', error);
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachments(Array.from(e.target.files));
+    }
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async () => {
     if (!selectedConnection || !message) {
       toast({
         title: "Error",
-        description: "Por favor completa todos los campos requeridos",
+        description: "Por favor selecciona una sesión y escribe un mensaje",
         variant: "destructive",
       });
       return;
@@ -71,6 +96,30 @@ export default function CreateMassCampaign() {
 
     setLoading(true);
     try {
+      // Upload attachments if any
+      let attachmentUrls: string[] = [];
+      let attachmentNames: string[] = [];
+      
+      if (attachments.length > 0) {
+        for (const file of attachments) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user!.id}/${Date.now()}-${Math.random()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('campaign-attachments')
+            .upload(fileName, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('campaign-attachments')
+            .getPublicUrl(fileName);
+
+          attachmentUrls.push(publicUrl);
+          attachmentNames.push(file.name);
+        }
+      }
+
       // Crear campaña
       const { data: campaign, error } = await supabase
         .from('mass_campaigns')
@@ -79,9 +128,14 @@ export default function CreateMassCampaign() {
           name: `Campaña ${new Date().toLocaleDateString()}`,
           message: message,
           whatsapp_connection_id: selectedConnection,
+          contact_list_id: selectedContactList || null,
           min_delay: waitTimeEnabled ? parseInt(waitTime) : 0,
           max_delay: waitTimeEnabled ? parseInt(waitTime) + 10 : 10,
+          edit_with_ai: editWithAi,
+          attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : null,
+          attachment_names: attachmentNames.length > 0 ? attachmentNames : null,
           status: 'pending',
+          channel_type: 'whatsapp',
         })
         .select()
         .single();
@@ -122,11 +176,11 @@ export default function CreateMassCampaign() {
           <h1 className="text-2xl font-semibold text-white">Nuevo envío masivo</h1>
         </div>
 
-        {/* Selección de sesión y contacto */}
+        {/* Selección de sesión y lista de contactos */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <Select value={selectedConnection} onValueChange={setSelectedConnection}>
             <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
-              <SelectValue placeholder="Buscar sesión" />
+              <SelectValue placeholder="Buscar sesión de WhatsApp" />
             </SelectTrigger>
             <SelectContent>
               {connections.map((conn) => (
@@ -137,44 +191,50 @@ export default function CreateMassCampaign() {
             </SelectContent>
           </Select>
 
-          <Select value={selectedContact} onValueChange={setSelectedContact}>
+          <Select value={selectedContactList} onValueChange={setSelectedContactList}>
             <SelectTrigger className="bg-[#2a3942] border-[#3d4d57] text-white">
-              <SelectValue placeholder="Buscar contacto" />
+              <SelectValue placeholder="Buscar lista de contactos" />
             </SelectTrigger>
             <SelectContent>
-              {contacts.map((contact) => (
-                <SelectItem key={contact.id} value={contact.id}>
-                  {contact.name} - {contact.phone_number}
+              {contactLists.map((list) => (
+                <SelectItem key={list.id} value={list.id}>
+                  {list.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Campo de teléfonos */}
-        <div className="mb-4">
-          <div className="flex items-center gap-2 bg-[#2a3942] border border-[#3d4d57] rounded-md px-3 py-2">
-            <Input
-              value={phoneNumbers}
-              onChange={(e) => setPhoneNumbers(e.target.value)}
-              placeholder="Ingresa números de teléfono separados por comas"
-              className="flex-1 bg-transparent border-none text-white placeholder:text-gray-400 focus-visible:ring-0"
-            />
-            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-transparent">
-              <Paperclip className="h-5 w-5" />
-            </Button>
-            <Button variant="outline" className="border-[#00a884] text-[#00a884] hover:bg-[#00a884] hover:text-white">
-              CSV
-            </Button>
+        {/* AI Agent y modificar con IA */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-4">
+            <Label className="text-white mb-2 block">Agente de IA (opcional)</Label>
+            <Select value={selectedAiAgent} onValueChange={setSelectedAiAgent}>
+              <SelectTrigger className="bg-[#1f2c34] border-[#3d4d57] text-white">
+                <SelectValue placeholder="Seleccionar agente de IA" />
+              </SelectTrigger>
+              <SelectContent>
+                {aiAgents.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
 
-        {/* Botón agregar sesión */}
-        <div className="mb-6">
-          <Button variant="outline" className="border-[#00a884] text-[#00a884] hover:bg-[#00a884] hover:text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            AGREGAR OTRA SESIÓN
-          </Button>
+          <div className="bg-[#2a3942] border border-[#3d4d57] rounded-md p-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-white">Personalizar con IA</Label>
+              <Switch
+                checked={editWithAi}
+                onCheckedChange={setEditWithAi}
+              />
+            </div>
+            <p className="text-sm text-gray-400 mt-2">
+              La IA personalizará cada mensaje para que sea único
+            </p>
+          </div>
         </div>
 
         {/* Área de mensaje */}
@@ -184,9 +244,20 @@ export default function CreateMassCampaign() {
               <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-transparent">
                 <Smile className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-transparent">
-                <Paperclip className="h-5 w-5" />
-              </Button>
+              <label htmlFor="file-upload">
+                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-transparent" asChild>
+                  <span>
+                    <Paperclip className="h-5 w-5" />
+                  </span>
+                </Button>
+              </label>
+              <input
+                id="file-upload"
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+              />
               <Textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -194,11 +265,22 @@ export default function CreateMassCampaign() {
                 className="flex-1 bg-transparent border-none text-white placeholder:text-gray-400 focus-visible:ring-0 resize-none min-h-[100px]"
               />
             </div>
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {attachments.map((file, index) => (
+                  <div key={index} className="flex items-center gap-2 bg-[#1f2c34] px-3 py-1 rounded-md">
+                    <span className="text-sm text-gray-300">{file.name}</span>
+                    <button
+                      onClick={() => handleRemoveAttachment(index)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <button className="text-[#00a884] text-sm mt-2 hover:underline flex items-center gap-1">
-            <Plus className="h-4 w-4" />
-            AGREGAR VARIACIONES DE MENSAJE
-          </button>
         </div>
 
         {/* Configuración de envío */}
