@@ -45,6 +45,9 @@ verify_jwt = true
 [functions.waha-session-status]
 verify_jwt = true
 
+[functions.waha-delete-session]
+verify_jwt = true
+
 [functions.waha-webhook]
 verify_jwt = false
 
