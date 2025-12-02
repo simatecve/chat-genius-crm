@@ -32,6 +32,7 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState('');
+  const [currentConnectionId, setCurrentConnectionId] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [leadColumns, setLeadColumns] = useState<LeadColumn[]>([]);
@@ -152,7 +153,9 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
 
       // Usar el session_name sanitizado devuelto por el backend
       const sessionName = sessionData.connection?.name || formData.name;
+      const connectionId = sessionData.connection?.id;
       setCurrentSession(sessionName);
+      setCurrentConnectionId(connectionId);
       handleQRConnect(sessionName);
       
     } catch (error: any) {
@@ -199,17 +202,15 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
     
     try {
       const { data, error } = await supabase.functions.invoke('waha-session-status', {
-        body: { session_name: currentSession }
+        body: { 
+          session_name: currentSession,
+          connection_id: currentConnectionId 
+        }
       });
 
       if (error) throw error;
 
       if (data?.status === 'WORKING') {
-        await supabase
-          .from('whatsapp_connections')
-          .update({ status: 'connected' })
-          .eq('phone_number', currentSession);
-
         toast({
           title: "¡Conectado!",
           description: "WhatsApp conectado correctamente",
