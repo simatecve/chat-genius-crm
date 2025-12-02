@@ -644,11 +644,11 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
             })
             .eq('id', existingBuffer.id);
 
-          console.log(`Buffer updated: ${existingBuffer.message_count + 1} messages`);
+          console.log(`Buffer updated: ${existingBuffer.message_count + 1} messages, mediaType: ${mediaType}`);
 
-          // Si alcanzó 2 mensajes, procesar inmediatamente
-          if (existingBuffer.message_count + 1 >= 2) {
-            console.log('Buffer reached 2 messages, processing immediately...');
+          // Si alcanzó 2 mensajes O ES UNA IMAGEN, procesar inmediatamente
+          if (existingBuffer.message_count + 1 >= 2 || mediaType === 'image') {
+            console.log('Buffer reached 2 messages or has image, processing immediately...');
             await supabase.functions.invoke('process-ai-buffer', { body: {} });
           }
         } else {
@@ -672,26 +672,32 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
             .select()
             .single();
 
-          console.log('New buffer created, scheduling processing in 10 seconds...');
+          // Si es una imagen, procesar INMEDIATAMENTE (puede ser comprobante de pago)
+          if (mediaType === 'image') {
+            console.log('Image received, processing immediately for potential payment receipt...');
+            await supabase.functions.invoke('process-ai-buffer', { body: {} });
+          } else {
+            console.log('New buffer created, scheduling processing in 10 seconds...');
 
-          // Programar procesamiento después de 10 segundos usando EdgeRuntime.waitUntil
-          EdgeRuntime.waitUntil((async () => {
-            // Esperar 10 segundos
-            await new Promise(resolve => setTimeout(resolve, 10000));
-            
-            // Verificar si el buffer aún no fue procesado
-            const { data: currentBuffer } = await supabase
-              .from('ai_response_buffer')
-              .select('processed')
-              .eq('conversation_id', conversation.id)
-              .eq('processed', false)
-              .maybeSingle();
-            
-            if (currentBuffer) {
-              console.log('10 seconds passed, processing buffer...');
-              await supabase.functions.invoke('process-ai-buffer', { body: {} });
-            }
-          })());
+            // Programar procesamiento después de 10 segundos usando EdgeRuntime.waitUntil
+            EdgeRuntime.waitUntil((async () => {
+              // Esperar 10 segundos
+              await new Promise(resolve => setTimeout(resolve, 10000));
+              
+              // Verificar si el buffer aún no fue procesado
+              const { data: currentBuffer } = await supabase
+                .from('ai_response_buffer')
+                .select('processed')
+                .eq('conversation_id', conversation.id)
+                .eq('processed', false)
+                .maybeSingle();
+              
+              if (currentBuffer) {
+                console.log('10 seconds passed, processing buffer...');
+                await supabase.functions.invoke('process-ai-buffer', { body: {} });
+              }
+            })());
+          }
         }
       } catch (aiError) {
         console.error('Exception calling AI agent:', aiError);
