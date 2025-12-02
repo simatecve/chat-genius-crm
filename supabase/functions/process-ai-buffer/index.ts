@@ -62,8 +62,25 @@ async function processBuffer(supabase: any, buffer: any) {
       return;
     }
 
-    // Combinar todos los mensajes en uno solo
-    const combinedMessage = messages.join('\n\n');
+    // Parsear mensajes - soporta tanto formato antiguo (strings) como nuevo (objetos)
+    let combinedMessage = '';
+    let imageUrls: string[] = [];
+
+    if (messages.length > 0) {
+      if (typeof messages[0] === 'string') {
+        // Formato antiguo: array de strings
+        combinedMessage = messages.join('\n\n');
+      } else {
+        // Formato nuevo: array de objetos { type, content, imageUrl }
+        combinedMessage = messages.map((m: any) => m.content || '').join('\n\n');
+        imageUrls = messages
+          .filter((m: any) => m.type === 'image' && m.imageUrl)
+          .map((m: any) => m.imageUrl);
+      }
+    }
+
+    console.log(`[process-ai-buffer] Combined message: ${combinedMessage.substring(0, 100)}...`);
+    console.log(`[process-ai-buffer] Found ${imageUrls.length} images`);
 
     // Intentar llamar a un agente específico
     let aiResponse = null;
@@ -120,6 +137,7 @@ async function processBuffer(supabase: any, buffer: any) {
           body: {
             userId,
             messageContent: combinedMessage,
+            imageUrls, // Pasar URLs de imágenes al agente
             contactName: conversation.contact_name || conversation.pushname,
             phoneNumber: conversation.phone_number,
             conversationId

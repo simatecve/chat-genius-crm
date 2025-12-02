@@ -627,9 +627,13 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
           .single();
 
         if (existingBuffer) {
-          // Actualizar buffer existente
+          // Actualizar buffer existente - estructura con type, content, imageUrl
           const currentMessages = JSON.parse(existingBuffer.accumulated_messages);
-          currentMessages.push(messageContent);
+          currentMessages.push({
+            type: mediaType,
+            content: messageContent,
+            imageUrl: mediaType === 'image' ? mediaUrl : null
+          });
           
           await supabase
             .from('ai_response_buffer')
@@ -648,14 +652,18 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
             await supabase.functions.invoke('process-ai-buffer', { body: {} });
           }
         } else {
-          // Crear nuevo buffer
+          // Crear nuevo buffer - estructura con type, content, imageUrl
           const { data: newBuffer } = await supabase
             .from('ai_response_buffer')
             .insert({
               conversation_id: conversation.id,
               user_id: userId,
               message_count: 1,
-              accumulated_messages: JSON.stringify([messageContent]),
+              accumulated_messages: JSON.stringify([{
+                type: mediaType,
+                content: messageContent,
+                imageUrl: mediaType === 'image' ? mediaUrl : null
+              }]),
               channel_type: 'whatsapp',
               session_name: session,
               phone_number: conversation.phone_number,
