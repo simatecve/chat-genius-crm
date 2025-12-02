@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { dashboardService, DashboardStats, RecentLead, ActiveConversation } from '@/services/dashboardService';
+import { dashboardService, DashboardStats, RecentLead, ActiveConversation, MessagesByHour, ConversationStats } from '@/services/dashboardService';
 import { useAuth } from './useAuth';
 
-export const useDashboard = () => {
+export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'today') => {
   const { user } = useAuth();
 
   const {
@@ -39,6 +39,28 @@ export const useDashboard = () => {
     refetchInterval: 30 * 1000, // Refetch every 30 seconds for real-time feel
   });
 
+  const {
+    data: messagesByHour,
+    isLoading: messagesLoading,
+    error: messagesError
+  } = useQuery({
+    queryKey: ['messages-by-hour', user?.id, period],
+    queryFn: () => user ? dashboardService.getMessagesByHour(user.id, period) : null,
+    enabled: !!user,
+    refetchInterval: 2 * 60 * 1000,
+  });
+
+  const {
+    data: conversationsByHour,
+    isLoading: conversationsByHourLoading,
+    error: conversationsByHourError
+  } = useQuery({
+    queryKey: ['conversations-by-hour', user?.id, period],
+    queryFn: () => user ? dashboardService.getConversationsByHour(user.id, period) : null,
+    enabled: !!user,
+    refetchInterval: 2 * 60 * 1000,
+  });
+
   return {
     stats: stats || {
       totalLeads: 0,
@@ -51,7 +73,9 @@ export const useDashboard = () => {
     },
     recentLeads: recentLeads || [],
     activeConversations: activeConversations || [],
-    isLoading: statsLoading || leadsLoading || conversationsLoading,
-    error: statsError || leadsError || conversationsError
+    messagesByHour: messagesByHour || [],
+    conversationsByHour: conversationsByHour || [],
+    isLoading: statsLoading || leadsLoading || conversationsLoading || messagesLoading || conversationsByHourLoading,
+    error: statsError || leadsError || conversationsError || messagesError || conversationsByHourError
   };
 };

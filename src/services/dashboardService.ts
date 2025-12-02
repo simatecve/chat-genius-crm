@@ -28,6 +28,20 @@ export interface ActiveConversation {
   unread_count: number;
 }
 
+export interface MessagesByHour {
+  hour: string;
+  incoming: number;
+  outgoing: number;
+  total: number;
+}
+
+export interface ConversationStats {
+  hour: string;
+  new: number;
+  recurring: number;
+  total: number;
+}
+
 export const dashboardService = {
   async getDashboardStats(userId: string): Promise<DashboardStats> {
     try {
@@ -183,6 +197,129 @@ export const dashboardService = {
       return data || [];
     } catch (error) {
       console.error('Error fetching active conversations:', error);
+      return [];
+    }
+  },
+
+  async getMessagesByHour(userId: string, period: 'today' | 'week' | 'month' | 'year' = 'today'): Promise<MessagesByHour[]> {
+    try {
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch (period) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setMonth(now.getMonth() - 1);
+          break;
+        case 'year':
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('created_at, direction')
+        .eq('user_id', userId)
+        .gte('created_at', startDate.toISOString());
+
+      if (error) throw error;
+
+      // Agrupar por hora
+      const hourlyData: { [key: string]: { incoming: number; outgoing: number } } = {};
+      
+      for (let i = 0; i < 24; i++) {
+        const hourKey = `${String(i).padStart(2, '0')} hs`;
+        hourlyData[hourKey] = { incoming: 0, outgoing: 0 };
+      }
+
+      data?.forEach(message => {
+        const hour = new Date(message.created_at).getHours();
+        const hourKey = `${String(hour).padStart(2, '0')} hs`;
+        
+        if (message.direction === 'incoming' || message.direction === 'inbound') {
+          hourlyData[hourKey].incoming++;
+        } else if (message.direction === 'outgoing' || message.direction === 'outbound') {
+          hourlyData[hourKey].outgoing++;
+        }
+      });
+
+      return Object.entries(hourlyData).map(([hour, counts]) => ({
+        hour,
+        incoming: counts.incoming,
+        outgoing: counts.outgoing,
+        total: counts.incoming + counts.outgoing
+      }));
+    } catch (error) {
+      console.error('Error fetching messages by hour:', error);
+      return [];
+    }
+  },
+
+  async getConversationsByHour(userId: string, period: 'today' | 'week' | 'month' | 'year' = 'today'): Promise<ConversationStats[]> {
+    try {
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch (period) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setMonth(now.getMonth() - 1);
+          break;
+        case 'year':
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('created_at, last_message_time')
+        .eq('user_id', userId)
+        .gte('created_at', startDate.toISOString());
+
+      if (error) throw error;
+
+      // Agrupar por hora
+      const hourlyData: { [key: string]: { new: number; recurring: number } } = {};
+      
+      for (let i = 0; i < 24; i++) {
+        const hourKey = `${String(i).padStart(2, '0')} hs`;
+        hourlyData[hourKey] = { new: 0, recurring: 0 };
+      }
+
+      const oldConversationDate = new Date();
+      oldConversationDate.setDate(oldConversationDate.getDate() - 30);
+
+      data?.forEach(conversation => {
+        const created = new Date(conversation.created_at);
+        const hour = created.getHours();
+        const hourKey = `${String(hour).padStart(2, '0')} hs`;
+        
+        // Considerar "nuevos" si se crearon hace menos de 30 días
+        if (created > oldConversationDate) {
+          hourlyData[hourKey].new++;
+        } else {
+          hourlyData[hourKey].recurring++;
+        }
+      });
+
+      return Object.entries(hourlyData).map(([hour, counts]) => ({
+        hour,
+        new: counts.new,
+        recurring: counts.recurring,
+        total: counts.new + counts.recurring
+      }));
+    } catch (error) {
+      console.error('Error fetching conversations by hour:', error);
       return [];
     }
   }
