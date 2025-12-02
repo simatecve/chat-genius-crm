@@ -13,13 +13,13 @@ type DefaultAgentResponse = {
   comprobanteDetectado: boolean;
   respuesta: string;
   actionExecuted?: {
-    type: 'crear_jugador' | 'depositar_saldo' | 'retirar_saldo';
+    type: 'crear_jugador';
     success: boolean;
     result?: any;
   };
 };
 
-// Funciones helper para ejecutar webhooks del casino
+// Función helper para crear jugador en el casino
 async function crearJugador(userName: string, password: string, contactName: string, phoneNumber: string) {
   try {
     console.log(`Creating player: ${userName} for ${contactName} (${phoneNumber})`);
@@ -33,42 +33,6 @@ async function crearJugador(userName: string, password: string, contactName: str
     return { success: response.ok, data: result };
   } catch (error) {
     console.error('Error creating player:', error);
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMsg };
-  }
-}
-
-async function depositarSaldo(userName: string, amount: number) {
-  try {
-    console.log(`Depositing ${amount} to ${userName}`);
-    const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/cargar-saldo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userName, amount })
-    });
-    const result = await response.json();
-    console.log('Deposit result:', result);
-    return { success: response.ok, data: result };
-  } catch (error) {
-    console.error('Error depositing:', error);
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMsg };
-  }
-}
-
-async function retirarSaldo(userName: string, amount: number) {
-  try {
-    console.log(`Withdrawing ${amount} from ${userName}`);
-    const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/retirar-saldo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userName, amount })
-    });
-    const result = await response.json();
-    console.log('Withdrawal result:', result);
-    return { success: response.ok, data: result };
-  } catch (error) {
-    console.error('Error withdrawing:', error);
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMsg };
   }
@@ -94,48 +58,6 @@ const casinoTools = [
           }
         },
         required: ["userName", "password"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "depositar_saldo",
-      description: "Cargar fichas/saldo a un jugador existente. Usar cuando el usuario quiera cargar fichas, depositar o agregar saldo. IMPORTANTE: Confirmar el username y monto antes de ejecutar.",
-      parameters: {
-        type: "object",
-        properties: {
-          userName: { 
-            type: "string", 
-            description: "Nombre de usuario del casino del jugador" 
-          },
-          amount: { 
-            type: "number", 
-            description: "Monto a depositar en pesos" 
-          }
-        },
-        required: ["userName", "amount"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "retirar_saldo",
-      description: "Retirar saldo/fichas de un jugador. Usar cuando el usuario quiera retirar dinero o fichas. IMPORTANTE: Confirmar el username y monto antes de ejecutar.",
-      parameters: {
-        type: "object",
-        properties: {
-          userName: { 
-            type: "string", 
-            description: "Nombre de usuario del casino del jugador" 
-          },
-          amount: { 
-            type: "number", 
-            description: "Monto a retirar en pesos" 
-          }
-        },
-        required: ["userName", "amount"]
       }
     }
   }
@@ -264,18 +186,14 @@ Tenés acceso a las siguientes funciones que podés ejecutar:
    - IMPORTANTE: Confirmá los datos antes de crear la cuenta.
    - El username debe ser único y la contraseña debe tener al menos 6 caracteres.
 
-2. **DEPOSITAR SALDO**: Cuando alguien quiera cargar fichas, necesitás su username y el monto.
-   - IMPORTANTE: Confirmá el username y el monto antes de ejecutar.
-   - Informá que la carga es inmediata.
-
-3. **RETIRAR SALDO**: Cuando alguien quiera retirar, necesitás su username y el monto.
-   - IMPORTANTE: Confirmá el username y el monto antes de ejecutar.
-   - Informá que el retiro se procesa en minutos.
+⚠️ OPERACIONES DE SALDO (NO AUTOMATIZADAS):
+Para cargar fichas o retirar saldo, derivá al usuario con un asesor humano diciendo:
+"Para gestionar tu saldo necesito que hables con uno de nuestros asesores. Te van a contactar enseguida."
+NO podés ejecutar depósitos ni retiros directamente.
 
 ⚠️ REGLAS IMPORTANTES:
 - Antes de ejecutar cualquier acción, SIEMPRE confirmá los datos con el usuario.
 - Si el usuario no tiene cuenta, ofrecé crearle una primero.
-- Siempre confirmá el monto antes de depositar o retirar.
 - Después de ejecutar una acción, informá el resultado de forma clara y amigable.
 - Si hay un error, explicá qué pasó y cómo solucionarlo.
 
@@ -334,7 +252,7 @@ Formato de salida: NO devuelvas JSON, solo devolvé el texto de respuesta conver
             
             if (args) {
               let toolResult;
-              let actionType: 'crear_jugador' | 'depositar_saldo' | 'retirar_saldo';
+              let actionType: 'crear_jugador';
               
               switch (toolCall.function.name) {
                 case 'crear_jugador':
@@ -346,17 +264,9 @@ Formato de salida: NO devuelvas JSON, solo devolvé el texto de respuesta conver
                     phoneNumber || ''
                   );
                   break;
-                case 'depositar_saldo':
-                  actionType = 'depositar_saldo';
-                  toolResult = await depositarSaldo(args.userName, args.amount);
-                  break;
-                case 'retirar_saldo':
-                  actionType = 'retirar_saldo';
-                  toolResult = await retirarSaldo(args.userName, args.amount);
-                  break;
                 default:
-                  console.error('Unknown tool:', toolCall.function.name);
-                  respuesta = 'Disculpá, no pude procesar esa acción. ¿Podés intentar de nuevo?';
+                  console.error('Tool no permitida:', toolCall.function.name);
+                  respuesta = 'Para esa operación necesitás hablar con un asesor humano. Te contactamos enseguida.';
                   toolResult = null;
                   break;
               }
