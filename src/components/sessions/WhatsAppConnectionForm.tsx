@@ -169,7 +169,7 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
     
     try {
       const { data, error } = await supabase.functions.invoke('waha-get-qr', {
-        body: { session: sessionName }
+        body: { session_name: sessionName }
       });
 
       if (error) throw error;
@@ -195,7 +195,7 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
     
     try {
       const { data, error } = await supabase.functions.invoke('waha-session-status', {
-        body: { session: currentSession }
+        body: { session_name: currentSession }
       });
 
       if (error) throw error;
