@@ -10,6 +10,11 @@ export interface DefaultAgentResponse {
   intencionCargaFichas: boolean;
   comprobanteDetectado: boolean;
   respuesta: string;
+  actionExecuted?: {
+    type: 'crear_jugador' | 'depositar_saldo' | 'retirar_saldo';
+    success: boolean;
+    result?: any;
+  };
 }
 
 export const iaDefaultAgentClient = {
