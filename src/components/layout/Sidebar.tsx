@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
@@ -56,6 +56,10 @@ export const Sidebar = () => {
       icon: MessageSquare,
       href: '/conversaciones',
       badge: unreadCount > 0 ? unreadCount : undefined
+    }, {
+      label: 'Chat - Landing',
+      icon: Globe,
+      href: '/chat-landing'
     }, {
       label: 'Chat Interno',
       icon: MessagesSquare,
