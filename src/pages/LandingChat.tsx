@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-// Default import for AppLayout
-import AppLayout from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { MessageSquare, Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { MessageSquare, Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -217,13 +215,14 @@ const LandingChat = () => {
   }, [user, selectedConversation]);
 
   return (
-    <AppLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Chat - Landing</h1>
-        <p className="text-muted-foreground text-sm">Gestiona las conversaciones del chat de tu landing page</p>
+    <div className="space-y-6">
+      <div className="flex items-center space-x-2">
+        <Globe className="h-6 w-6 text-primary" />
+        <h1 className="text-3xl font-bold">Chat - Landing</h1>
       </div>
+      <p className="text-muted-foreground">Gestiona las conversaciones del chat de tu landing page</p>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mx-4 mt-4 w-fit">
             <TabsTrigger value="conversations" className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -408,7 +407,7 @@ const LandingChat = () => {
             </Card>
           </TabsContent>
         </Tabs>
-    </AppLayout>
+    </div>
   );
 };
 
