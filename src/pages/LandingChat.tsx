@@ -218,11 +218,10 @@ const LandingChat = () => {
 
   return (
     <AppLayout>
-      <div className="h-full flex flex-col bg-background">
-        <div className="border-b border-border p-4">
-          <h1 className="text-2xl font-bold text-foreground">Chat - Landing</h1>
-          <p className="text-muted-foreground text-sm">Gestiona las conversaciones del chat de tu landing page</p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Chat - Landing</h1>
+        <p className="text-muted-foreground text-sm">Gestiona las conversaciones del chat de tu landing page</p>
+      </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
           <TabsList className="mx-4 mt-4 w-fit">
@@ -409,7 +408,6 @@ const LandingChat = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
     </AppLayout>
   );
 };
