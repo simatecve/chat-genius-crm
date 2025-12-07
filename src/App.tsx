@@ -20,6 +20,7 @@ import Settings from "./pages/Settings";
 import Leads from "./pages/Leads";
 import Conversations from "./pages/Conversations";
 import InternalChat from "./pages/InternalChat";
+import LandingChat from "./pages/LandingChat";
 import Sales from "./pages/Sales";
 import Calendar from "./pages/Calendar";
 import PaymentPlans from "./pages/PaymentPlans";
@@ -120,6 +121,11 @@ const App = () => (
               <Route path="/chat-interno" element={
                 <ProtectedRoute>
                   <InternalChat />
+                </ProtectedRoute>
+              } />
+              <Route path="/chat-landing" element={
+                <ProtectedRoute>
+                  <LandingChat />
                 </ProtectedRoute>
               } />
               <Route path="/ventas" element={

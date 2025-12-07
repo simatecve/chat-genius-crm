@@ -776,6 +776,101 @@ export type Database = {
         }
         Relationships: []
       }
+      landing_chat_config: {
+        Row: {
+          cashier_number: string | null
+          cbu: string | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cashier_number?: string | null
+          cbu?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cashier_number?: string | null
+          cbu?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      landing_chat_conversations: {
+        Row: {
+          created_at: string | null
+          id: string
+          session_id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          visitor_email: string | null
+          visitor_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          session_id: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          session_id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          visitor_email?: string | null
+          visitor_name?: string | null
+        }
+        Relationships: []
+      }
+      landing_chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string | null
+          direction: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string | null
+          direction: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string | null
+          direction?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landing_chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "landing_chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_columns: {
         Row: {
           color: string | null
