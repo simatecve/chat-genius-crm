@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Hook para cargar archivos media con autenticación de WAHA
+ * Hook para cargar archivos media con autenticación de WAHA o Twilio
  * Convierte URLs protegidas en blob URLs para mostrar en el navegador
  */
 export const useAuthenticatedMedia = (url: string | null) => {
@@ -16,8 +16,11 @@ export const useAuthenticatedMedia = (url: string | null) => {
       return;
     }
 
-    // Si no es una URL de WAHA, usarla directamente
-    if (!url.includes('/api/files/')) {
+    const isWahaUrl = url.includes('/api/files/');
+    const isTwilioUrl = url.includes('api.twilio.com') || url.includes('media.twiliocdn.com');
+
+    // Si no es una URL protegida, usarla directamente
+    if (!isWahaUrl && !isTwilioUrl) {
       setBlobUrl(url);
       return;
     }
@@ -29,13 +32,32 @@ export const useAuthenticatedMedia = (url: string | null) => {
       setError(null);
 
       try {
-        // Invocar edge function para obtener el archivo con autenticación
-        const { data, error: invokeError } = await supabase.functions.invoke('waha-get-file', {
-          body: { fileUrl: url }
-        });
+        let data: { file: string; mimeType: string } | null = null;
 
-        if (invokeError) throw invokeError;
-        if (!data?.file) throw new Error('No se recibió el archivo');
+        if (isWahaUrl) {
+          // Usar edge function de WAHA
+          const { data: wahaData, error: invokeError } = await supabase.functions.invoke('waha-get-file', {
+            body: { fileUrl: url }
+          });
+
+          if (invokeError) throw invokeError;
+          if (!wahaData?.file) throw new Error('No se recibió el archivo');
+          data = wahaData;
+        } else if (isTwilioUrl) {
+          // Usar edge function de Twilio
+          const { data: twilioData, error: invokeError } = await supabase.functions.invoke('twilio-get-file', {
+            body: { mediaUrl: url }
+          });
+
+          if (invokeError) throw invokeError;
+          if (!twilioData?.file) throw new Error('No se recibió el archivo');
+          data = twilioData;
+        }
+
+        if (!data) {
+          setBlobUrl(url);
+          return;
+        }
 
         // Convertir base64 a blob
         const base64Data = data.file.split(',')[1] || data.file;
@@ -47,10 +69,10 @@ export const useAuthenticatedMedia = (url: string | null) => {
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: data.mimeType || 'application/octet-stream' });
         
-        const blobUrl = URL.createObjectURL(blob);
+        const newBlobUrl = URL.createObjectURL(blob);
         
         if (isMounted) {
-          setBlobUrl(blobUrl);
+          setBlobUrl(newBlobUrl);
         }
       } catch (err) {
         console.error('Error loading authenticated media:', err);
