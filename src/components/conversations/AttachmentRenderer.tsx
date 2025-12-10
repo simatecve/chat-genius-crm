@@ -24,8 +24,24 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   // Usar hook para cargar archivos con autenticación
   const { blobUrl, isLoading: isLoadingMedia } = useAuthenticatedMedia(attachmentUrl);
 
-  // Detectar tipo de archivo por extensión o URL
-  const getFileType = (url: string) => {
+  // Detectar tipo de archivo por extensión, URL o messageType
+  const getFileType = (url: string, type?: string) => {
+    // Primero verificar si tenemos messageType explícito
+    if (type) {
+      const normalizedType = type.toLowerCase();
+      if (normalizedType === 'image' || normalizedType.startsWith('image/')) return 'image';
+      if (normalizedType === 'video' || normalizedType.startsWith('video/')) return 'video';
+      if (normalizedType === 'audio' || normalizedType === 'ptt' || normalizedType.startsWith('audio/')) return 'audio';
+      if (normalizedType === 'document' || normalizedType === 'application/pdf') return 'pdf';
+    }
+    
+    // Detectar URLs de Twilio (no tienen extensión visible)
+    if (url.includes('api.twilio.com') || url.includes('media.twiliocdn.com')) {
+      // Si tenemos messageType, ya lo manejamos arriba
+      // Por defecto asumir imagen para URLs de Twilio sin tipo
+      if (!type) return 'image';
+    }
+    
     // Detectar URLs de WAHA
     if (url.includes('/api/files/')) {
       if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return 'video';
@@ -44,7 +60,7 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
     return 'file';
   };
 
-  const fileType = getFileType(attachmentUrl);
+  const fileType = getFileType(attachmentUrl, messageType);
   const fileName = attachmentUrl.split('/').pop() || 'archivo';
 
   // Funciones para audio
