@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { supabase } from '@/integrations/supabase/client';
 import WhatsAppConnectionForm from './WhatsAppConnectionForm';
@@ -24,7 +26,7 @@ interface Session {
   id: string;
   name: string;
   type: 'whatsapp' | 'telegram' | 'telegram-bot' | 'twilio' | 'webchat';
-  identifier: string; // phone_number or bot_username
+  identifier: string;
   status: string;
   created_at: string;
 }
@@ -49,6 +51,9 @@ const SessionsManager = () => {
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
   const [verifyingSession, setVerifyingSession] = useState<string | null>(null);
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editedName, setEditedName] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
 
@@ -262,6 +267,73 @@ const SessionsManager = () => {
     }
   };
 
+  const handleEditSession = (session: Session) => {
+    setEditingSession(session);
+    setEditedName(session.name);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSession || !editedName.trim()) return;
+
+    setSavingEdit(true);
+    try {
+      let error = null;
+
+      switch (editingSession.type) {
+        case 'whatsapp':
+          const { error: waError } = await supabase
+            .from('whatsapp_connections')
+            .update({ name: editedName.trim() })
+            .eq('id', editingSession.id);
+          error = waError;
+          break;
+
+        case 'telegram-bot':
+          const { error: tgError } = await supabase
+            .from('telegram_bots')
+            .update({ bot_name: editedName.trim() })
+            .eq('id', editingSession.id);
+          error = tgError;
+          break;
+
+        case 'twilio':
+          const { error: twError } = await supabase
+            .from('twilio_connections')
+            .update({ connection_name: editedName.trim() })
+            .eq('id', editingSession.id);
+          error = twError;
+          break;
+
+        case 'webchat':
+          const { error: wcError } = await supabase
+            .from('web_chatbots')
+            .update({ name: editedName.trim() })
+            .eq('id', editingSession.id);
+          error = wcError;
+          break;
+      }
+
+      if (error) throw error;
+
+      toast({
+        title: "Nombre actualizado",
+        description: "El nombre de la sesión ha sido actualizado correctamente",
+      });
+
+      setEditingSession(null);
+      fetchAllSessions();
+    } catch (error: any) {
+      console.error('Error updating session name:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el nombre de la sesión",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleDeleteSession = async (session: Session) => {
     const confirmed = window.confirm(`¿Estás seguro de que quieres eliminar la sesión "${session.name}"?`);
     if (!confirmed) return;
@@ -270,7 +342,6 @@ const SessionsManager = () => {
     try {
       switch (session.type) {
         case 'whatsapp':
-          // Delete from WAHA and database
           const { error: wahaError } = await supabase.functions.invoke('waha-delete-session', {
             body: { 
               session_name: session.name,
@@ -281,7 +352,6 @@ const SessionsManager = () => {
           break;
 
         case 'telegram-bot':
-          // Delete from database
           const { error: telegramError } = await supabase
             .from('telegram_bots')
             .delete()
@@ -290,7 +360,6 @@ const SessionsManager = () => {
           break;
 
         case 'twilio':
-          // Delete from database
           const { error: twilioError } = await supabase
             .from('twilio_connections')
             .delete()
@@ -299,7 +368,6 @@ const SessionsManager = () => {
           break;
 
         case 'webchat':
-          // Delete from database
           const { error: webchatError } = await supabase
             .from('web_chatbots')
             .delete()
@@ -316,7 +384,6 @@ const SessionsManager = () => {
         description: "La sesión ha sido eliminada correctamente",
       });
 
-      // Refresh sessions list
       fetchAllSessions();
     } catch (error: any) {
       console.error('Error deleting session:', error);
@@ -420,6 +487,15 @@ const SessionsManager = () => {
                   </span>
                 </div>
                 <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditSession(session)}
+                    className="flex-1"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span className="ml-1 text-xs">Editar</span>
+                  </Button>
                   {session.type === 'whatsapp' && (
                     <Button
                       variant="outline"
@@ -524,6 +600,35 @@ const SessionsManager = () => {
       {selectedChannel === 'web-chat' && (
         <WebChatConnectionForm onClose={handleCloseForm} />
       )}
+
+      {/* Edit Session Dialog */}
+      <Dialog open={!!editingSession} onOpenChange={(open) => !open && setEditingSession(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar nombre de sesión</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="session-name">Nombre</Label>
+              <Input
+                id="session-name"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                placeholder="Nombre de la sesión"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingSession(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit || !editedName.trim()}>
+              {savingEdit ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
