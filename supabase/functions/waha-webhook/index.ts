@@ -43,20 +43,25 @@ function normalizePhoneNumber(phone: string): string {
     .trim();
 }
 
-// Obtener user_id desde el nombre de la sesión
-async function getUserIdFromSession(supabase: any, sessionName: string): Promise<string | null> {
+// Obtener user_id, phone_number y workspace_id desde el nombre de la sesión
+async function getSessionData(supabase: any, sessionName: string): Promise<{ userId: string | null, sessionPhoneNumber: string | null, workspaceId: string | null, defaultColumnId: string | null }> {
   const { data, error } = await supabase
     .from('whatsapp_connections')
-    .select('user_id')
+    .select('user_id, phone_number, workspace_id, default_column_id')
     .eq('name', sessionName)
     .single();
 
   if (error) {
-    console.error('Error getting user_id from session:', error);
-    return null;
+    console.error('Error getting session data:', error);
+    return { userId: null, sessionPhoneNumber: null, workspaceId: null, defaultColumnId: null };
   }
 
-  return data?.user_id || null;
+  return {
+    userId: data?.user_id || null,
+    sessionPhoneNumber: data?.phone_number || null,
+    workspaceId: data?.workspace_id || null,
+    defaultColumnId: data?.default_column_id || null
+  };
 }
 
 // Obtener columna por defecto del usuario o de la conexión
@@ -123,7 +128,7 @@ async function getNextPosition(supabase: any, columnId: string): Promise<number>
   return (data.position || 0) + 1;
 }
 
-// Buscar o crear conversación
+// Buscar o crear conversación - AHORA FILTRA POR whatsapp_number
 async function getOrCreateConversation(
   supabase: any,
   userId: string,
@@ -131,15 +136,22 @@ async function getOrCreateConversation(
   pushName: string | null,
   messageContent: string,
   messageTimestamp: number,
-  fromMe: boolean
+  fromMe: boolean,
+  sessionPhoneNumber: string | null
 ) {
-  // Buscar conversación existente
-  let { data: conversation, error } = await supabase
+  // Buscar conversación existente - INCLUIR whatsapp_number en la búsqueda
+  let query = supabase
     .from('conversations')
     .select('*')
     .eq('user_id', userId)
-    .eq('phone_number', phoneNumber)
-    .single();
+    .eq('phone_number', phoneNumber);
+  
+  // Si tenemos el número de sesión, filtrar también por él
+  if (sessionPhoneNumber) {
+    query = query.eq('whatsapp_number', sessionPhoneNumber);
+  }
+
+  let { data: conversation, error } = await query.single();
 
   if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
     console.error('Error searching conversation:', error);
@@ -147,15 +159,17 @@ async function getOrCreateConversation(
   }
 
   if (!conversation) {
-    // Crear nueva conversación
+    // Crear nueva conversación CON whatsapp_number
     const newConversation = {
       user_id: userId,
       phone_number: phoneNumber,
+      whatsapp_number: sessionPhoneNumber, // NUEVO: guardar el número de la sesión
       pushname: pushName,
       last_message: messageContent,
       last_message_time: new Date(messageTimestamp * 1000).toISOString(),
       unread_count: 1,
       status: 'active',
+      channel_type: 'whatsapp',
     };
 
     const { data: created, error: createError } = await supabase
@@ -169,7 +183,7 @@ async function getOrCreateConversation(
       return null;
     }
 
-    console.log('New conversation created:', created.id);
+    console.log('New conversation created:', created.id, 'with whatsapp_number:', sessionPhoneNumber);
     return created;
   } else {
     // Actualizar conversación existente
@@ -243,66 +257,150 @@ async function saveMessage(
   return data;
 }
 
-// Buscar o crear lead
+// Buscar o crear lead - AHORA FILTRA POR WORKSPACE
 async function getOrCreateLead(
   supabase: any,
   userId: string,
   phoneNumber: string,
   pushName: string | null,
-  sessionName: string
+  workspaceId: string | null,
+  defaultColumnId: string | null
 ) {
-  // Buscar lead existente por teléfono
-  let { data: lead, error } = await supabase
-    .from('leads')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('phone', phoneNumber)
-    .single();
+  // Si tenemos workspace, buscar lead solo en columnas de ese workspace
+  if (workspaceId) {
+    // Primero obtener las columnas de este workspace
+    const { data: workspaceColumns } = await supabase
+      .from('lead_columns')
+      .select('id')
+      .eq('workspace_id', workspaceId);
+    
+    if (workspaceColumns && workspaceColumns.length > 0) {
+      const columnIds = workspaceColumns.map((c: any) => c.id);
+      
+      // Buscar lead en las columnas del workspace
+      const { data: existingLead, error: leadError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('phone', phoneNumber)
+        .in('column_id', columnIds)
+        .maybeSingle();
+      
+      if (leadError && leadError.code !== 'PGRST116') {
+        console.error('Error searching lead in workspace:', leadError);
+      }
+      
+      if (existingLead) {
+        console.log('Lead already exists in workspace:', existingLead.id);
+        return { lead: existingLead, isNew: false };
+      }
+    }
+  } else {
+    // Sin workspace, buscar por usuario y teléfono (comportamiento legacy)
+    const { data: lead, error } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('phone', phoneNumber)
+      .maybeSingle();
 
-  if (error && error.code !== 'PGRST116') {
-    console.error('Error searching lead:', error);
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error searching lead:', error);
+      return { lead: null, isNew: false };
+    }
+
+    if (lead) {
+      console.log('Lead already exists:', lead.id);
+      return { lead, isNew: false };
+    }
+  }
+
+  // Crear nuevo lead - usar defaultColumnId si se proporciona
+  let columnIdToUse = defaultColumnId;
+  
+  if (!columnIdToUse) {
+    // Buscar la columna default del workspace o del usuario
+    if (workspaceId) {
+      const { data: defaultCol } = await supabase
+        .from('lead_columns')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('is_default', true)
+        .maybeSingle();
+      
+      columnIdToUse = defaultCol?.id;
+      
+      // Si no hay default, usar la primera columna del workspace
+      if (!columnIdToUse) {
+        const { data: firstCol } = await supabase
+          .from('lead_columns')
+          .select('id')
+          .eq('workspace_id', workspaceId)
+          .order('position', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        
+        columnIdToUse = firstCol?.id;
+      }
+    }
+    
+    // Si aún no tenemos columna, buscar cualquier columna del usuario
+    if (!columnIdToUse) {
+      const { data: anyCol } = await supabase
+        .from('lead_columns')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_default', true)
+        .maybeSingle();
+      
+      columnIdToUse = anyCol?.id;
+      
+      if (!columnIdToUse) {
+        const { data: firstUserCol } = await supabase
+          .from('lead_columns')
+          .select('id')
+          .eq('user_id', userId)
+          .order('position', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        
+        columnIdToUse = firstUserCol?.id;
+      }
+    }
+  }
+
+  if (!columnIdToUse) {
+    console.error('No column found to create lead');
     return { lead: null, isNew: false };
   }
 
-  if (!lead) {
-    // Obtener columna por defecto (primero de la conexión, luego del usuario)
-    const defaultColumnId = await getDefaultColumn(supabase, userId, sessionName);
-    if (!defaultColumnId) {
-      console.error('No default column found for user');
-      return { lead: null, isNew: false };
-    }
+  // Obtener siguiente posición
+  const position = await getNextPosition(supabase, columnIdToUse);
 
-    // Obtener siguiente posición
-    const position = await getNextPosition(supabase, defaultColumnId);
+  // Crear nuevo lead
+  const newLead = {
+    user_id: userId,
+    column_id: columnIdToUse,
+    name: pushName || phoneNumber,
+    phone: phoneNumber,
+    position: position,
+    notes: 'Lead creado automáticamente desde WhatsApp',
+    bot_active: true,
+  };
 
-    // Crear nuevo lead
-    const newLead = {
-      user_id: userId,
-      column_id: defaultColumnId,
-      name: pushName || phoneNumber,
-      phone: phoneNumber,
-      position: position,
-      notes: 'Lead creado automáticamente desde WhatsApp',
-      bot_active: true,
-    };
+  const { data: created, error: createError } = await supabase
+    .from('leads')
+    .insert(newLead)
+    .select()
+    .single();
 
-    const { data: created, error: createError } = await supabase
-      .from('leads')
-      .insert(newLead)
-      .select()
-      .single();
-
-    if (createError) {
-      console.error('Error creating lead:', createError);
-      return { lead: null, isNew: false };
-    }
-
-    console.log('New lead created:', created.id);
-    return { lead: created, isNew: true };
+  if (createError) {
+    console.error('Error creating lead:', createError);
+    return { lead: null, isNew: false };
   }
 
-  console.log('Lead already exists:', lead.id);
-  return { lead, isNew: false };
+  console.log('New lead created:', created.id, 'in column:', columnIdToUse);
+  return { lead: created, isNew: true };
 }
 
 // Vincular conversación con lead
@@ -455,16 +553,18 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     console.log(`Message from: ${phoneNumber} (${pushName}), fromMe: ${fromMe}`);
     console.log(`Content: ${messageContent.substring(0, 50)}...`);
 
-    // Obtener user_id de la sesión
-    const userId = await getUserIdFromSession(supabase, session);
+    // Obtener datos de la sesión (user_id, phone_number de la sesión, workspace_id)
+    const sessionData = await getSessionData(supabase, session);
+    const { userId, sessionPhoneNumber, workspaceId, defaultColumnId } = sessionData;
+    
     if (!userId) {
       console.error('Could not get user_id from session');
       return;
     }
 
-    console.log(`User ID: ${userId}`);
+    console.log(`User ID: ${userId}, Session Phone: ${sessionPhoneNumber}, Workspace: ${workspaceId}`);
 
-  // Buscar o crear conversación
+    // Buscar o crear conversación - AHORA CON whatsapp_number
     const conversation = await getOrCreateConversation(
       supabase,
       userId,
@@ -472,7 +572,8 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
       pushName,
       messageContent,
       timestamp,
-      fromMe
+      fromMe,
+      sessionPhoneNumber
     );
 
     if (!conversation) {
@@ -533,7 +634,7 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
       // Crear o actualizar contacto
       await getOrCreateContact(supabase, userId, phoneNumber, pushName);
       
-      const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, pushName, session);
+      const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, pushName, workspaceId, defaultColumnId);
       
       if (lead && !conversation.lead_id) {
         // Vincular conversación con lead si aún no está vinculada
