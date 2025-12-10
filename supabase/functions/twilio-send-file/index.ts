@@ -69,9 +69,12 @@ Deno.serve(async (req) => {
       messageType = 'audio';
     }
 
-    // Format phone numbers for Twilio WhatsApp
-    const formattedFrom = `whatsapp:${connection.phone_number}`;
-    const formattedTo = `whatsapp:${phoneNumber}`;
+    // Format phone numbers for Twilio WhatsApp - MUST include + prefix
+    const formattedFrom = `whatsapp:+${connection.phone_number.replace(/[^0-9]/g, '')}`;
+    const cleanPhoneNumber = phoneNumber.replace(/[^0-9]/g, '');
+    const formattedTo = `whatsapp:+${cleanPhoneNumber}`;
+    
+    console.log('[twilio-send-file] Formatted numbers:', { from: formattedFrom, to: formattedTo });
 
     // Prepare Twilio API request
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${connection.account_sid}/Messages.json`;
