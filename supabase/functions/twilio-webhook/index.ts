@@ -196,14 +196,17 @@ async function getOrCreateConversation(
   }
 }
 
-// Guardar mensaje en la base de datos
+// Guardar mensaje en la base de datos - AHORA SOPORTA MEDIA
 async function saveMessage(
   supabase: any,
   conversationId: string,
   userId: string,
   messageContent: string,
   fromMe: boolean,
-  twilioMessageId: string
+  twilioMessageId: string,
+  mediaUrl: string | null = null,
+  mediaType: string = 'text',
+  mimeType: string | null = null
 ) {
   const message = {
     conversation_id: conversationId,
@@ -211,12 +214,16 @@ async function saveMessage(
     content: messageContent || '',
     direction: fromMe ? 'outbound' : 'inbound',
     status: 'delivered',
-    message_type: 'text',
+    message_type: mediaType,
     is_bot: false,
+    file_url: mediaUrl,
+    attachment_url: mediaUrl,
     created_at: new Date().toISOString(),
     metadata: {
       twilio_message_id: twilioMessageId,
-      channel: 'twilio_whatsapp'
+      channel: 'twilio_whatsapp',
+      mime_type: mimeType,
+      has_media: !!mediaUrl
     },
   };
 
@@ -231,7 +238,7 @@ async function saveMessage(
     return null;
   }
 
-  console.log('Message saved:', data.id);
+  console.log('Message saved:', data.id, 'mediaType:', mediaType, 'hasMedia:', !!mediaUrl);
   return data;
 }
 
@@ -377,13 +384,40 @@ serve(async (req) => {
     const messageBody = twilioData.Body || '';
     const twilioMessageId = twilioData.MessageSid || '';
     const profileName = twilioData.ProfileName || null;
+    
+    // PROCESAR MEDIA ATTACHMENTS
+    const numMedia = parseInt(twilioData.NumMedia || '0', 10);
+    let mediaUrl: string | null = null;
+    let mediaType = 'text';
+    let mimeType: string | null = null;
+    
+    if (numMedia > 0) {
+      // Twilio envía MediaUrl0, MediaUrl1, etc.
+      mediaUrl = twilioData.MediaUrl0 || null;
+      mimeType = twilioData.MediaContentType0 || null;
+      
+      console.log(`[twilio-webhook] Media detected: numMedia=${numMedia}, url=${mediaUrl}, mimeType=${mimeType}`);
+      
+      // Determinar tipo de media
+      if (mimeType) {
+        if (mimeType.startsWith('image/')) {
+          mediaType = 'image';
+        } else if (mimeType.startsWith('video/')) {
+          mediaType = 'video';
+        } else if (mimeType.startsWith('audio/')) {
+          mediaType = 'audio';
+        } else {
+          mediaType = 'document';
+        }
+      }
+    }
 
     // Normalizar números
     const phoneNumber = normalizePhoneNumber(fromNumber);
     const twilioPhoneNumber = normalizePhoneNumber(toNumber);
 
     console.log(`Message from: ${phoneNumber}, to: ${twilioPhoneNumber}`);
-    console.log(`Content: ${messageBody.substring(0, 50)}...`);
+    console.log(`Content: ${messageBody.substring(0, 50)}... | Media: ${mediaType} (${numMedia} files)`);
 
     // Obtener user_id y connection_id desde el número de Twilio
     const { userId, connectionId } = await getUserIdFromTwilioNumber(supabase, toNumber);
@@ -394,6 +428,9 @@ serve(async (req) => {
 
     console.log(`User ID: ${userId}, Connection ID: ${connectionId}`);
 
+    // Determinar contenido del mensaje para mostrar
+    const displayContent = messageBody || (mediaUrl ? `📎 [${mediaType}]` : '');
+
     // Buscar o crear conversación
     const conversation = await getOrCreateConversation(
       supabase,
@@ -401,7 +438,7 @@ serve(async (req) => {
       connectionId,
       phoneNumber,
       profileName,
-      messageBody,
+      displayContent,
       false // fromMe = false (mensaje entrante)
     );
 
@@ -410,8 +447,8 @@ serve(async (req) => {
       return new Response('OK', { status: 200, headers: corsHeaders });
     }
 
-    // Guardar mensaje
-    await saveMessage(supabase, conversation.id, userId, messageBody, false, twilioMessageId);
+    // Guardar mensaje CON MEDIA
+    await saveMessage(supabase, conversation.id, userId, displayContent, false, twilioMessageId, mediaUrl, mediaType, mimeType);
 
     // Crear lead si es nuevo contacto
     const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, profileName, connectionId);
@@ -462,6 +499,13 @@ serve(async (req) => {
     if (botSettings?.bot_enabled !== false) {
       console.log('[twilio-webhook] Bot enabled, adding to buffer...');
       
+      // Estructura del mensaje para el buffer (compatible con WAHA)
+      const bufferMessage = {
+        type: mediaType,
+        content: displayContent,
+        imageUrl: mediaType === 'image' ? mediaUrl : null
+      };
+      
       const { data: existingBuffer } = await supabase
         .from('ai_response_buffer')
         .select('*')
@@ -471,7 +515,7 @@ serve(async (req) => {
 
       if (existingBuffer) {
         const currentMessages = JSON.parse(existingBuffer.accumulated_messages);
-        currentMessages.push(messageBody);
+        currentMessages.push(bufferMessage);
         
         await supabase
           .from('ai_response_buffer')
@@ -482,18 +526,19 @@ serve(async (req) => {
           })
           .eq('id', existingBuffer.id);
 
-        if (existingBuffer.message_count + 1 >= 2) {
-          console.log('[twilio-webhook] Buffer reached 2 messages, processing...');
+        // Si alcanzó 2 mensajes O ES UNA IMAGEN, procesar inmediatamente
+        if (existingBuffer.message_count + 1 >= 2 || mediaType === 'image') {
+          console.log('[twilio-webhook] Buffer reached 2 messages or has image, processing...');
           await supabase.functions.invoke('process-ai-buffer', { body: {} });
         }
       } else {
-        const { data: newBuffer } = await supabase
+        await supabase
           .from('ai_response_buffer')
           .insert({
             conversation_id: conversation.id,
             user_id: userId,
             message_count: 1,
-            accumulated_messages: JSON.stringify([messageBody]),
+            accumulated_messages: JSON.stringify([bufferMessage]),
             channel_type: 'twilio',
             twilio_connection_id: connectionId,
             phone_number: phoneNumber,
@@ -502,23 +547,29 @@ serve(async (req) => {
           .select()
           .single();
 
-        console.log('[twilio-webhook] New buffer created, scheduling processing in 10 seconds...');
+        // Si es una imagen, procesar INMEDIATAMENTE (puede ser comprobante de pago)
+        if (mediaType === 'image') {
+          console.log('[twilio-webhook] Image received, processing immediately...');
+          await supabase.functions.invoke('process-ai-buffer', { body: {} });
+        } else {
+          console.log('[twilio-webhook] New buffer created, scheduling processing in 10 seconds...');
 
-        EdgeRuntime.waitUntil((async () => {
-          await new Promise(resolve => setTimeout(resolve, 10000));
-          
-          const { data: currentBuffer } = await supabase
-            .from('ai_response_buffer')
-            .select('processed')
-            .eq('conversation_id', conversation.id)
-            .eq('processed', false)
-            .maybeSingle();
-          
-          if (currentBuffer) {
-            console.log('[twilio-webhook] 10 seconds passed, processing buffer...');
-            await supabase.functions.invoke('process-ai-buffer', { body: {} });
-          }
-        })());
+          EdgeRuntime.waitUntil((async () => {
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
+            const { data: currentBuffer } = await supabase
+              .from('ai_response_buffer')
+              .select('processed')
+              .eq('conversation_id', conversation.id)
+              .eq('processed', false)
+              .maybeSingle();
+            
+            if (currentBuffer) {
+              console.log('[twilio-webhook] 10 seconds passed, processing buffer...');
+              await supabase.functions.invoke('process-ai-buffer', { body: {} });
+            }
+          })());
+        }
       }
     }
 
