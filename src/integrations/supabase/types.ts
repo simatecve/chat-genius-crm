@@ -1081,6 +1081,30 @@ export type Database = {
           },
         ]
       }
+      mensaje_landing: {
+        Row: {
+          created_at: string
+          id: number
+          id_usuario: string | null
+          mensaje: string | null
+          orientacion: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          id_usuario?: string | null
+          mensaje?: string | null
+          orientacion?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          id_usuario?: string | null
+          mensaje?: string | null
+          orientacion?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           attachment_url: string | null
