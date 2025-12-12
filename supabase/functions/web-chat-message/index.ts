@@ -69,7 +69,7 @@ const casinoTools = [
 ];
 
 // Function to create player via n8n webhook
-async function crearJugador(username: string, password: string = "Capibet1234", phoneNumber?: string): Promise<{ success: boolean; message: string }> {
+async function crearJugador(username: string, password: string = "Capibet1234", phoneNumber?: string): Promise<{ success: boolean; message: string; username: string; password: string }> {
   try {
     console.log(`Creating casino player: ${username}`);
     
@@ -84,20 +84,32 @@ async function crearJugador(username: string, password: string = "Capibet1234", 
     });
 
     if (response.ok) {
-      const result = await response.json();
+      // Handle response - may not be valid JSON
+      let result = null;
+      try {
+        const text = await response.text();
+        if (text && text.trim()) {
+          result = JSON.parse(text);
+        }
+      } catch (parseError) {
+        console.log("Webhook response is not JSON, treating as success");
+      }
+      
       console.log("Player created successfully:", result);
       return { 
         success: true, 
-        message: `¡Listo! Usuario: ${username} - Contraseña: ${password}. Entrá: http://capibet.fun/` 
+        message: `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
+        username,
+        password
       };
     } else {
       const errorText = await response.text();
       console.error("Error creating player:", errorText);
-      return { success: false, message: "Error al crear la cuenta. Contactá al cajero." };
+      return { success: false, message: "Error al crear la cuenta. Contactá al cajero.", username, password };
     }
   } catch (error) {
     console.error("Error in crearJugador:", error);
-    return { success: false, message: "Error de conexión. Intentá de nuevo o contactá al cajero." };
+    return { success: false, message: "Error de conexión. Intentá de nuevo o contactá al cajero.", username, password };
   }
 }
 
@@ -417,13 +429,49 @@ serve(async (req) => {
                     console.log(`Auto-generated username: ${username}`);
                   }
                   
-                  const result = await crearJugador(
-                    username,
-                    args.password || "Capibet1234",
-                    sessionId
-                  );
+                  const password = args.password || "Capibet1234";
+                  const result = await crearJugador(username, password, sessionId);
                   
-                  botReply = result.message;
+                  if (result.success) {
+                    // Send multiple messages for successful user creation
+                    const cashierNum = webchatAISettings?.cashier_numbers?.replace(/\D/g, '') || '';
+                    const cashierLink = cashierNum ? `https://wa.me/${cashierNum}` : "Contactá al cajero";
+                    
+                    const successMessages = [
+                      `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
+                      `Entrá acá → http://capibet.fun/`,
+                      `Para recargar fichas, transferí al CBU ↓`,
+                      webchatAISettings?.cbu || "CBU no configurado",
+                      `Después enviá el comprobante al cajero ↓`,
+                      cashierLink
+                    ];
+                    
+                    console.log(`Sending ${successMessages.length} success messages for user creation`);
+                    
+                    for (const msg of successMessages) {
+                      await supabase.from('messages').insert({
+                        conversation_id: conversation.id,
+                        user_id: webchat.user_id,
+                        content: msg,
+                        direction: 'outbound',
+                        message_type: 'text',
+                        is_bot: true
+                      });
+                      await new Promise(r => setTimeout(r, 500));
+                    }
+                    
+                    await supabase.from('conversations').update({
+                      last_message: successMessages[successMessages.length - 1],
+                      last_message_time: new Date().toISOString()
+                    }).eq('id', conversation.id);
+                    
+                    return new Response(
+                      JSON.stringify({ success: true, botReply: successMessages.join('\n') }),
+                      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                    );
+                  } else {
+                    botReply = result.message;
+                  }
                 }
               }
             } else {
