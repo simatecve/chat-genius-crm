@@ -1995,6 +1995,7 @@ export type Database = {
           ai_agent_id: string | null
           allowed_domains: string[] | null
           created_at: string | null
+          height: string | null
           id: string
           is_active: boolean | null
           logo_url: string | null
@@ -2005,11 +2006,14 @@ export type Database = {
           updated_at: string | null
           user_id: string
           welcome_message: string | null
+          widget_type: string | null
+          width: string | null
         }
         Insert: {
           ai_agent_id?: string | null
           allowed_domains?: string[] | null
           created_at?: string | null
+          height?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -2020,11 +2024,14 @@ export type Database = {
           updated_at?: string | null
           user_id: string
           welcome_message?: string | null
+          widget_type?: string | null
+          width?: string | null
         }
         Update: {
           ai_agent_id?: string | null
           allowed_domains?: string[] | null
           created_at?: string | null
+          height?: string | null
           id?: string
           is_active?: boolean | null
           logo_url?: string | null
@@ -2035,6 +2042,8 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           welcome_message?: string | null
+          widget_type?: string | null
+          width?: string | null
         }
         Relationships: [
           {

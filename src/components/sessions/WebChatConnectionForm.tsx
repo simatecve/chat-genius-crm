@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { toast } from 'sonner';
@@ -18,6 +19,9 @@ interface WebChatConfig {
   placeholderText: string;
   position: 'bottom-right' | 'bottom-left';
   aiAgentId: string | null;
+  widgetType: 'floating' | 'embedded';
+  width: string;
+  height: string;
 }
 
 interface AIAgent {
@@ -46,7 +50,10 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
     welcomeMessage: '¡Hola! ¿En qué puedo ayudarte?',
     placeholderText: 'Escribe tu mensaje...',
     position: 'bottom-right',
-    aiAgentId: null
+    aiAgentId: null,
+    widgetType: 'floating',
+    width: '400px',
+    height: '600px'
   });
   const [agents, setAgents] = useState<AIAgent[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -117,7 +124,10 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
           welcome_message: config.welcomeMessage,
           placeholder_text: config.placeholderText,
           position: config.position,
-          ai_agent_id: config.aiAgentId
+          ai_agent_id: config.aiAgentId,
+          widget_type: config.widgetType,
+          width: config.width,
+          height: config.height
         })
         .select()
         .single();
@@ -136,6 +146,13 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
 
   const getEmbedScript = () => {
     if (!savedId) return '';
+    
+    if (config.widgetType === 'embedded') {
+      return `<!-- Web Chat Embebido -->
+<div id="webchat-embedded-container" style="width: ${config.width}; height: ${config.height};"></div>
+<script src="https://pxvembsxhwvpotydtiqa.supabase.co/functions/v1/web-chat-widget-embedded?id=${savedId}" async></script>`;
+    }
+    
     return `<!-- Web Chatbot Widget -->
 <script>
 (function() {
@@ -172,6 +189,47 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
                 placeholder="Asistente Virtual"
               />
             </div>
+
+            <div>
+              <Label>Tipo de Widget</Label>
+              <Tabs 
+                value={config.widgetType} 
+                onValueChange={(v) => setConfig(prev => ({ ...prev, widgetType: v as 'floating' | 'embedded' }))}
+                className="mt-2"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="floating">Flotante</TabsTrigger>
+                  <TabsTrigger value="embedded">Embebido</TabsTrigger>
+                </TabsList>
+                <TabsContent value="floating" className="text-sm text-muted-foreground mt-2">
+                  Icono flotante que abre un modal de chat
+                </TabsContent>
+                <TabsContent value="embedded" className="text-sm text-muted-foreground mt-2">
+                  Chat siempre visible para insertar en tu página
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            {config.widgetType === 'embedded' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Ancho</Label>
+                  <Input
+                    value={config.width}
+                    onChange={(e) => setConfig(prev => ({ ...prev, width: e.target.value }))}
+                    placeholder="400px o 100%"
+                  />
+                </div>
+                <div>
+                  <Label>Alto</Label>
+                  <Input
+                    value={config.height}
+                    onChange={(e) => setConfig(prev => ({ ...prev, height: e.target.value }))}
+                    placeholder="600px o 100vh"
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <Label>Logo</Label>
@@ -243,21 +301,23 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
               />
             </div>
 
-            <div>
-              <Label>Posición</Label>
-              <Select
-                value={config.position}
-                onValueChange={(v) => setConfig(prev => ({ ...prev, position: v as 'bottom-right' | 'bottom-left' }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bottom-right">Abajo Derecha</SelectItem>
-                  <SelectItem value="bottom-left">Abajo Izquierda</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {config.widgetType === 'floating' && (
+              <div>
+                <Label>Posición</Label>
+                <Select
+                  value={config.position}
+                  onValueChange={(v) => setConfig(prev => ({ ...prev, position: v as 'bottom-right' | 'bottom-left' }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bottom-right">Abajo Derecha</SelectItem>
+                    <SelectItem value="bottom-left">Abajo Izquierda</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div>
               <Label>Agente de IA</Label>
@@ -282,7 +342,7 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
             {savedId ? (
               <div className="space-y-3 p-4 bg-muted rounded-lg">
                 <Label>Script para insertar en tu web:</Label>
-                <pre className="text-xs bg-background p-3 rounded overflow-x-auto">
+                <pre className="text-xs bg-background p-3 rounded overflow-x-auto whitespace-pre-wrap">
                   {getEmbedScript()}
                 </pre>
                 <Button onClick={copyScript} className="w-full">
@@ -303,90 +363,143 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
               Vista previa del widget
             </div>
             
-            {/* Simulated webpage */}
-            <div className="relative h-[450px] bg-background rounded-lg border overflow-hidden">
-              <div className="p-4 border-b bg-muted/30">
-                <div className="h-4 w-32 bg-muted rounded" />
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="h-3 w-full bg-muted/50 rounded" />
-                <div className="h-3 w-3/4 bg-muted/50 rounded" />
-                <div className="h-3 w-5/6 bg-muted/50 rounded" />
-              </div>
-
-              {/* Floating Button */}
-              <button
-                onClick={() => setPreviewOpen(!previewOpen)}
-                className={`absolute bottom-4 ${config.position === 'bottom-right' ? 'right-4' : 'left-4'} w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-110`}
-                style={{ backgroundColor: config.primaryColor }}
+            {config.widgetType === 'embedded' ? (
+              /* Embedded Preview */
+              <div 
+                className="bg-[#0d1418] rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+                style={{ height: '450px' }}
               >
-                {config.logoUrl ? (
-                  <img src={config.logoUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-                ) : (
-                  <MessageCircle className="w-6 h-6 text-white" />
-                )}
-              </button>
-
-              {/* Chat Modal Preview */}
-              {previewOpen && (
+                {/* Header */}
                 <div 
-                  className={`absolute bottom-20 ${config.position === 'bottom-right' ? 'right-4' : 'left-4'} w-[300px] bg-card rounded-2xl shadow-2xl overflow-hidden border`}
+                  className="p-4 flex items-center gap-3"
+                  style={{ backgroundColor: config.primaryColor }}
                 >
-                  {/* Header */}
-                  <div 
-                    className="p-3 flex items-center gap-3"
-                    style={{ backgroundColor: config.primaryColor }}
-                  >
-                    {config.logoUrl ? (
-                      <img src={config.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                        <MessageCircle className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-white text-sm">{config.name}</h3>
-                      <span className="text-white/80 text-xs">En línea</span>
+                  {config.logoUrl ? (
+                    <img src={config.logoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                      <MessageCircle className="w-5 h-5 text-white" />
                     </div>
-                    <button 
-                      onClick={() => setPreviewOpen(false)}
-                      className="text-white/80 hover:text-white"
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-white text-sm">{config.name}</h3>
+                    <span className="text-white/80 text-xs">● En línea</span>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 p-4 overflow-y-auto">
+                  <div className="flex gap-2">
+                    <div 
+                      className="rounded-lg rounded-tl-none p-3 max-w-[85%] text-sm bg-[#202c33] text-[#e9edef]"
                     >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Messages */}
-                  <div className="h-[200px] p-3 bg-background overflow-y-auto">
-                    <div className="flex gap-2">
-                      <div 
-                        className="rounded-lg rounded-tl-none p-2 max-w-[85%] text-sm"
-                        style={{ backgroundColor: `${config.primaryColor}20` }}
-                      >
-                        {config.welcomeMessage}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Input */}
-                  <div className="p-3 border-t bg-card">
-                    <div className="flex gap-2">
-                      <input
-                        placeholder={config.placeholderText}
-                        className="flex-1 bg-muted rounded-full px-3 py-2 text-sm outline-none"
-                        disabled
-                      />
-                      <button 
-                        className="w-9 h-9 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: config.primaryColor }}
-                      >
-                        <Send className="w-4 h-4 text-white" />
-                      </button>
+                      {config.welcomeMessage}
+                      <div className="text-[10px] opacity-60 mt-1 text-right">12:00</div>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+
+                {/* Input */}
+                <div className="p-3 bg-[#202c33] border-t border-[#2a3942] flex gap-2">
+                  <input
+                    placeholder={config.placeholderText}
+                    className="flex-1 bg-[#2a3942] rounded-full px-4 py-2 text-sm text-[#e9edef] outline-none"
+                    disabled
+                  />
+                  <button 
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: config.primaryColor }}
+                  >
+                    <Send className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Floating Preview */
+              <div className="relative h-[450px] bg-background rounded-lg border overflow-hidden">
+                <div className="p-4 border-b bg-muted/30">
+                  <div className="h-4 w-32 bg-muted rounded" />
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="h-3 w-full bg-muted/50 rounded" />
+                  <div className="h-3 w-3/4 bg-muted/50 rounded" />
+                  <div className="h-3 w-5/6 bg-muted/50 rounded" />
+                </div>
+
+                {/* Floating Button */}
+                <button
+                  onClick={() => setPreviewOpen(!previewOpen)}
+                  className={`absolute bottom-4 ${config.position === 'bottom-right' ? 'right-4' : 'left-4'} w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-110`}
+                  style={{ backgroundColor: config.primaryColor }}
+                >
+                  {config.logoUrl ? (
+                    <img src={config.logoUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <MessageCircle className="w-6 h-6 text-white" />
+                  )}
+                </button>
+
+                {/* Chat Modal Preview */}
+                {previewOpen && (
+                  <div 
+                    className={`absolute bottom-20 ${config.position === 'bottom-right' ? 'right-4' : 'left-4'} w-[300px] bg-card rounded-2xl shadow-2xl overflow-hidden border`}
+                  >
+                    {/* Header */}
+                    <div 
+                      className="p-3 flex items-center gap-3"
+                      style={{ backgroundColor: config.primaryColor }}
+                    >
+                      {config.logoUrl ? (
+                        <img src={config.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                          <MessageCircle className="w-5 h-5 text-white" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-white text-sm">{config.name}</h3>
+                        <span className="text-white/80 text-xs">En línea</span>
+                      </div>
+                      <button 
+                        onClick={() => setPreviewOpen(false)}
+                        className="text-white/80 hover:text-white"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="h-[200px] p-3 bg-background overflow-y-auto">
+                      <div className="flex gap-2">
+                        <div 
+                          className="rounded-lg rounded-tl-none p-2 max-w-[85%] text-sm"
+                          style={{ backgroundColor: `${config.primaryColor}20` }}
+                        >
+                          {config.welcomeMessage}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Input */}
+                    <div className="p-3 border-t bg-card">
+                      <div className="flex gap-2">
+                        <input
+                          placeholder={config.placeholderText}
+                          className="flex-1 bg-muted rounded-full px-3 py-2 text-sm outline-none"
+                          disabled
+                        />
+                        <button 
+                          className="w-9 h-9 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: config.primaryColor }}
+                        >
+                          <Send className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>

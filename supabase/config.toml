@@ -74,3 +74,12 @@ verify_jwt = false
 
 [functions.web-chat-message]
 verify_jwt = false
+
+[functions.web-chat-widget-embedded]
+verify_jwt = false
+
+[functions.web-chat-send]
+verify_jwt = true
+
+[functions.web-chat-poll]
+verify_jwt = false
