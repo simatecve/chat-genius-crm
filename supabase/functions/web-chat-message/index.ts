@@ -25,10 +25,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get webchat config with AI agent
+    // Get webchat config with AI agent (using explicit FK to avoid ambiguous relationship)
     const { data: webchat, error: webchatError } = await supabase
       .from('web_chatbots')
-      .select('*, ai_agents(*)')
+      .select('*, ai_agents!web_chatbots_ai_agent_id_fkey(*)')
       .eq('id', webchatId)
       .eq('is_active', true)
       .single();
