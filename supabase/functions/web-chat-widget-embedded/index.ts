@@ -106,11 +106,28 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   function createWidgetHTML() {
     return \`
       <style>
+        * { box-sizing: border-box; }
+        #webchat-embedded-container {
+          width: 100%;
+          max-width: 100%;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
         @media (max-width: 480px) {
+          #webchat-embedded-container {
+            width: 100% !important;
+            max-width: 100vw !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
           #webchat-widget {
             width: 100% !important;
             max-width: 100vw !important;
+            min-width: 100% !important;
             border-radius: 0 !important;
+            margin: 0 !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
           }
         }
         #webchat-emoji-picker {
