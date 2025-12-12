@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { webchatId, sessionId, lastMessageTime } = await req.json();
+    const { webchatId, sessionId, lastMessageTime, lastMessageId } = await req.json();
 
     if (!webchatId || !sessionId) {
       return new Response(
@@ -55,16 +55,18 @@ serve(async (req) => {
       );
     }
 
-    // Get new messages since lastMessageTime (only outbound from CRM, not bot)
+    // Get new outbound messages (from CRM operators) - use ID-based filtering to avoid duplicates
     let query = supabase
       .from('messages')
-      .select('*')
+      .select('id, content, direction, is_bot, created_at, message_type, attachment_url')
       .eq('conversation_id', conversation.id)
       .eq('direction', 'outbound')
-      .eq('is_bot', false)
       .order('created_at', { ascending: true });
 
-    if (lastMessageTime) {
+    // Use lastMessageId for more reliable deduplication
+    if (lastMessageId) {
+      query = query.gt('id', lastMessageId);
+    } else if (lastMessageTime) {
       query = query.gt('created_at', lastMessageTime);
     }
 

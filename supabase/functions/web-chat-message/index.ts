@@ -12,9 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { webchatId, sessionId, message } = await req.json();
+    const { webchatId, sessionId, message, attachmentUrl, attachmentType } = await req.json();
 
-    if (!webchatId || !sessionId || !message) {
+    if (!webchatId || !sessionId || (!message && !attachmentUrl)) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -25,10 +25,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get webchat config with AI agent (using explicit FK to avoid ambiguous relationship)
+    // Get webchat config (NO AI agent processing - just save message)
     const { data: webchat, error: webchatError } = await supabase
       .from('web_chatbots')
-      .select('*, ai_agents!web_chatbots_ai_agent_id_fkey(*)')
+      .select('*')
       .eq('id', webchatId)
       .eq('is_active', true)
       .single();
@@ -44,100 +44,47 @@ serve(async (req) => {
     // Find or create conversation for this session
     let conversation = await getOrCreateConversation(supabase, webchat.user_id, sessionId, webchat.name);
 
-    // Save incoming message
+    // Determine message type
+    let messageType = 'text';
+    if (attachmentUrl) {
+      if (attachmentType?.startsWith('image/')) {
+        messageType = 'image';
+      } else if (attachmentType?.startsWith('video/')) {
+        messageType = 'video';
+      } else if (attachmentType?.startsWith('audio/')) {
+        messageType = 'audio';
+      } else {
+        messageType = 'document';
+      }
+    }
+
+    // Save incoming message (NO bot response - just save and notify CRM)
+    const messageContent = message || (attachmentUrl ? `[Archivo adjunto: ${messageType}]` : '');
+    
     await supabase.from('messages').insert({
       conversation_id: conversation.id,
       user_id: webchat.user_id,
-      content: message,
+      content: messageContent,
       direction: 'inbound',
-      message_type: 'text'
+      message_type: messageType,
+      attachment_url: attachmentUrl || null
     });
 
     // Update conversation
     await supabase
       .from('conversations')
       .update({
-        last_message: message,
+        last_message: messageContent,
         last_message_time: new Date().toISOString(),
-        unread_count: conversation.unread_count + 1
+        unread_count: (conversation.unread_count || 0) + 1
       })
       .eq('id', conversation.id);
 
-    // Process with AI if agent is assigned
-    let reply = webchat.welcome_message || '¡Gracias por tu mensaje! Te responderemos pronto.';
+    console.log(`Webchat message saved for session ${sessionId} - no bot response`);
 
-    if (webchat.ai_agent_id && webchat.ai_agents) {
-      const agent = webchat.ai_agents;
-      
-      // Get conversation history for context
-      const { data: history } = await supabase
-        .from('messages')
-        .select('content, direction')
-        .eq('conversation_id', conversation.id)
-        .order('created_at', { ascending: true })
-        .limit(20);
-
-      const messagesForAI = (history || []).map(m => ({
-        role: m.direction === 'inbound' ? 'user' : 'assistant',
-        content: m.content
-      }));
-
-      // Call Lovable AI
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      if (LOVABLE_API_KEY) {
-        try {
-          const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: agent.model || 'google/gemini-2.5-flash',
-              messages: [
-                { role: 'system', content: agent.system_prompt },
-                ...messagesForAI
-              ],
-              max_tokens: agent.max_tokens || 500,
-              temperature: agent.temperature || 0.7
-            })
-          });
-
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json();
-            reply = aiData.choices?.[0]?.message?.content || reply;
-          } else {
-            console.error('AI API error:', await aiResponse.text());
-          }
-        } catch (aiError) {
-          console.error('AI request failed:', aiError);
-        }
-      }
-    }
-
-    // Save bot response
-    await supabase.from('messages').insert({
-      conversation_id: conversation.id,
-      user_id: webchat.user_id,
-      content: reply,
-      direction: 'outbound',
-      is_bot: true,
-      message_type: 'text'
-    });
-
-    // Update conversation with bot reply
-    await supabase
-      .from('conversations')
-      .update({
-        last_message: reply,
-        last_message_time: new Date().toISOString()
-      })
-      .eq('id', conversation.id);
-
-    console.log(`Webchat message processed for session ${sessionId}`);
-
+    // Return success without bot reply (the welcome message is shown only once client-side)
     return new Response(
-      JSON.stringify({ reply }),
+      JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
