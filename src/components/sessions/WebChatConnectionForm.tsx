@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { toast } from 'sonner';
-import { Upload, Copy, Check, MessageCircle, X, Send } from 'lucide-react';
+import { Upload, Copy, Check, MessageCircle, X, Send, Image } from 'lucide-react';
 
 interface WebChatConfig {
   name: string;
   logoUrl: string;
+  backgroundImageUrl: string;
   primaryColor: string;
   welcomeMessage: string;
   placeholderText: string;
@@ -46,6 +47,7 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
   const [config, setConfig] = useState<WebChatConfig>({
     name: 'Asistente Virtual',
     logoUrl: '',
+    backgroundImageUrl: '',
     primaryColor: '#00a884',
     welcomeMessage: '¡Hola! ¿En qué puedo ayudarte?',
     placeholderText: 'Escribe tu mensaje...',
@@ -61,6 +63,7 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
   const [savedId, setSavedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingBg, setUploadingBg] = useState(false);
 
   useEffect(() => {
     fetchAgents();
@@ -105,6 +108,35 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
     }
   };
 
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !effectiveUserId) return;
+
+    setUploadingBg(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${effectiveUserId}/webchat-bg-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-attachments')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-attachments')
+        .getPublicUrl(fileName);
+
+      setConfig(prev => ({ ...prev, backgroundImageUrl: publicUrl }));
+      toast.success('Imagen de fondo subida correctamente');
+    } catch (error) {
+      console.error('Error uploading background:', error);
+      toast.error('Error al subir la imagen de fondo');
+    } finally {
+      setUploadingBg(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!effectiveUserId) return;
     if (!config.name.trim()) {
@@ -120,6 +152,7 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
           user_id: effectiveUserId,
           name: config.name,
           logo_url: config.logoUrl || null,
+          background_image_url: config.backgroundImageUrl || null,
           primary_color: config.primaryColor,
           welcome_message: config.welcomeMessage,
           placeholder_text: config.placeholderText,
@@ -260,6 +293,41 @@ export default function WebChatConnectionForm({ onClose }: WebChatConnectionForm
                     type="file"
                     accept="image/*"
                     onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <Label>Imagen de Fondo (opcional)</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {config.backgroundImageUrl ? (
+                  <div className="relative">
+                    <img src={config.backgroundImageUrl} alt="Background" className="w-16 h-12 rounded object-cover" />
+                    <button
+                      onClick={() => setConfig(prev => ({ ...prev, backgroundImageUrl: '' }))}
+                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-16 h-12 rounded bg-muted flex items-center justify-center">
+                    <Image className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                )}
+                <label className="cursor-pointer">
+                  <Button variant="outline" size="sm" disabled={uploadingBg} asChild>
+                    <span>
+                      <Upload className="w-4 h-4 mr-2" />
+                      {uploadingBg ? 'Subiendo...' : 'Subir Fondo'}
+                    </span>
+                  </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleBackgroundUpload}
                     className="hidden"
                   />
                 </label>
