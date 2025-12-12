@@ -51,7 +51,7 @@ serve(async (req) => {
 });
 
 function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string {
-  const sessionId = 'webchat_' + Math.random().toString(36).substring(2, 15);
+  // Use localStorage to persist session across page reloads
   
   return `
 (function() {
@@ -59,6 +59,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     id: config.id,
     name: config.name,
     logoUrl: config.logo_url,
+    backgroundImageUrl: config.background_image_url,
     primaryColor: config.primary_color || '#00a884',
     welcomeMessage: config.welcome_message || '¡Hola! ¿En qué puedo ayudarte?',
     placeholderText: config.placeholder_text || 'Escribe tu mensaje...',
@@ -67,7 +68,14 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   })};
   
   const SUPABASE_URL = '${supabaseUrl}';
-  const SESSION_ID = '${sessionId}';
+  
+  // Persist session in localStorage
+  let SESSION_ID = localStorage.getItem('webchat_session_' + CONFIG.id);
+  if (!SESSION_ID) {
+    SESSION_ID = 'webchat_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now();
+    localStorage.setItem('webchat_session_' + CONFIG.id, SESSION_ID);
+  }
+  
   let messages = [];
   let lastMessageTime = null;
   let pollingInterval = null;
@@ -126,6 +134,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
           overflow-y: auto;
           padding: 16px;
           background: #0d1418;
+          ${config.background_image_url ? `background-image: url('${config.background_image_url}'); background-size: cover; background-position: center;` : ''}
           display: flex;
           flex-direction: column;
           gap: 12px;

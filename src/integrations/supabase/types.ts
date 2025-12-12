@@ -30,6 +30,7 @@ export type Database = {
           twilio_connection_id: string | null
           updated_at: string | null
           user_id: string
+          web_chatbot_id: string | null
           whatsapp_connection_id: string | null
         }
         Insert: {
@@ -47,6 +48,7 @@ export type Database = {
           twilio_connection_id?: string | null
           updated_at?: string | null
           user_id: string
+          web_chatbot_id?: string | null
           whatsapp_connection_id?: string | null
         }
         Update: {
@@ -64,6 +66,7 @@ export type Database = {
           twilio_connection_id?: string | null
           updated_at?: string | null
           user_id?: string
+          web_chatbot_id?: string | null
           whatsapp_connection_id?: string | null
         }
         Relationships: [
@@ -79,6 +82,13 @@ export type Database = {
             columns: ["twilio_connection_id"]
             isOneToOne: false
             referencedRelation: "twilio_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agents_web_chatbot_id_fkey"
+            columns: ["web_chatbot_id"]
+            isOneToOne: false
+            referencedRelation: "web_chatbots"
             referencedColumns: ["id"]
           },
           {
@@ -1994,6 +2004,7 @@ export type Database = {
         Row: {
           ai_agent_id: string | null
           allowed_domains: string[] | null
+          background_image_url: string | null
           created_at: string | null
           height: string | null
           id: string
@@ -2012,6 +2023,7 @@ export type Database = {
         Insert: {
           ai_agent_id?: string | null
           allowed_domains?: string[] | null
+          background_image_url?: string | null
           created_at?: string | null
           height?: string | null
           id?: string
@@ -2030,6 +2042,7 @@ export type Database = {
         Update: {
           ai_agent_id?: string | null
           allowed_domains?: string[] | null
+          background_image_url?: string | null
           created_at?: string | null
           height?: string | null
           id?: string

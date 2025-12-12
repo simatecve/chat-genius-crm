@@ -27,11 +27,18 @@ interface TelegramBot {
   status: string | null;
 }
 
+interface WebChatbot {
+  id: string;
+  name: string;
+  is_active: boolean | null;
+}
+
 interface FormData {
   name: string;
-  channel_type: 'whatsapp' | 'telegram' | 'none';
+  channel_type: 'whatsapp' | 'telegram' | 'webchat' | 'none';
   whatsapp_connection_id: string;
   telegram_bot_id: string;
+  web_chatbot_id: string;
   instructions: string;
   message_delay: number;
   is_active: boolean;
@@ -41,6 +48,7 @@ const CreateAIAgent = () => {
   const navigate = useNavigate();
   const [whatsappConnections, setWhatsappConnections] = useState<WhatsAppConnection[]>([]);
   const [telegramBots, setTelegramBots] = useState<TelegramBot[]>([]);
+  const [webChatbots, setWebChatbots] = useState<WebChatbot[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -48,6 +56,7 @@ const CreateAIAgent = () => {
     channel_type: 'none',
     whatsapp_connection_id: 'none',
     telegram_bot_id: 'none',
+    web_chatbot_id: 'none',
     instructions: '',
     message_delay: 1,
     is_active: false
@@ -86,6 +95,16 @@ const CreateAIAgent = () => {
 
       if (telegramError) throw telegramError;
       setTelegramBots(telegramData || []);
+
+      // Cargar Web Chatbots
+      const { data: webChatData, error: webChatError } = await supabase
+        .from('web_chatbots')
+        .select('id, name, is_active')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (webChatError) throw webChatError;
+      setWebChatbots(webChatData || []);
       
     } catch (error) {
       console.error('Error loading connections:', error);
@@ -134,6 +153,8 @@ const CreateAIAgent = () => {
         agentData.whatsapp_connection_id = formData.whatsapp_connection_id;
       } else if (formData.channel_type === 'telegram' && formData.telegram_bot_id !== 'none') {
         agentData.telegram_bot_id = formData.telegram_bot_id;
+      } else if (formData.channel_type === 'webchat' && formData.web_chatbot_id !== 'none') {
+        agentData.web_chatbot_id = formData.web_chatbot_id;
       }
       
       const { data, error } = await supabase
@@ -231,7 +252,8 @@ const CreateAIAgent = () => {
                     ...prev, 
                     channel_type: value,
                     whatsapp_connection_id: 'none',
-                    telegram_bot_id: 'none'
+                    telegram_bot_id: 'none',
+                    web_chatbot_id: 'none'
                   }))}
                 >
                   <SelectTrigger>
@@ -241,6 +263,7 @@ const CreateAIAgent = () => {
                     <SelectItem value="none">Sin canal específico</SelectItem>
                     <SelectItem value="whatsapp">WhatsApp</SelectItem>
                     <SelectItem value="telegram">Telegram Bot</SelectItem>
+                    <SelectItem value="webchat">Web Chat</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -298,6 +321,37 @@ const CreateAIAgent = () => {
                                 : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                             }`}>
                               {bot.status || 'inactivo'}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {formData.channel_type === 'webchat' && (
+                <div className="space-y-2">
+                  <Label htmlFor="web_chatbot">Web Chatbot</Label>
+                  <Select
+                    value={formData.web_chatbot_id}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, web_chatbot_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar chatbot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin chatbot</SelectItem>
+                      {webChatbots.map((chatbot) => (
+                        <SelectItem key={chatbot.id} value={chatbot.id}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{chatbot.name}</span>
+                            <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                              chatbot.is_active 
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {chatbot.is_active ? 'activo' : 'inactivo'}
                             </span>
                           </div>
                         </SelectItem>
