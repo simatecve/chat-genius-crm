@@ -117,19 +117,19 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         }
         @media (max-width: 480px) {
           #webchat-embedded-container {
-            width: 100% !important;
-            max-width: 100vw !important;
+            width: calc(100% - 24px) !important;
+            max-width: calc(100vw - 24px) !important;
             padding: 0 !important;
-            margin: 0 !important;
+            margin: 0 12px !important;
           }
           #webchat-widget {
             width: 100% !important;
-            max-width: 100vw !important;
+            max-width: 100% !important;
             min-width: 100% !important;
-            border-radius: 0 !important;
+            border-radius: 12px !important;
             margin: 0 !important;
-            height: 100vh !important;
-            max-height: 100vh !important;
+            height: calc(100vh - 24px) !important;
+            max-height: calc(100vh - 24px) !important;
           }
         }
         #webchat-emoji-picker {
@@ -357,7 +357,14 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     if (content && (content.match(/\\.(jpg|jpeg|png|gif|webp)$/i) || content.startsWith('data:image'))) {
       return \`<img src="\${content}" style="max-width: 100%; border-radius: 8px; margin: 4px 0;" />\`;
     }
-    return escapeHtml(content);
+    // Escape HTML first
+    let escaped = escapeHtml(content);
+    // Convert URLs to clickable links (WhatsApp links especially)
+    escaped = escaped.replace(
+      /(https?:\\/\\/[^\\s<]+)/g,
+      '<a href="$1" target="_blank" rel="noopener" style="color: #53bdeb; text-decoration: underline;">$1</a>'
+    );
+    return escaped;
   }
 
   function escapeHtml(text) {
@@ -403,6 +410,9 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         addMessage('bot', '⚠️ Error enviando mensaje. Recargá la página.', 'error_' + Date.now());
       } else {
         console.log('[WebChat] Message sent successfully');
+        // Poll immediately for potential AI response
+        setTimeout(pollForMessages, 500);
+        setTimeout(pollForMessages, 1500);
       }
     } catch (error) {
       console.error('[WebChat] Send error:', error);
@@ -465,7 +475,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   }
 
   function startPolling() {
-    pollingInterval = setInterval(pollForMessages, 3000);
+    pollingInterval = setInterval(pollForMessages, 2000);
   }
 
   function toggleEmojiPicker() {
