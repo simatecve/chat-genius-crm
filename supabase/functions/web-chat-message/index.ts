@@ -61,14 +61,14 @@ serve(async (req) => {
     // Save incoming message
     const messageContent = message || (attachmentUrl ? `[Archivo adjunto: ${messageType}]` : '');
     
-    const { data: savedMessage } = await supabase.from('messages').insert({
+    await supabase.from('messages').insert({
       conversation_id: conversation.id,
       user_id: webchat.user_id,
       content: messageContent,
       direction: 'inbound',
       message_type: messageType,
       attachment_url: attachmentUrl || null
-    }).select().single();
+    });
 
     // Update conversation
     await supabase
@@ -82,7 +82,7 @@ serve(async (req) => {
 
     console.log(`Webchat message saved for session ${sessionId}`);
 
-    // Check if there's an AI agent assigned to this webchat
+    // Check if there's an AI agent assigned to this webchat (highest priority)
     const { data: aiAgent } = await supabase
       .from('ai_agents')
       .select('*')
@@ -90,17 +90,19 @@ serve(async (req) => {
       .eq('is_active', true)
       .single();
 
-    // Also check default AI settings
-    const { data: defaultAISettings } = await supabase
-      .from('ia_default_settings')
+    // Check webchat-specific AI settings (isolated from ia_default_settings)
+    const { data: webchatAISettings } = await supabase
+      .from('webchat_ai_settings')
       .select('*')
-      .eq('id', 1)
+      .eq('user_id', webchat.user_id)
       .single();
 
     let botReply: string | null = null;
 
-    // Process AI response if agent is assigned OR default AI is enabled
-    if (aiAgent || (defaultAISettings && defaultAISettings.is_enabled)) {
+    // Process AI response: AI Agent takes priority, then webchat AI settings
+    const shouldProcessAI = aiAgent || (webchatAISettings && webchatAISettings.is_enabled);
+    
+    if (shouldProcessAI) {
       try {
         const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
         
@@ -118,16 +120,33 @@ serve(async (req) => {
             content: m.content
           }));
 
-          // Build system prompt
+          // Build system prompt - AI Agent takes priority
           let systemPrompt = '';
+          let model = 'google/gemini-2.5-flash';
+          let maxTokens = 500;
+
           if (aiAgent) {
             systemPrompt = aiAgent.system_prompt;
-          } else if (defaultAISettings) {
-            systemPrompt = `Eres un asistente virtual amigable para un sitio web. 
-Responde de manera concisa y útil a las consultas de los visitantes.
-${defaultAISettings.cashier_numbers ? `Número de cajero para consultas: ${defaultAISettings.cashier_numbers}` : ''}
-${defaultAISettings.cbu ? `CBU para transferencias: ${defaultAISettings.cbu}` : ''}`;
+            model = aiAgent.model || model;
+            maxTokens = aiAgent.max_tokens || maxTokens;
+            console.log(`Using AI Agent: ${aiAgent.name}`);
+          } else if (webchatAISettings) {
+            // Use webchat-specific settings with custom prompt
+            systemPrompt = webchatAISettings.system_prompt || 'Eres un asistente virtual amigable.';
+            model = webchatAISettings.model || model;
+            maxTokens = webchatAISettings.max_tokens || maxTokens;
+            
+            // Append cashier and CBU info if available
+            if (webchatAISettings.cashier_numbers) {
+              systemPrompt += `\n\nNúmero de cajero para consultas: ${webchatAISettings.cashier_numbers}`;
+            }
+            if (webchatAISettings.cbu) {
+              systemPrompt += `\nCBU para transferencias: ${webchatAISettings.cbu}`;
+            }
+            console.log('Using Webchat AI Settings');
           }
+
+          console.log(`Calling AI with model: ${model}, prompt length: ${systemPrompt.length}`);
 
           const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
@@ -136,12 +155,12 @@ ${defaultAISettings.cbu ? `CBU para transferencias: ${defaultAISettings.cbu}` : 
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: aiAgent?.model || "google/gemini-2.5-flash",
+              model: model,
               messages: [
                 { role: "system", content: systemPrompt },
                 ...conversationHistory
               ],
-              max_tokens: aiAgent?.max_tokens || 500,
+              max_tokens: maxTokens,
             }),
           });
 
@@ -172,12 +191,17 @@ ${defaultAISettings.cbu ? `CBU para transferencias: ${defaultAISettings.cbu}` : 
               console.log(`AI response saved for webchat session ${sessionId}`);
             }
           } else {
-            console.error('AI Gateway error:', await response.text());
+            const errorText = await response.text();
+            console.error('AI Gateway error:', response.status, errorText);
           }
+        } else {
+          console.log('LOVABLE_API_KEY not configured');
         }
       } catch (aiError) {
         console.error('Error generating AI response:', aiError);
       }
+    } else {
+      console.log('No AI agent or webchat AI settings enabled for this webchat');
     }
 
     return new Response(

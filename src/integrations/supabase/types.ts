@@ -2068,6 +2068,45 @@ export type Database = {
           },
         ]
       }
+      webchat_ai_settings: {
+        Row: {
+          cashier_numbers: string
+          cbu: string
+          created_at: string | null
+          id: number
+          is_enabled: boolean
+          max_tokens: number
+          model: string
+          system_prompt: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cashier_numbers?: string
+          cbu?: string
+          created_at?: string | null
+          id?: number
+          is_enabled?: boolean
+          max_tokens?: number
+          model?: string
+          system_prompt?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cashier_numbers?: string
+          cbu?: string
+          created_at?: string | null
+          id?: number
+          is_enabled?: boolean
+          max_tokens?: number
+          model?: string
+          system_prompt?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_connections: {
         Row: {
           created_at: string | null

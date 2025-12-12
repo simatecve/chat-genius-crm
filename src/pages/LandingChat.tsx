@@ -7,16 +7,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File } from 'lucide-react';
+import { Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Bot, RefreshCw } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EmojiPicker from 'emoji-picker-react';
 import { FileUploadService } from '@/services/fileUploadService';
-import { iaDefaultService } from '@/services/iaDefaultService';
+import { webchatAIService } from '@/services/webchatAIService';
 
 interface WebChatConversation {
   id: string;
@@ -56,9 +57,10 @@ const LandingChat = () => {
   const webChatFileInputRef = useRef<HTMLInputElement>(null);
   const webChatMessagesEndRef = useRef<HTMLDivElement>(null);
 
-  // IA Default Config state
+  // Webchat AI Config state (isolated from ia_default_settings)
   const [iaLoading, setIaLoading] = useState(true);
   const [iaEnabled, setIaEnabled] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [cashierNumbers, setCashierNumbers] = useState('');
   const [cbu, setCbu] = useState('');
   const [savingIA, setSavingIA] = useState(false);
@@ -157,28 +159,36 @@ const LandingChat = () => {
     setShowWebChatEmoji(false);
   };
 
-  // Fetch IA Default settings
-  const fetchIASettings = async () => {
+  // Fetch Webchat AI settings (isolated table)
+  const fetchWebchatAISettings = async () => {
+    if (!effectiveUserId) return;
     try {
-      const settings = await iaDefaultService.getSettings();
+      const settings = await webchatAIService.getSettings(effectiveUserId);
       if (settings) {
         setIaEnabled(!!settings.is_enabled);
+        setSystemPrompt(settings.system_prompt || webchatAIService.getDefaultPrompt());
         setCashierNumbers(settings.cashier_numbers || '');
         setCbu(settings.cbu || '');
+      } else {
+        // Set default prompt if no settings exist
+        setSystemPrompt(webchatAIService.getDefaultPrompt());
       }
     } catch (error) {
-      console.error('Error loading IA settings:', error);
+      console.error('Error loading webchat AI settings:', error);
+      setSystemPrompt(webchatAIService.getDefaultPrompt());
     } finally {
       setIaLoading(false);
     }
   };
 
-  const saveIASettings = async () => {
+  const saveWebchatAISettings = async () => {
+    if (!effectiveUserId) return;
     setSavingIA(true);
     try {
-      await iaDefaultService.saveSettings({
-        id: 1,
+      await webchatAIService.saveSettings({
+        user_id: effectiveUserId,
         is_enabled: iaEnabled,
+        system_prompt: systemPrompt,
         cashier_numbers: cashierNumbers,
         cbu: cbu,
       });
@@ -191,9 +201,14 @@ const LandingChat = () => {
     }
   };
 
+  const resetPromptToDefault = () => {
+    setSystemPrompt(webchatAIService.getDefaultPrompt());
+    toast.info('Prompt restaurado al valor predeterminado');
+  };
+
   useEffect(() => {
     fetchWebChatConversations();
-    fetchIASettings();
+    fetchWebchatAISettings();
   }, [effectiveUserId]);
 
   useEffect(() => {
@@ -237,8 +252,8 @@ const LandingChat = () => {
             Conversaciones
           </TabsTrigger>
           <TabsTrigger value="config" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Configuración IA
+            <Bot className="h-4 w-4" />
+            IA Web Chat
           </TabsTrigger>
         </TabsList>
 
@@ -462,16 +477,18 @@ const LandingChat = () => {
           </div>
         </TabsContent>
 
-        {/* Configuration Tab with IA Settings */}
+        {/* IA Web Chat Configuration Tab */}
         <TabsContent value="config" className="flex-1 p-4">
-          <div className="max-w-2xl space-y-6">
-            {/* IA Default Settings */}
+          <div className="max-w-3xl space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <span>🧠</span>
+                  <Bot className="h-5 w-5 text-primary" />
                   IA Predeterminada para Web Chat
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Configuración aislada de la IA general. Solo afecta al Web Chat.
+                </p>
               </CardHeader>
               <CardContent className="space-y-6">
                 {iaLoading ? (
@@ -480,16 +497,44 @@ const LandingChat = () => {
                   </div>
                 ) : (
                   <>
+                    {/* Enable/Disable */}
                     <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                       <div>
-                        <Label className="text-base font-medium">Activar IA automáticamente</Label>
+                        <Label className="text-base font-medium">Activar IA para Web Chat</Label>
                         <p className="text-sm text-muted-foreground mt-1">
-                          La IA responderá automáticamente a los mensajes del web chat
+                          La IA responderá automáticamente a los visitantes del web chat
                         </p>
                       </div>
                       <Switch checked={iaEnabled} onCheckedChange={setIaEnabled} />
                     </div>
 
+                    {/* System Prompt */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-medium">Prompt del Sistema</Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={resetPromptToDefault}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          Restaurar
+                        </Button>
+                      </div>
+                      <Textarea
+                        placeholder="Escribe las instrucciones para la IA..."
+                        value={systemPrompt}
+                        onChange={(e) => setSystemPrompt(e.target.value)}
+                        rows={8}
+                        className="resize-none font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Define cómo debe comportarse la IA al responder a los visitantes del web chat.
+                      </p>
+                    </div>
+
+                    {/* Cashier Numbers */}
                     <div className="space-y-2">
                       <Label>Números de Cajeros</Label>
                       <Input
@@ -498,10 +543,11 @@ const LandingChat = () => {
                         onChange={(e) => setCashierNumbers(e.target.value)}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Ingresa uno o varios números de cajero separados por coma
+                        Estos números se añadirán al contexto de la IA automáticamente
                       </p>
                     </div>
 
+                    {/* CBU */}
                     <div className="space-y-2">
                       <Label>CBU</Label>
                       <Input
@@ -510,12 +556,12 @@ const LandingChat = () => {
                         onChange={(e) => setCbu(e.target.value)}
                       />
                       <p className="text-xs text-muted-foreground">
-                        CBU para transferencias bancarias
+                        CBU para transferencias (se añade al contexto de la IA)
                       </p>
                     </div>
 
-                    <Button onClick={saveIASettings} disabled={savingIA} className="w-full">
-                      {savingIA ? 'Guardando...' : 'Guardar Configuración IA'}
+                    <Button onClick={saveWebchatAISettings} disabled={savingIA} className="w-full">
+                      {savingIA ? 'Guardando...' : 'Guardar Configuración'}
                     </Button>
                   </>
                 )}
