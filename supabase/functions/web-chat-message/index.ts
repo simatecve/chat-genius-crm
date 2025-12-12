@@ -433,17 +433,13 @@ serve(async (req) => {
                   const result = await crearJugador(username, password, sessionId);
                   
                   if (result.success) {
-                    // Send multiple messages for successful user creation
-                    const cashierNum = webchatAISettings?.cashier_numbers?.replace(/\D/g, '') || '';
-                    const cashierLink = cashierNum ? `https://wa.me/${cashierNum}` : "Contactá al cajero";
-                    
+                    // Send messages for successful user creation (NO cashier link yet - only after payment proof)
                     const successMessages = [
                       `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
                       `Entrá acá → http://capibet.fun/`,
                       `Para recargar fichas, transferí al CBU ↓`,
                       webchatAISettings?.cbu || "CBU no configurado",
-                      `Después enviá el comprobante al cajero ↓`,
-                      cashierLink
+                      `Cuando hagas la transferencia, enviame el comprobante acá y te paso el link del cajero 👍`
                     ];
                     
                     console.log(`Sending ${successMessages.length} success messages for user creation`);
