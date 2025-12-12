@@ -141,6 +141,31 @@ export class ConversationService {
         telegramBotId,
         conversationId
       });
+
+      // Si es WebChat, usar web-chat-send
+      if (channelType === 'webchat') {
+        console.log('[ConversationService] Sending via WebChat...');
+        
+        const { data, error } = await supabase.functions.invoke('web-chat-send', {
+          body: {
+            conversationId,
+            message,
+            userId
+          }
+        });
+
+        if (error) {
+          console.error('[ConversationService] Error calling web-chat-send:', error);
+          throw error;
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to send WebChat message');
+        }
+
+        console.log('[ConversationService] WebChat message sent successfully');
+        return data.savedMessage;
+      }
       
       // Si es Telegram, usar telegram-send-message
       if (channelType === 'telegram' && telegramBotId) {
