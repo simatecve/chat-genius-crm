@@ -4,13 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { MessageSquare, Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, User, MessageCircle, Paperclip, Image, File } from 'lucide-react';
+import { MessageSquare, Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, User, MessageCircle, Paperclip, Smile, File } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import EmojiPicker from 'emoji-picker-react';
+import { FileUploadService } from '@/services/fileUploadService';
 
 interface LandingConversation {
   id_usuario: string;
@@ -75,6 +78,10 @@ const LandingChat = () => {
   const [webChatNewMessage, setWebChatNewMessage] = useState('');
   const [webChatLoading, setWebChatLoading] = useState(false);
   const [sendingWebChat, setSendingWebChat] = useState(false);
+  const [showWebChatEmoji, setShowWebChatEmoji] = useState(false);
+  const [webChatAttachment, setWebChatAttachment] = useState<File | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const webChatFileInputRef = useRef<HTMLInputElement>(null);
   const webChatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -275,20 +282,23 @@ const LandingChat = () => {
     setWebChatMessages(data || []);
   };
 
-  const sendWebChatMessage = async () => {
-    if (!selectedWebChat || !webChatNewMessage.trim()) return;
+  const sendWebChatMessage = async (attachmentUrl?: string, attachmentType?: string) => {
+    if (!selectedWebChat || (!webChatNewMessage.trim() && !attachmentUrl)) return;
     setSendingWebChat(true);
     try {
       const { error } = await supabase.functions.invoke('web-chat-send', {
         body: {
           conversationId: selectedWebChat.id,
           message: webChatNewMessage.trim(),
-          userId: effectiveUserId
+          userId: effectiveUserId,
+          attachmentUrl: attachmentUrl || undefined,
+          attachmentType: attachmentType || undefined
         }
       });
 
       if (error) throw error;
       setWebChatNewMessage('');
+      setWebChatAttachment(null);
       fetchWebChatMessages(selectedWebChat.id);
     } catch (error) {
       console.error('Error sending webchat message:', error);
@@ -296,6 +306,36 @@ const LandingChat = () => {
     } finally {
       setSendingWebChat(false);
     }
+  };
+
+  const handleWebChatFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedWebChat) return;
+
+    const validation = FileUploadService.validateFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error);
+      return;
+    }
+
+    setUploadingAttachment(true);
+    try {
+      const result = await FileUploadService.uploadFile(file, effectiveUserId || '', selectedWebChat.id);
+      await sendWebChatMessage(result.url, file.type);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Error al subir archivo');
+    } finally {
+      setUploadingAttachment(false);
+      if (webChatFileInputRef.current) {
+        webChatFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleWebChatEmojiSelect = (emojiData: any) => {
+    setWebChatNewMessage(prev => prev + emojiData.emoji);
+    setShowWebChatEmoji(false);
   };
 
   useEffect(() => {
@@ -699,7 +739,39 @@ const LandingChat = () => {
                     
                     {/* Input Area */}
                     <div className="p-3 border-t border-border bg-[#202c33]">
-                      <div className="flex gap-2">
+                      <input 
+                        type="file" 
+                        ref={webChatFileInputRef}
+                        onChange={handleWebChatFileSelect}
+                        accept="image/*,.pdf,.doc,.docx"
+                        className="hidden"
+                      />
+                      <div className="flex gap-2 items-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => webChatFileInputRef.current?.click()}
+                          disabled={uploadingAttachment}
+                          className="text-[#8696a0] hover:text-foreground hover:bg-[#2a3942]"
+                          title="Adjuntar archivo"
+                        >
+                          <Paperclip className="h-5 w-5" />
+                        </Button>
+                        <Popover open={showWebChatEmoji} onOpenChange={setShowWebChatEmoji}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-[#8696a0] hover:text-foreground hover:bg-[#2a3942]"
+                              title="Emojis"
+                            >
+                              <Smile className="h-5 w-5" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0 border-none" side="top" align="start">
+                            <EmojiPicker onEmojiClick={handleWebChatEmojiSelect} />
+                          </PopoverContent>
+                        </Popover>
                         <Input
                           placeholder="Escribe un mensaje..."
                           value={webChatNewMessage}
@@ -708,10 +780,10 @@ const LandingChat = () => {
                           className="flex-1 bg-[#2a3942] border-none text-[#e9edef] placeholder:text-[#8696a0]"
                         />
                         <Button 
-                          onClick={sendWebChatMessage} 
+                          onClick={() => sendWebChatMessage()} 
                           size="icon"
                           className="bg-primary hover:bg-primary/90"
-                          disabled={!webChatNewMessage.trim() || sendingWebChat}
+                          disabled={(!webChatNewMessage.trim() && !webChatAttachment) || sendingWebChat || uploadingAttachment}
                         >
                           <Send className="h-4 w-4" />
                         </Button>

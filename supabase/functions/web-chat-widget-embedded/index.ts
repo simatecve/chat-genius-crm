@@ -67,6 +67,9 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   
   const SUPABASE_URL = '${supabaseUrl}';
   
+  // Common emojis for picker
+  const EMOJIS = ['😊', '👍', '❤️', '😂', '🙏', '😍', '🎉', '🔥', '✨', '💪', '👋', '😢', '🤔', '👏', '💯', '🙌', '😎', '🥰', '💕', '✅'];
+  
   // Persist session in localStorage
   let SESSION_ID = localStorage.getItem('webchat_session_' + CONFIG.id);
   if (!SESSION_ID) {
@@ -77,7 +80,8 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   let lastMessageId = null;
   let pollingInterval = null;
   let displayedMessageIds = new Set();
-  let welcomeShown = false;
+  let welcomeShown = localStorage.getItem('webchat_welcome_' + CONFIG.id) === 'true';
+  let showEmojiPicker = false;
 
   function init() {
     const container = document.getElementById('webchat-embedded-container');
@@ -89,10 +93,11 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     container.innerHTML = createWidgetHTML();
     setupEventListeners();
     
-    // Show welcome message only once on first load
+    // Show welcome message only once per session (persisted)
     if (!welcomeShown) {
-      addMessage('bot', CONFIG.welcomeMessage, null, true);
+      addMessage('bot', CONFIG.welcomeMessage, 'welcome_msg', true);
       welcomeShown = true;
+      localStorage.setItem('webchat_welcome_' + CONFIG.id, 'true');
     }
     
     startPolling();
@@ -108,6 +113,36 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
             border-radius: 0 !important;
           }
         }
+        #webchat-emoji-picker {
+          display: none;
+          position: absolute;
+          bottom: 60px;
+          left: 12px;
+          background: #202c33;
+          border-radius: 12px;
+          padding: 8px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+          z-index: 100;
+          max-width: 200px;
+        }
+        #webchat-emoji-picker.show {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+        .emoji-btn {
+          width: 32px;
+          height: 32px;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-size: 18px;
+          border-radius: 6px;
+          transition: background 0.2s;
+        }
+        .emoji-btn:hover {
+          background: rgba(255,255,255,0.1);
+        }
       </style>
       <div id="webchat-widget" style="
         width: \${CONFIG.width};
@@ -121,6 +156,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background: #0d1418;
         box-sizing: border-box;
+        position: relative;
       ">
         <!-- Header -->
         <div style="
@@ -158,6 +194,11 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
           min-height: 0;
         "></div>
         
+        <!-- Emoji Picker -->
+        <div id="webchat-emoji-picker">
+          \${EMOJIS.map(e => \`<button class="emoji-btn" data-emoji="\${e}">\${e}</button>\`).join('')}
+        </div>
+        
         <!-- Input Area -->
         <div style="
           padding: 12px 16px;
@@ -167,6 +208,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
           gap: 10px;
           align-items: center;
           flex-shrink: 0;
+          position: relative;
         ">
           <label id="webchat-attach-btn" style="
             width: 36px;
@@ -178,12 +220,31 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-          ">
+          " title="Adjuntar archivo">
             <input type="file" id="webchat-file-input" accept="image/*,.pdf,.doc,.docx" style="display: none;" />
             <svg width="20" height="20" viewBox="0 0 24 24" fill="#8696a0" stroke="none">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
             </svg>
           </label>
+          <button id="webchat-emoji-btn" style="
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+          " title="Emojis">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#8696a0">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="#8696a0" stroke-width="2"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" fill="none" stroke="#8696a0" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="9" cy="9" r="1.5"/>
+              <circle cx="15" cy="9" r="1.5"/>
+            </svg>
+          </button>
           <input 
             id="webchat-input" 
             type="text" 
@@ -232,7 +293,11 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     }
     if (msgId) {
       displayedMessageIds.add(msgId);
-      lastMessageId = msgId;
+      // Only update lastMessageId for real server messages (UUIDs)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(msgId)) {
+        lastMessageId = msgId;
+      }
     }
     
     const container = document.getElementById('webchat-messages');
@@ -285,11 +350,12 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   async function sendMessage(text, attachmentUrl = null, attachmentType = null) {
     if (!text?.trim() && !attachmentUrl) return;
     
-    // Show message in UI immediately
+    // Show message in UI immediately with local ID
+    const localId = 'local_' + Date.now();
     if (attachmentUrl && attachmentType?.startsWith('image/')) {
-      addMessage('user', attachmentUrl, 'local_' + Date.now());
+      addMessage('user', attachmentUrl, localId);
     } else if (text?.trim()) {
-      addMessage('user', text, 'local_' + Date.now());
+      addMessage('user', text, localId);
     }
     
     try {
@@ -372,10 +438,29 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     pollingInterval = setInterval(pollForMessages, 3000);
   }
 
+  function toggleEmojiPicker() {
+    const picker = document.getElementById('webchat-emoji-picker');
+    if (picker) {
+      showEmojiPicker = !showEmojiPicker;
+      picker.classList.toggle('show', showEmojiPicker);
+    }
+  }
+
+  function insertEmoji(emoji) {
+    const input = document.getElementById('webchat-input');
+    if (input) {
+      input.value += emoji;
+      input.focus();
+    }
+    toggleEmojiPicker();
+  }
+
   function setupEventListeners() {
     const input = document.getElementById('webchat-input');
     const sendBtn = document.getElementById('webchat-send');
     const fileInput = document.getElementById('webchat-file-input');
+    const emojiBtn = document.getElementById('webchat-emoji-btn');
+    const emojiPicker = document.getElementById('webchat-emoji-picker');
     
     if (input && sendBtn) {
       sendBtn.addEventListener('click', () => {
@@ -400,6 +485,29 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         }
       });
     }
+    
+    if (emojiBtn) {
+      emojiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleEmojiPicker();
+      });
+    }
+    
+    if (emojiPicker) {
+      emojiPicker.querySelectorAll('.emoji-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          insertEmoji(btn.dataset.emoji);
+        });
+      });
+    }
+    
+    // Close emoji picker when clicking outside
+    document.addEventListener('click', () => {
+      if (showEmojiPicker) {
+        toggleEmojiPicker();
+      }
+    });
   }
 
   if (document.readyState === 'loading') {

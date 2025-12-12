@@ -63,8 +63,9 @@ serve(async (req) => {
       .eq('direction', 'outbound')
       .order('created_at', { ascending: true });
 
-    // Use lastMessageId for more reliable deduplication
-    if (lastMessageId) {
+    // Use lastMessageId for more reliable deduplication - only if it's a valid UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (lastMessageId && uuidRegex.test(lastMessageId)) {
       query = query.gt('id', lastMessageId);
     } else if (lastMessageTime) {
       query = query.gt('created_at', lastMessageTime);
