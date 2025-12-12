@@ -55,7 +55,7 @@ serve(async (req) => {
       );
     }
 
-    // Get new outbound messages (from CRM operators) - use ID-based filtering to avoid duplicates
+    // Get new outbound messages (from CRM operators) - use created_at for reliable chronological filtering
     let query = supabase
       .from('messages')
       .select('id, content, direction, is_bot, created_at, message_type, attachment_url')
@@ -63,13 +63,13 @@ serve(async (req) => {
       .eq('direction', 'outbound')
       .order('created_at', { ascending: true });
 
-    // Use lastMessageId for more reliable deduplication - only if it's a valid UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (lastMessageId && uuidRegex.test(lastMessageId)) {
-      query = query.gt('id', lastMessageId);
-    } else if (lastMessageTime) {
+    // Use created_at for reliable chronological filtering (UUIDs are not sequential)
+    if (lastMessageTime) {
+      console.log('[web-chat-poll] Filtering messages after:', lastMessageTime);
       query = query.gt('created_at', lastMessageTime);
     }
+
+    console.log('[web-chat-poll] Fetching outbound messages for conversation:', conversation.id);
 
     const { data: messages, error: msgError } = await query.limit(20);
 

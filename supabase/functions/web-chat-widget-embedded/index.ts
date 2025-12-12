@@ -79,7 +79,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     localStorage.setItem('webchat_session_' + CONFIG.id, SESSION_ID);
   }
   
-  let lastMessageId = null;
+  let lastMessageTime = null;  // Use timestamp for reliable chronological filtering
   let pollingInterval = null;
   let displayedMessageIds = new Set();
   let welcomeShown = localStorage.getItem('webchat_welcome_' + CONFIG.id) === 'true';
@@ -305,18 +305,18 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     \`;
   }
 
-  function addMessage(role, content, msgId, isWelcome = false) {
+  function addMessage(role, content, msgId, createdAt = null, isWelcome = false) {
     // Prevent duplicates using message ID
     if (msgId && displayedMessageIds.has(msgId)) {
       return;
     }
     if (msgId) {
       displayedMessageIds.add(msgId);
-      // Only update lastMessageId for real server messages (UUIDs)
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidRegex.test(msgId)) {
-        lastMessageId = msgId;
-      }
+    }
+    // Update lastMessageTime for chronological polling
+    if (createdAt) {
+      lastMessageTime = createdAt;
+      console.log('[WebChat] Updated lastMessageTime:', lastMessageTime);
     }
     
     const container = document.getElementById('webchat-messages');
@@ -447,24 +447,26 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
 
   async function pollForMessages() {
     try {
+      console.log('[WebChat Poll] Polling with lastMessageTime:', lastMessageTime);
       const response = await fetch(SUPABASE_URL + '/functions/v1/web-chat-poll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           webchatId: CONFIG.id,
           sessionId: SESSION_ID,
-          lastMessageId: lastMessageId
+          lastMessageTime: lastMessageTime
         })
       });
       
       if (response.ok) {
         const data = await response.json();
+        console.log('[WebChat Poll] Received messages:', data.messages?.length || 0);
         if (data.messages && data.messages.length > 0) {
           data.messages.forEach(msg => {
             // Only show outbound messages from CRM (avoid duplicates)
             if (msg.direction === 'outbound') {
               const content = msg.attachment_url || msg.content;
-              addMessage('bot', content, msg.id);
+              addMessage('bot', content, msg.id, msg.created_at);
             }
           });
         }
