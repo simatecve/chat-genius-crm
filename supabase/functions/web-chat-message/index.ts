@@ -255,11 +255,13 @@ serve(async (req) => {
             if (imageAnalysis.isReceipt) {
               console.log("Payment receipt detected, sending to cashier");
               
-              // Send multiple messages for receipt
+              // Send multiple messages for receipt with WhatsApp link
+              const cashierNum = webchatAISettings.cashier_numbers?.replace(/\D/g, '') || '';
+              const cashierLink = cashierNum ? `https://wa.me/${cashierNum}` : "Contactá al cajero";
               const messages = [
                 "¡Perfecto! Recibí tu comprobante 📄",
                 "Para completar tu recarga, enviá este comprobante al cajero ↓",
-                webchatAISettings.cashier_numbers || "Contactá al cajero"
+                cashierLink
               ];
 
               for (const msg of messages) {
@@ -318,10 +320,12 @@ serve(async (req) => {
             model = webchatAISettings.model || model;
             maxTokens = webchatAISettings.max_tokens || maxTokens;
             
-            // Replace placeholders
+            // Replace placeholders with WhatsApp link for cashier
+            const cashierForPrompt = webchatAISettings.cashier_numbers?.replace(/\D/g, '') || '';
+            const cashierLinkPrompt = cashierForPrompt ? `https://wa.me/${cashierForPrompt}` : 'No configurado';
             systemPrompt = systemPrompt
               .replace(/{CBU}/g, webchatAISettings.cbu || 'No configurado')
-              .replace(/{CAJERO}/g, webchatAISettings.cashier_numbers || 'No configurado');
+              .replace(/{CAJERO}/g, cashierLinkPrompt);
             
             console.log('Using Webchat AI Settings with casino prompt');
           }
@@ -337,12 +341,14 @@ serve(async (req) => {
                           lowerMessage.includes('fichas');
 
           if (wantsCBU && webchatAISettings) {
-            // Send CBU info directly
+            // Send CBU info directly with WhatsApp link for cashier
+            const cashierNumber = webchatAISettings.cashier_numbers?.replace(/\D/g, '') || '';
+            const cashierWhatsAppLink = cashierNumber ? `https://wa.me/${cashierNumber}` : "Cajero no configurado";
             const cbuMessages = [
               "Para transferir te dejo el CBU ↓",
               webchatAISettings.cbu || "CBU no configurado",
               "Enviá el comprobante al cajero ↓",
-              webchatAISettings.cashier_numbers || "Cajero no configurado"
+              cashierWhatsAppLink
             ];
 
             for (const msg of cbuMessages) {

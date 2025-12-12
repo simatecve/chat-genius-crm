@@ -44,6 +44,7 @@ const DEFAULT_PROMPT = `Sos el asistente virtual del casino online CAPIBET, con 
 
 **REGLAS:**
 - Para cargar fichas: dar CBU e indicar enviar comprobante al cajero
+- El link del cajero ya viene formateado como link de WhatsApp (https://wa.me/NUMERO)
 - NUNCA inventes info, derivá al cajero si no sabés`;
 
 export const webchatAIService = {
