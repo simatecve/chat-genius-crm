@@ -41,7 +41,9 @@ serve(async (req) => {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/javascript',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     });
   } catch (error) {
@@ -367,6 +369,8 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   async function sendMessage(text, attachmentUrl = null, attachmentType = null) {
     if (!text?.trim() && !attachmentUrl) return;
     
+    console.log('[WebChat] Sending message:', { text, hasAttachment: !!attachmentUrl, webchatId: CONFIG.id, sessionId: SESSION_ID });
+    
     // Show message in UI immediately with local ID
     const localId = 'local_' + Date.now();
     if (attachmentUrl && attachmentType?.startsWith('image/')) {
@@ -376,7 +380,10 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     }
     
     try {
-      const response = await fetch(SUPABASE_URL + '/functions/v1/web-chat-message', {
+      const url = SUPABASE_URL + '/functions/v1/web-chat-message';
+      console.log('[WebChat] Calling:', url);
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -388,12 +395,18 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         })
       });
       
+      console.log('[WebChat] Response status:', response.status);
+      
       if (!response.ok) {
-        console.error('Error sending message:', await response.text());
+        const errorText = await response.text();
+        console.error('[WebChat] Error response:', errorText);
+        addMessage('bot', '⚠️ Error enviando mensaje. Recargá la página.', 'error_' + Date.now());
+      } else {
+        console.log('[WebChat] Message sent successfully');
       }
-      // No bot reply expected - messages come from CRM via polling
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('[WebChat] Send error:', error);
+      addMessage('bot', '⚠️ Error de conexión. Recargá la página.', 'error_' + Date.now());
     }
   }
 
