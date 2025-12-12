@@ -25,7 +25,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get webchat config (NO AI agent processing - just save message)
+    // Get webchat config
     const { data: webchat, error: webchatError } = await supabase
       .from('web_chatbots')
       .select('*')
@@ -58,17 +58,17 @@ serve(async (req) => {
       }
     }
 
-    // Save incoming message (NO bot response - just save and notify CRM)
+    // Save incoming message
     const messageContent = message || (attachmentUrl ? `[Archivo adjunto: ${messageType}]` : '');
     
-    await supabase.from('messages').insert({
+    const { data: savedMessage } = await supabase.from('messages').insert({
       conversation_id: conversation.id,
       user_id: webchat.user_id,
       content: messageContent,
       direction: 'inbound',
       message_type: messageType,
       attachment_url: attachmentUrl || null
-    });
+    }).select().single();
 
     // Update conversation
     await supabase
@@ -80,11 +80,108 @@ serve(async (req) => {
       })
       .eq('id', conversation.id);
 
-    console.log(`Webchat message saved for session ${sessionId} - no bot response`);
+    console.log(`Webchat message saved for session ${sessionId}`);
 
-    // Return success without bot reply (the welcome message is shown only once client-side)
+    // Check if there's an AI agent assigned to this webchat
+    const { data: aiAgent } = await supabase
+      .from('ai_agents')
+      .select('*')
+      .eq('web_chatbot_id', webchatId)
+      .eq('is_active', true)
+      .single();
+
+    // Also check default AI settings
+    const { data: defaultAISettings } = await supabase
+      .from('ia_default_settings')
+      .select('*')
+      .eq('id', 1)
+      .single();
+
+    let botReply: string | null = null;
+
+    // Process AI response if agent is assigned OR default AI is enabled
+    if (aiAgent || (defaultAISettings && defaultAISettings.is_enabled)) {
+      try {
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        
+        if (LOVABLE_API_KEY) {
+          // Get conversation history
+          const { data: historyMessages } = await supabase
+            .from('messages')
+            .select('content, direction')
+            .eq('conversation_id', conversation.id)
+            .order('created_at', { ascending: true })
+            .limit(20);
+
+          const conversationHistory = (historyMessages || []).map(m => ({
+            role: m.direction === 'inbound' ? 'user' : 'assistant',
+            content: m.content
+          }));
+
+          // Build system prompt
+          let systemPrompt = '';
+          if (aiAgent) {
+            systemPrompt = aiAgent.system_prompt;
+          } else if (defaultAISettings) {
+            systemPrompt = `Eres un asistente virtual amigable para un sitio web. 
+Responde de manera concisa y útil a las consultas de los visitantes.
+${defaultAISettings.cashier_numbers ? `Número de cajero para consultas: ${defaultAISettings.cashier_numbers}` : ''}
+${defaultAISettings.cbu ? `CBU para transferencias: ${defaultAISettings.cbu}` : ''}`;
+          }
+
+          const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: aiAgent?.model || "google/gemini-2.5-flash",
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...conversationHistory
+              ],
+              max_tokens: aiAgent?.max_tokens || 500,
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            botReply = data.choices?.[0]?.message?.content;
+
+            if (botReply) {
+              // Save bot response
+              await supabase.from('messages').insert({
+                conversation_id: conversation.id,
+                user_id: webchat.user_id,
+                content: botReply,
+                direction: 'outbound',
+                message_type: 'text',
+                is_bot: true
+              });
+
+              // Update conversation with bot reply
+              await supabase
+                .from('conversations')
+                .update({
+                  last_message: botReply,
+                  last_message_time: new Date().toISOString()
+                })
+                .eq('id', conversation.id);
+
+              console.log(`AI response saved for webchat session ${sessionId}`);
+            }
+          } else {
+            console.error('AI Gateway error:', await response.text());
+          }
+        }
+      } catch (aiError) {
+        console.error('Error generating AI response:', aiError);
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, botReply }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
