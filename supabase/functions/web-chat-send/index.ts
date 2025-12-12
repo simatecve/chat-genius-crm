@@ -12,11 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    const { conversationId, message, userId } = await req.json();
+    const { conversationId, message, userId, attachmentUrl, attachmentType } = await req.json();
 
-    if (!conversationId || !message) {
+    if (!conversationId || (!message && !attachmentUrl)) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: conversationId, message' }),
+        JSON.stringify({ error: 'Missing required fields: conversationId, message or attachmentUrl' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -41,16 +41,33 @@ serve(async (req) => {
       );
     }
 
+    // Determine message type
+    let messageType = 'text';
+    if (attachmentUrl) {
+      if (attachmentType?.startsWith('image/')) {
+        messageType = 'image';
+      } else if (attachmentType?.startsWith('video/')) {
+        messageType = 'video';
+      } else if (attachmentType?.startsWith('audio/')) {
+        messageType = 'audio';
+      } else {
+        messageType = 'document';
+      }
+    }
+
+    const messageContent = message || (attachmentUrl ? `[Archivo: ${messageType}]` : '');
+
     // Insert the outbound message from CRM
     const { data: savedMessage, error: msgError } = await supabase
       .from('messages')
       .insert({
         conversation_id: conversationId,
         user_id: userId || conversation.user_id,
-        content: message,
+        content: messageContent,
         direction: 'outbound',
         is_bot: false,
-        message_type: 'text'
+        message_type: messageType,
+        attachment_url: attachmentUrl || null
       })
       .select()
       .single();
@@ -67,7 +84,7 @@ serve(async (req) => {
     await supabase
       .from('conversations')
       .update({
-        last_message: message,
+        last_message: messageContent,
         last_message_time: new Date().toISOString()
       })
       .eq('id', conversationId);

@@ -51,8 +51,6 @@ serve(async (req) => {
 });
 
 function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string {
-  // Use localStorage to persist session across page reloads
-  
   return `
 (function() {
   const CONFIG = ${JSON.stringify({
@@ -76,9 +74,10 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     localStorage.setItem('webchat_session_' + CONFIG.id, SESSION_ID);
   }
   
-  let messages = [];
-  let lastMessageTime = null;
+  let lastMessageId = null;
   let pollingInterval = null;
+  let displayedMessageIds = new Set();
+  let welcomeShown = false;
 
   function init() {
     const container = document.getElementById('webchat-embedded-container');
@@ -89,14 +88,30 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     
     container.innerHTML = createWidgetHTML();
     setupEventListeners();
-    addMessage('bot', CONFIG.welcomeMessage);
+    
+    // Show welcome message only once on first load
+    if (!welcomeShown) {
+      addMessage('bot', CONFIG.welcomeMessage, null, true);
+      welcomeShown = true;
+    }
+    
     startPolling();
   }
 
   function createWidgetHTML() {
     return \`
+      <style>
+        @media (max-width: 480px) {
+          #webchat-widget {
+            width: 100% !important;
+            max-width: 100vw !important;
+            border-radius: 0 !important;
+          }
+        }
+      </style>
       <div id="webchat-widget" style="
         width: \${CONFIG.width};
+        max-width: 100%;
         height: \${CONFIG.height};
         display: flex;
         flex-direction: column;
@@ -105,6 +120,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         box-shadow: 0 10px 40px rgba(0,0,0,0.2);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background: #0d1418;
+        box-sizing: border-box;
       ">
         <!-- Header -->
         <div style="
@@ -113,6 +129,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-shrink: 0;
         ">
           \${CONFIG.logoUrl ? 
             \`<img src="\${CONFIG.logoUrl}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;" />\` :
@@ -122,8 +139,8 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
               </svg>
             </div>\`
           }
-          <div style="flex: 1;">
-            <div style="color: white; font-weight: 600; font-size: 15px;">\${CONFIG.name}</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="color: white; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">\${CONFIG.name}</div>
             <div style="color: rgba(255,255,255,0.8); font-size: 12px;">● En línea</div>
           </div>
         </div>
@@ -134,10 +151,11 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
           overflow-y: auto;
           padding: 16px;
           background: #0d1418;
-          ${config.background_image_url ? `background-image: url('${config.background_image_url}'); background-size: cover; background-position: center;` : ''}
+          \${CONFIG.backgroundImageUrl ? \`background-image: url('\${CONFIG.backgroundImageUrl}'); background-size: cover; background-position: center;\` : ''}
           display: flex;
           flex-direction: column;
           gap: 12px;
+          min-height: 0;
         "></div>
         
         <!-- Input Area -->
@@ -148,7 +166,24 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
           display: flex;
           gap: 10px;
           align-items: center;
+          flex-shrink: 0;
         ">
+          <label id="webchat-attach-btn" style="
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+          ">
+            <input type="file" id="webchat-file-input" accept="image/*,.pdf,.doc,.docx" style="display: none;" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#8696a0" stroke="none">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </label>
           <input 
             id="webchat-input" 
             type="text" 
@@ -162,6 +197,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
               color: #e9edef;
               font-size: 14px;
               outline: none;
+              min-width: 0;
             "
           />
           <button 
@@ -177,6 +213,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
               align-items: center;
               justify-content: center;
               transition: transform 0.2s;
+              flex-shrink: 0;
             "
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="none">
@@ -188,7 +225,16 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     \`;
   }
 
-  function addMessage(role, content) {
+  function addMessage(role, content, msgId, isWelcome = false) {
+    // Prevent duplicates using message ID
+    if (msgId && displayedMessageIds.has(msgId)) {
+      return;
+    }
+    if (msgId) {
+      displayedMessageIds.add(msgId);
+      lastMessageId = msgId;
+    }
+    
     const container = document.getElementById('webchat-messages');
     if (!container) return;
     
@@ -213,16 +259,21 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         line-height: 1.4;
         word-wrap: break-word;
       ">
-        <div>\${escapeHtml(content)}</div>
+        <div>\${formatContent(content)}</div>
         <div style="font-size: 10px; opacity: 0.7; margin-top: 4px; text-align: right;">\${time}</div>
       </div>
     \`;
     
     container.appendChild(msgDiv);
     container.scrollTop = container.scrollHeight;
-    
-    messages.push({ role, content, time: new Date().toISOString() });
-    lastMessageTime = new Date().toISOString();
+  }
+
+  function formatContent(content) {
+    // Check if it's an image URL
+    if (content && (content.match(/\\.(jpg|jpeg|png|gif|webp)$/i) || content.startsWith('data:image'))) {
+      return \`<img src="\${content}" style="max-width: 100%; border-radius: 8px; margin: 4px 0;" />\`;
+    }
+    return escapeHtml(content);
   }
 
   function escapeHtml(text) {
@@ -231,10 +282,15 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     return div.innerHTML;
   }
 
-  async function sendMessage(text) {
-    if (!text.trim()) return;
+  async function sendMessage(text, attachmentUrl = null, attachmentType = null) {
+    if (!text?.trim() && !attachmentUrl) return;
     
-    addMessage('user', text);
+    // Show message in UI immediately
+    if (attachmentUrl && attachmentType?.startsWith('image/')) {
+      addMessage('user', attachmentUrl, 'local_' + Date.now());
+    } else if (text?.trim()) {
+      addMessage('user', text, 'local_' + Date.now());
+    }
     
     try {
       const response = await fetch(SUPABASE_URL + '/functions/v1/web-chat-message', {
@@ -243,18 +299,43 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         body: JSON.stringify({
           webchatId: CONFIG.id,
           sessionId: SESSION_ID,
-          message: text
+          message: text || '',
+          attachmentUrl: attachmentUrl,
+          attachmentType: attachmentType
         })
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        if (data.reply) {
-          addMessage('bot', data.reply);
-        }
+      if (!response.ok) {
+        console.error('Error sending message:', await response.text());
       }
+      // No bot reply expected - messages come from CRM via polling
     } catch (error) {
       console.error('Error sending message:', error);
+    }
+  }
+
+  async function uploadFile(file) {
+    // Convert to base64 for simple storage
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleFileUpload(file) {
+    if (!file) return;
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('El archivo es demasiado grande. Máximo 5MB.');
+      return;
+    }
+    
+    const dataUrl = await uploadFile(file);
+    if (dataUrl) {
+      await sendMessage('', dataUrl, file.type);
     }
   }
 
@@ -266,7 +347,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         body: JSON.stringify({
           webchatId: CONFIG.id,
           sessionId: SESSION_ID,
-          lastMessageTime: lastMessageTime
+          lastMessageId: lastMessageId
         })
       });
       
@@ -274,8 +355,10 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         const data = await response.json();
         if (data.messages && data.messages.length > 0) {
           data.messages.forEach(msg => {
-            if (msg.direction === 'outbound' && !msg.is_bot) {
-              addMessage('bot', msg.content);
+            // Only show outbound messages from CRM (avoid duplicates)
+            if (msg.direction === 'outbound') {
+              const content = msg.attachment_url || msg.content;
+              addMessage('bot', content, msg.id);
             }
           });
         }
@@ -292,6 +375,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
   function setupEventListeners() {
     const input = document.getElementById('webchat-input');
     const sendBtn = document.getElementById('webchat-send');
+    const fileInput = document.getElementById('webchat-file-input');
     
     if (input && sendBtn) {
       sendBtn.addEventListener('click', () => {
@@ -303,6 +387,16 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
         if (e.key === 'Enter') {
           sendMessage(input.value);
           input.value = '';
+        }
+      });
+    }
+    
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          handleFileUpload(file);
+          e.target.value = ''; // Reset input
         }
       });
     }
