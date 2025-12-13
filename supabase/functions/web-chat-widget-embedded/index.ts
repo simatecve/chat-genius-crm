@@ -97,7 +97,7 @@ function generateEmbeddedWidgetScript(config: any, supabaseUrl: string): string 
     
     // Show welcome message only once per session (persisted)
     if (!welcomeShown) {
-      addMessage('bot', CONFIG.welcomeMessage, 'welcome_msg', true);
+      addMessage('bot', CONFIG.welcomeMessage, 'welcome_msg', null, true);
       welcomeShown = true;
       localStorage.setItem('webchat_welcome_' + CONFIG.id, 'true');
     }
