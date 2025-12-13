@@ -56,10 +56,6 @@ const casinoTools = [
           password: {
             type: "string",
             description: "Contraseña para la cuenta. Si no se proporciona, usar 'Capibet1234'"
-          },
-          phoneNumber: {
-            type: "string",
-            description: "Número de teléfono del usuario (opcional)"
           }
         },
         required: ["username"]
@@ -69,16 +65,22 @@ const casinoTools = [
 ];
 
 // Function to create player via n8n webhook
-async function crearJugador(username: string, password: string = "Capibet1234", phoneNumber?: string): Promise<{ success: boolean; message: string; username: string; password: string }> {
+async function crearJugador(
+  userName: string, 
+  password: string = "Capibet1234", 
+  contactName: string = "Usuario Web Chat",
+  phoneNumber?: string
+): Promise<{ success: boolean; message: string; userName: string; password: string }> {
   try {
-    console.log(`Creating casino player: ${username}`);
+    console.log(`Creating casino player: ${userName} for contact: ${contactName}`);
     
     const response = await fetch("https://n8n2025.nocodeveloper.site/webhook/crear-usuario", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username,
+        userName,
         password,
+        contactName,
         phoneNumber: phoneNumber || ""
       })
     });
@@ -98,18 +100,18 @@ async function crearJugador(username: string, password: string = "Capibet1234", 
       console.log("Player created successfully:", result);
       return { 
         success: true, 
-        message: `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
-        username,
+        message: `¡Listo! Usuario: ${userName} - Contraseña: ${password}`,
+        userName,
         password
       };
     } else {
       const errorText = await response.text();
       console.error("Error creating player:", errorText);
-      return { success: false, message: "Error al crear la cuenta. Contactá al cajero.", username, password };
+      return { success: false, message: "Error al crear la cuenta. Contactá al cajero.", userName, password };
     }
   } catch (error) {
     console.error("Error in crearJugador:", error);
-    return { success: false, message: "Error de conexión. Intentá de nuevo o contactá al cajero.", username, password };
+    return { success: false, message: "Error de conexión. Intentá de nuevo o contactá al cajero.", userName, password };
   }
 }
 
@@ -430,7 +432,8 @@ serve(async (req) => {
                   }
                   
                   const password = args.password || "Capibet1234";
-                  const result = await crearJugador(username, password, sessionId);
+                  const contactName = conversation?.contact_name || "Usuario Web Chat";
+                  const result = await crearJugador(username, password, contactName, sessionId);
                   
                   if (result.success) {
                     // Send messages for successful user creation (NO cashier link yet - only after payment proof)
