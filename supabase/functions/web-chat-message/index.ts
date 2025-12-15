@@ -464,7 +464,7 @@ serve(async (req) => {
                       `Entrá acá → http://capibet.fun/`,
                       `Para recargar fichas, transferí al CBU ↓`,
                       webchatAISettings?.cbu || "CBU no configurado",
-                      `Cuando hagas la transferencia, enviame el comprobante acá y te paso el link del cajero 👍`
+                      `Cuando hagas la transferencia, enviame el comprobante acá 👍`
                     ];
                     
                     console.log(`Sending ${successMessages.length} success messages for user creation`);
