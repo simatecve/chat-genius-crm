@@ -282,30 +282,45 @@ serve(async (req) => {
 
     // AUTO-DETECT NAME AND CREATE USER AUTOMATICALLY (only once per conversation)
     if (webchatAISettings && webchatAISettings.is_enabled && !casinoUserAlreadyCreated && message) {
-      // Patrones para detectar nombres SOLO con prefijos explícitos
-      const nombrePatterns = [
-        /(?:me llamo|soy|mi nombre es)\s+([a-záéíóúñ]+)/i,
-      ];
-
       // Palabras que NO son nombres (saludos, palabras comunes)
       const palabrasExcluidas = [
         'hola', 'buenas', 'buenos', 'hey', 'ey', 'que', 'tal',
         'gracias', 'gracia', 'como', 'bien', 'mal', 'si', 'no',
         'ok', 'dale', 'listo', 'perfecto', 'genial', 'bueno',
-        'quiero', 'necesito', 'tengo', 'puedo', 'ayuda', 'soy'
+        'quiero', 'necesito', 'tengo', 'puedo', 'ayuda',
+        'nuevo', 'nueva', 'cliente', 'usuario', 'player', 'jugador'
       ];
 
       let nombreDetectado = null;
-      const trimmedMessage = message.trim();
-      for (const pattern of nombrePatterns) {
-        const match = trimmedMessage.match(pattern);
-        if (match && match[1]) {
-          const posibleNombre = match[1].toLowerCase();
-          // Verificar que no sea una palabra excluida
-          if (!palabrasExcluidas.includes(posibleNombre)) {
-            nombreDetectado = posibleNombre;
-            break;
-          }
+      const trimmedMessage = message.trim().toLowerCase();
+
+      // Patrón 1: "me llamo X" (más específico, prioridad alta)
+      const meLlamoMatch = trimmedMessage.match(/me llamo\s+([a-záéíóúñ]+)/i);
+      if (meLlamoMatch && meLlamoMatch[1] && !palabrasExcluidas.includes(meLlamoMatch[1].toLowerCase())) {
+        nombreDetectado = meLlamoMatch[1].toLowerCase();
+      }
+
+      // Patrón 2: "X me llamo" (nombre antes de "me llamo")
+      if (!nombreDetectado) {
+        const antesMatch = trimmedMessage.match(/([a-záéíóúñ]+)\s+me llamo/i);
+        if (antesMatch && antesMatch[1] && !palabrasExcluidas.includes(antesMatch[1].toLowerCase())) {
+          nombreDetectado = antesMatch[1].toLowerCase();
+        }
+      }
+
+      // Patrón 3: "mi nombre es X"
+      if (!nombreDetectado) {
+        const nombreEsMatch = trimmedMessage.match(/mi nombre es\s+([a-záéíóúñ]+)/i);
+        if (nombreEsMatch && nombreEsMatch[1] && !palabrasExcluidas.includes(nombreEsMatch[1].toLowerCase())) {
+          nombreDetectado = nombreEsMatch[1].toLowerCase();
+        }
+      }
+
+      // Patrón 4: "soy X" (solo si X no es palabra común)
+      if (!nombreDetectado) {
+        const soyMatch = trimmedMessage.match(/soy\s+([a-záéíóúñ]+)/i);
+        if (soyMatch && soyMatch[1] && !palabrasExcluidas.includes(soyMatch[1].toLowerCase())) {
+          nombreDetectado = soyMatch[1].toLowerCase();
         }
       }
 
