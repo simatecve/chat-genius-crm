@@ -122,7 +122,7 @@ async function crearJugador(
 // Analyze image for payment receipt
 async function analyzeImageForPaymentReceipt(imageUrl: string, LOVABLE_API_KEY: string): Promise<{ isReceipt: boolean; description: string }> {
   try {
-    console.log("Analyzing image for payment receipt...");
+    console.log("Analyzing image for payment receipt, URL:", imageUrl);
     
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -138,7 +138,7 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, LOVABLE_API_KEY: 
             content: [
               {
                 type: "text",
-                text: "Analizá esta imagen y decime si es un comprobante de pago, transferencia bancaria, voucher o prueba de depósito. Respondé SOLO con 'SI' o 'NO' seguido de una breve descripción."
+                text: "Analizá esta imagen. ¿Es un comprobante de pago, transferencia bancaria, voucher, captura de pago, recibo o prueba de depósito? Respondé SOLO con 'SI' si es cualquier tipo de comprobante/prueba de pago/transferencia, o 'NO' si no lo es. Después agregá una breve descripción de lo que ves."
               },
               {
                 type: "image_url",
@@ -147,16 +147,36 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, LOVABLE_API_KEY: 
             ]
           }
         ],
-        max_tokens: 100
+        max_tokens: 150
       })
     });
 
+    console.log("Image analysis response status:", response.status);
+    
     if (response.ok) {
       const data = await response.json();
       const analysis = data.choices?.[0]?.message?.content || "";
-      const isReceipt = analysis.toUpperCase().startsWith("SI");
+      console.log("Image analysis result:", analysis);
+      
+      // More flexible detection - check for SI at start or payment-related keywords
+      const upperAnalysis = analysis.toUpperCase();
+      const isReceipt = upperAnalysis.startsWith("SI") || 
+                        upperAnalysis.startsWith("SÍ") ||
+                        (upperAnalysis.includes("COMPROBANTE") && !upperAnalysis.startsWith("NO")) ||
+                        (upperAnalysis.includes("TRANSFERENCIA") && !upperAnalysis.startsWith("NO")) ||
+                        (upperAnalysis.includes("PAGO") && !upperAnalysis.startsWith("NO")) ||
+                        (upperAnalysis.includes("DEPÓSITO") && !upperAnalysis.startsWith("NO")) ||
+                        (upperAnalysis.includes("DEPOSITO") && !upperAnalysis.startsWith("NO")) ||
+                        (upperAnalysis.includes("VOUCHER") && !upperAnalysis.startsWith("NO")) ||
+                        (upperAnalysis.includes("RECIBO") && !upperAnalysis.startsWith("NO"));
+      
+      console.log("Is receipt detected:", isReceipt);
       return { isReceipt, description: analysis };
     }
+    
+    console.log("Image analysis failed with status:", response.status);
+    const errorText = await response.text();
+    console.log("Error response:", errorText);
     return { isReceipt: false, description: "No se pudo analizar la imagen" };
   } catch (error) {
     console.error("Error analyzing image:", error);
@@ -271,11 +291,16 @@ serve(async (req) => {
             const imageAnalysis = await analyzeImageForPaymentReceipt(attachmentUrl, LOVABLE_API_KEY);
             
             if (imageAnalysis.isReceipt) {
-              console.log("Payment receipt detected, sending to cashier");
+              console.log("Payment receipt detected, sending cashier link");
               
-              // Send multiple messages for receipt with WhatsApp link
-              const cashierNum = webchatAISettings.cashier_numbers?.replace(/\D/g, '') || '';
-              const cashierLink = cashierNum ? `https://wa.me/${cashierNum}` : "Contactá al cajero";
+              // Use cashier link directly from DB (it's already a full URL like "http://wa.link/cargacapibet")
+              let cashierLink = webchatAISettings.cashier_numbers || "Contactá al cajero";
+              // Ensure it has http protocol if it's a URL without it
+              if (cashierLink && !cashierLink.startsWith('http') && cashierLink.includes('.')) {
+                cashierLink = `https://${cashierLink}`;
+              }
+              console.log("Cashier link from DB:", cashierLink);
+              
               const messages = [
                 "¡Perfecto! Recibí tu comprobante 📄",
                 "Para completar tu recarga, enviá este comprobante al cajero ↓",
