@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Bot, RefreshCw } from 'lucide-react';
+import { Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Bot, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -322,26 +322,51 @@ const LandingChat = () => {
               {selectedWebChat ? (
                 <>
                   <CardHeader className="py-3 border-b border-border bg-[#202c33]">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSelectedWebChat(null)}
+                          className="md:hidden text-foreground"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                          <MessageCircle className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-sm font-medium text-[#e9edef]">
+                            {selectedWebChat.contact_name || 'Visitante Web'}
+                          </CardTitle>
+                          <p className="text-xs text-[#8696a0]">
+                            Session: {selectedWebChat.phone_number.substring(0, 12)}...
+                          </p>
+                        </div>
+                      </div>
                       <Button
                         variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedWebChat(null)}
-                        className="md:hidden text-foreground"
+                        size="sm"
+                        onClick={async () => {
+                          if (!selectedWebChat) return;
+                          if (!confirm('¿Borrar memoria de IA para esta conversación?')) return;
+                          const { error } = await supabase
+                            .from('messages')
+                            .delete()
+                            .eq('conversation_id', selectedWebChat.id);
+                          if (error) {
+                            toast.error('Error al borrar memoria');
+                          } else {
+                            setWebChatMessages([]);
+                            toast.success('Memoria de IA borrada');
+                          }
+                        }}
+                        className="text-[#8696a0] hover:text-red-400 hover:bg-red-400/10"
+                        title="Borrar memoria de IA"
                       >
-                        <ArrowLeft className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Borrar Memoria
                       </Button>
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <MessageCircle className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-sm font-medium text-[#e9edef]">
-                          {selectedWebChat.contact_name || 'Visitante Web'}
-                        </CardTitle>
-                        <p className="text-xs text-[#8696a0]">
-                          Session: {selectedWebChat.phone_number.substring(0, 12)}...
-                        </p>
-                      </div>
                     </div>
                   </CardHeader>
                   
