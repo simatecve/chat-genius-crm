@@ -622,6 +622,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          casino_user_created: boolean | null
           channel_type: string | null
           contact_name: string | null
           created_at: string | null
@@ -640,6 +641,7 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          casino_user_created?: boolean | null
           channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
@@ -658,6 +660,7 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          casino_user_created?: boolean | null
           channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
