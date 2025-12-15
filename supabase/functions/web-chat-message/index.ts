@@ -277,6 +277,86 @@ serve(async (req) => {
 
     let botReply: string | null = null;
 
+    // Check if casino user was already created in this conversation
+    const casinoUserAlreadyCreated = conversation.casino_user_created === true;
+
+    // AUTO-DETECT NAME AND CREATE USER AUTOMATICALLY (only once per conversation)
+    if (webchatAISettings && webchatAISettings.is_enabled && !casinoUserAlreadyCreated && message) {
+      const nombrePatterns = [
+        /(?:me llamo|soy|mi nombre es)\s+([a-záéíóúñ]+)/i,
+        /^([a-záéíóúñ]{2,12})$/i  // Solo un nombre corto (2-12 caracteres)
+      ];
+
+      let nombreDetectado = null;
+      const trimmedMessage = message.trim();
+      for (const pattern of nombrePatterns) {
+        const match = trimmedMessage.match(pattern);
+        if (match && match[1]) {
+          nombreDetectado = match[1].toLowerCase();
+          break;
+        }
+      }
+
+      if (nombreDetectado) {
+        console.log(`Auto-detected name: ${nombreDetectado}, creating user automatically`);
+        
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (LOVABLE_API_KEY) {
+          // Generate username with date DDMMYY
+          const now = new Date();
+          const dateStr = String(now.getDate()).padStart(2, '0') + 
+                         String(now.getMonth() + 1).padStart(2, '0') + 
+                         String(now.getFullYear()).slice(-2);
+          const username = nombreDetectado + dateStr;
+          const password = 'Capibet1234';
+          
+          const contactName = conversation?.contact_name || "Usuario Web Chat";
+          const result = await crearJugador(username, password, contactName, sessionId);
+          
+          if (result.success) {
+            // Mark conversation as user created
+            await supabase
+              .from('conversations')
+              .update({ casino_user_created: true })
+              .eq('id', conversation.id);
+            
+            // Send success messages
+            const successMessages = [
+              `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
+              `Entrá acá → http://capibet.fun/`,
+              `Para recargar fichas, transferí al CBU ↓`,
+              webchatAISettings.cbu || "CBU no configurado",
+              `Cuando hagas la transferencia, enviame el comprobante acá 👍`
+            ];
+            
+            console.log(`Sending ${successMessages.length} success messages for auto-created user`);
+            
+            for (const msg of successMessages) {
+              await supabase.from('messages').insert({
+                conversation_id: conversation.id,
+                user_id: webchat.user_id,
+                content: msg,
+                direction: 'outbound',
+                message_type: 'text',
+                is_bot: true
+              });
+              await new Promise(r => setTimeout(r, 500));
+            }
+            
+            await supabase.from('conversations').update({
+              last_message: successMessages[successMessages.length - 1],
+              last_message_time: new Date().toISOString()
+            }).eq('id', conversation.id);
+            
+            return new Response(
+              JSON.stringify({ success: true, botReply: successMessages.join('\n') }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+    }
+
     // Process AI response: AI Agent takes priority, then webchat AI settings
     const shouldProcessAI = aiAgent || (webchatAISettings && webchatAISettings.is_enabled);
     
@@ -458,6 +538,12 @@ serve(async (req) => {
                   const result = await crearJugador(username, password, contactName, sessionId);
                   
                   if (result.success) {
+                    // Mark conversation as user created to prevent duplicates
+                    await supabase
+                      .from('conversations')
+                      .update({ casino_user_created: true })
+                      .eq('id', conversation.id);
+                    
                     // Send messages for successful user creation (NO cashier link yet - only after payment proof)
                     const successMessages = [
                       `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
