@@ -7,10 +7,86 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Check if AI is enabled for a specific session
+async function isSessionAIEnabled(supabase: any, channelType: string, buffer: any): Promise<boolean> {
+  let table: string;
+  let sessionId: string | null = null;
+
+  switch (channelType) {
+    case 'telegram':
+      table = 'telegram_bots';
+      sessionId = buffer.telegram_bot_id;
+      break;
+    case 'twilio':
+      table = 'twilio_connections';
+      sessionId = buffer.twilio_connection_id;
+      break;
+    case 'webchat':
+      // For webchat, we need to get the web_chatbot_id from the conversation
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('phone_number')
+        .eq('id', buffer.conversation_id)
+        .single();
+      
+      if (conv) {
+        // Find webchat by matching session
+        const { data: webchat } = await supabase
+          .from('web_chatbots')
+          .select('id, ai_enabled')
+          .eq('user_id', buffer.user_id)
+          .single();
+        
+        return webchat?.ai_enabled ?? false;
+      }
+      return false;
+    default:
+      // WhatsApp - find by session name
+      if (buffer.session_name) {
+        const { data: whatsappConn } = await supabase
+          .from('whatsapp_connections')
+          .select('id, ai_enabled')
+          .eq('user_id', buffer.user_id)
+          .eq('name', buffer.session_name)
+          .single();
+        
+        return whatsappConn?.ai_enabled ?? false;
+      }
+      return false;
+  }
+
+  if (!sessionId) {
+    console.log(`[process-ai-buffer] No session ID found for ${channelType}`);
+    return false;
+  }
+
+  const { data: session } = await supabase
+    .from(table)
+    .select('ai_enabled')
+    .eq('id', sessionId)
+    .single();
+
+  return session?.ai_enabled ?? false;
+}
+
 // Procesar un buffer de mensajes
 async function processBuffer(supabase: any, buffer: any) {
   try {
     console.log(`[process-ai-buffer] Processing buffer ${buffer.id} with ${buffer.message_count} messages`);
+    
+    const channelType = buffer.channel_type;
+
+    // Check if AI is enabled for this specific session
+    const aiEnabled = await isSessionAIEnabled(supabase, channelType, buffer);
+    
+    if (!aiEnabled) {
+      console.log(`[process-ai-buffer] AI not enabled for session, skipping buffer ${buffer.id}`);
+      await supabase
+        .from('ai_response_buffer')
+        .update({ processed: true })
+        .eq('id', buffer.id);
+      return;
+    }
     
     // accumulated_messages puede venir como string JSON o ya parseado
     let messages: any[];
@@ -23,7 +99,6 @@ async function processBuffer(supabase: any, buffer: any) {
     
     const conversationId = buffer.conversation_id;
     const userId = buffer.user_id;
-    const channelType = buffer.channel_type;
 
     // Obtener datos de la conversación
     const { data: conversation } = await supabase
@@ -37,7 +112,7 @@ async function processBuffer(supabase: any, buffer: any) {
       return;
     }
 
-    // Verificar si el bot está habilitado
+    // Verificar si el bot está habilitado globalmente
     const { data: botSettings } = await supabase
       .from('user_bot_settings')
       .select('bot_enabled')
@@ -45,7 +120,7 @@ async function processBuffer(supabase: any, buffer: any) {
       .single();
 
     if (botSettings?.bot_enabled === false) {
-      console.log('[process-ai-buffer] Bot disabled, skipping');
+      console.log('[process-ai-buffer] Bot disabled globally, skipping');
       await supabase
         .from('ai_response_buffer')
         .update({ processed: true })
@@ -104,7 +179,14 @@ async function processBuffer(supabase: any, buffer: any) {
     console.log(`[process-ai-buffer] Combined message: ${combinedMessage.substring(0, 100)}...`);
     console.log(`[process-ai-buffer] Found ${imageUrls.length} images: ${JSON.stringify(imageUrls)}`);
 
-    // Intentar llamar a un agente específico
+    // Get unified AI settings for this user
+    const { data: unifiedSettings } = await supabase
+      .from('webchat_ai_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    // Intentar llamar a un agente específico primero
     let aiResponse = null;
 
     if (channelType === 'telegram') {
@@ -142,18 +224,13 @@ async function processBuffer(supabase: any, buffer: any) {
       aiResponse = aiResult;
     }
 
-    // Si no hay agente específico, intentar con el agente por defecto
+    // Si no hay agente específico, usar configuración unificada de IA
     if (!aiResponse?.processed) {
-      console.log('[process-ai-buffer] No active AI agent, checking default IA...');
+      console.log('[process-ai-buffer] No active AI agent, using unified IA settings...');
       
-      const { data: defaultSettings } = await supabase
-        .from('ia_default_settings')
-        .select('is_enabled')
-        .eq('id', 1)
-        .single();
-
-      if (defaultSettings?.is_enabled) {
-        console.log('[process-ai-buffer] Invoking default IA agent...');
+      // Use unified settings (webchat_ai_settings) as the default AI
+      if (unifiedSettings) {
+        console.log('[process-ai-buffer] Invoking unified IA agent...');
         
         const { data: defaultResult } = await supabase.functions.invoke('ia-default-agent', {
           body: {
@@ -162,14 +239,20 @@ async function processBuffer(supabase: any, buffer: any) {
             imageUrls, // Pasar URLs de imágenes al agente
             contactName: conversation.contact_name || conversation.pushname,
             phoneNumber: conversation.phone_number,
-            conversationId
+            conversationId,
+            // Pass unified settings
+            systemPrompt: unifiedSettings.system_prompt,
+            cashierNumbers: unifiedSettings.cashier_numbers,
+            cbu: unifiedSettings.cbu,
+            model: unifiedSettings.model,
+            maxTokens: unifiedSettings.max_tokens,
           }
         });
 
         // Determinar los mensajes a enviar (múltiples o único)
-        const mensajesToSend = defaultResult.mensajesMultiples && defaultResult.mensajesMultiples.length > 0
+        const mensajesToSend = defaultResult?.mensajesMultiples && defaultResult.mensajesMultiples.length > 0
           ? defaultResult.mensajesMultiples
-          : (defaultResult.respuesta ? [defaultResult.respuesta] : []);
+          : (defaultResult?.respuesta ? [defaultResult.respuesta] : []);
 
         if (mensajesToSend.length > 0) {
           // Enviar cada mensaje según el canal con pequeño delay entre ellos
@@ -225,6 +308,8 @@ async function processBuffer(supabase: any, buffer: any) {
             }
           }
         }
+      } else {
+        console.log('[process-ai-buffer] No unified AI settings found for user');
       }
     }
 
