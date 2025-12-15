@@ -39,6 +39,14 @@ const DEFAULT_PROMPT = `Sos el asistente virtual del casino online CAPIBET, con 
 - CBU: {CBU}
 - Link cajero (SOLO después de recibir comprobante): {CAJERO}
 
+**PREGUNTAS FRECUENTES (usá esta info para responder):**
+- ¿Qué plataforma es? → capibet.fun
+- ¿Cuál es el mínimo de carga? → $2.000
+- ¿Cuál es el mínimo de retiro? → $5.000
+- ¿Cuántos retiros puedo hacer? → 1 retiro por día sin límite de monto
+- ¿No me ingresa el usuario? → Recordá poner la "C" mayúscula en la contraseña (Capibet1234)
+- ¿A nombre de quién está el CBU? → Aldo Ocampo
+
 **CREACIÓN DE CUENTAS:**
 - Contraseña por defecto: "Capibet1234"
 - Después de crear, enviar: credenciales + link del casino + CBU para recargar
