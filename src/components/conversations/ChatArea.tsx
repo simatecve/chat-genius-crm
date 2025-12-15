@@ -68,7 +68,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const { user } = useAuth();
   const { quickReplies } = useQuickReplies();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
-    conversation?.whatsapp_number || null,
+    conversation?.phone_number || null,
     conversation?.pushname || null
   );
   const { autoStopEnabled } = useBotAutoStop();
