@@ -1,23 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Settings, ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Bot, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Trash2, Settings } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EmojiPicker from 'emoji-picker-react';
 import { FileUploadService } from '@/services/fileUploadService';
-import { webchatAIService } from '@/services/webchatAIService';
+import { Link } from 'react-router-dom';
 
 interface WebChatConversation {
   id: string;
@@ -42,7 +38,7 @@ interface WebChatMessage {
 const LandingChat = () => {
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
-  const [activeTab, setActiveTab] = useState('webchat');
+  
   
   // Web Chat state
   const [webChatConversations, setWebChatConversations] = useState<WebChatConversation[]>([]);
@@ -57,13 +53,6 @@ const LandingChat = () => {
   const webChatFileInputRef = useRef<HTMLInputElement>(null);
   const webChatMessagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Webchat AI Config state (isolated from ia_default_settings)
-  const [iaLoading, setIaLoading] = useState(true);
-  const [iaEnabled, setIaEnabled] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState('');
-  const [cashierNumbers, setCashierNumbers] = useState('');
-  const [cbu, setCbu] = useState('');
-  const [savingIA, setSavingIA] = useState(false);
 
   // Web Chat Functions
   const fetchWebChatConversations = async () => {
@@ -159,56 +148,8 @@ const LandingChat = () => {
     setShowWebChatEmoji(false);
   };
 
-  // Fetch Webchat AI settings (isolated table)
-  const fetchWebchatAISettings = async () => {
-    if (!effectiveUserId) return;
-    try {
-      const settings = await webchatAIService.getSettings(effectiveUserId);
-      if (settings) {
-        setIaEnabled(!!settings.is_enabled);
-        setSystemPrompt(settings.system_prompt || webchatAIService.getDefaultPrompt());
-        setCashierNumbers(settings.cashier_numbers || '');
-        setCbu(settings.cbu || '');
-      } else {
-        // Set default prompt if no settings exist
-        setSystemPrompt(webchatAIService.getDefaultPrompt());
-      }
-    } catch (error) {
-      console.error('Error loading webchat AI settings:', error);
-      setSystemPrompt(webchatAIService.getDefaultPrompt());
-    } finally {
-      setIaLoading(false);
-    }
-  };
-
-  const saveWebchatAISettings = async () => {
-    if (!effectiveUserId) return;
-    setSavingIA(true);
-    try {
-      await webchatAIService.saveSettings({
-        user_id: effectiveUserId,
-        is_enabled: iaEnabled,
-        system_prompt: systemPrompt,
-        cashier_numbers: cashierNumbers,
-        cbu: cbu,
-      });
-      toast.success('Configuración de IA guardada');
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Error al guardar configuración de IA');
-    } finally {
-      setSavingIA(false);
-    }
-  };
-
-  const resetPromptToDefault = () => {
-    setSystemPrompt(webchatAIService.getDefaultPrompt());
-    toast.info('Prompt restaurado al valor predeterminado');
-  };
-
   useEffect(() => {
     fetchWebChatConversations();
-    fetchWebchatAISettings();
   }, [effectiveUserId]);
 
   useEffect(() => {
@@ -243,23 +184,16 @@ const LandingChat = () => {
         <Globe className="h-6 w-6 text-primary" />
         <h1 className="text-3xl font-bold">Web Chat</h1>
       </div>
-      <p className="text-muted-foreground">Gestiona las conversaciones del chat web</p>
+      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <span>Para configurar la IA, ve a</span>
+        <Link to="/configuracion" className="text-primary hover:underline flex items-center gap-1">
+          <Settings className="h-4 w-4" />
+          Configuración → Inteligencia Artificial
+        </Link>
+      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mx-4 mt-4 w-fit">
-          <TabsTrigger value="webchat" className="flex items-center gap-2">
-            <MessageCircle className="h-4 w-4" />
-            Conversaciones
-          </TabsTrigger>
-          <TabsTrigger value="config" className="flex items-center gap-2">
-            <Bot className="h-4 w-4" />
-            IA Web Chat
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Web Chat Tab */}
-        <TabsContent value="webchat" className="flex-1 p-4">
-          <div className="h-[calc(100vh-280px)] flex gap-4">
+      {/* Web Chat Content */}
+      <div className="h-[calc(100vh-280px)] flex gap-4">
             {/* Web Chat Conversations List */}
             <Card className="w-80 flex flex-col bg-card border-border">
               <CardHeader className="py-3 border-b border-border">
@@ -499,102 +433,7 @@ const LandingChat = () => {
                 </CardContent>
               )}
             </Card>
-          </div>
-        </TabsContent>
-
-        {/* IA Web Chat Configuration Tab */}
-        <TabsContent value="config" className="flex-1 p-4">
-          <div className="max-w-3xl space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5 text-primary" />
-                  IA Predeterminada para Web Chat
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Configuración aislada de la IA general. Solo afecta al Web Chat.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {iaLoading ? (
-                  <div className="flex items-center justify-center h-32">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : (
-                  <>
-                    {/* Enable/Disable */}
-                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                      <div>
-                        <Label className="text-base font-medium">Activar IA para Web Chat</Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          La IA responderá automáticamente a los visitantes del web chat
-                        </p>
-                      </div>
-                      <Switch checked={iaEnabled} onCheckedChange={setIaEnabled} />
-                    </div>
-
-                    {/* System Prompt */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-base font-medium">Prompt del Sistema</Label>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={resetPromptToDefault}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Restaurar
-                        </Button>
-                      </div>
-                      <Textarea
-                        placeholder="Escribe las instrucciones para la IA..."
-                        value={systemPrompt}
-                        onChange={(e) => setSystemPrompt(e.target.value)}
-                        rows={8}
-                        className="resize-none font-mono text-sm"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Define cómo debe comportarse la IA al responder a los visitantes del web chat.
-                      </p>
-                    </div>
-
-                    {/* Cashier Numbers */}
-                    <div className="space-y-2">
-                      <Label>Números de Cajeros</Label>
-                      <Input
-                        placeholder="Ej: +54911..., +549351..."
-                        value={cashierNumbers}
-                        onChange={(e) => setCashierNumbers(e.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Estos números se añadirán al contexto de la IA automáticamente
-                      </p>
-                    </div>
-
-                    {/* CBU */}
-                    <div className="space-y-2">
-                      <Label>CBU</Label>
-                      <Input
-                        placeholder="Ingresa el CBU..."
-                        value={cbu}
-                        onChange={(e) => setCbu(e.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        CBU para transferencias (se añade al contexto de la IA)
-                      </p>
-                    </div>
-
-                    <Button onClick={saveWebchatAISettings} disabled={savingIA} className="w-full">
-                      {savingIA ? 'Guardando...' : 'Guardar Configuración'}
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 };
