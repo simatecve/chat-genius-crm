@@ -318,10 +318,10 @@ const LandingChat = () => {
             </Card>
 
             {/* Web Chat Messages Area */}
-            <Card className="flex-1 flex flex-col bg-[#0d1418] border-border overflow-hidden">
+            <Card className="flex-1 flex flex-col bg-background border-border overflow-hidden">
               {selectedWebChat ? (
                 <>
-                  <CardHeader className="py-3 border-b border-border bg-[#202c33]">
+                  <CardHeader className="py-3 border-b border-border bg-muted">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Button
@@ -336,10 +336,10 @@ const LandingChat = () => {
                           <MessageCircle className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <CardTitle className="text-sm font-medium text-[#e9edef]">
+                          <CardTitle className="text-sm font-medium text-foreground">
                             {selectedWebChat.contact_name || 'Visitante Web'}
                           </CardTitle>
-                          <p className="text-xs text-[#8696a0]">
+                          <p className="text-xs text-muted-foreground">
                             Session: {selectedWebChat.phone_number.substring(0, 12)}...
                           </p>
                         </div>
@@ -361,7 +361,7 @@ const LandingChat = () => {
                             toast.success('Memoria de IA borrada');
                           }
                         }}
-                        className="text-[#8696a0] hover:text-red-400 hover:bg-red-400/10"
+                        className="text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
                         title="Borrar memoria de IA"
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
@@ -370,7 +370,7 @@ const LandingChat = () => {
                     </div>
                   </CardHeader>
                   
-                  <CardContent className="flex-1 p-0 flex flex-col overflow-hidden bg-[#0d1418]">
+                  <CardContent className="flex-1 p-0 flex flex-col overflow-hidden bg-background">
                     <ScrollArea className="flex-1 p-4">
                       <div className="space-y-2">
                         {webChatMessages.map((msg) => {
@@ -383,17 +383,17 @@ const LandingChat = () => {
                               <div
                                 className={`max-w-[70%] p-2 px-3 rounded-lg shadow-sm ${
                                   isOutgoing
-                                    ? 'bg-[#005c4b] text-white rounded-tr-none'
-                                    : 'bg-[#202c33] text-[#e9edef] rounded-tl-none'
+                                    ? 'bg-primary text-primary-foreground rounded-tr-none'
+                                    : 'bg-muted text-foreground rounded-tl-none'
                                 }`}
                               >
                                 <div className="flex items-center gap-1 mb-0.5">
                                   {isOutgoing ? (
-                                    <ArrowUpRight className="h-3 w-3 text-[#8696a0]" />
+                                    <ArrowUpRight className="h-3 w-3 text-muted-foreground" />
                                   ) : (
-                                    <ArrowDownLeft className="h-3 w-3 text-[#8696a0]" />
+                                    <ArrowDownLeft className="h-3 w-3 text-muted-foreground" />
                                   )}
-                                  <span className="text-[10px] text-[#8696a0]">
+                                  <span className="text-[10px] text-muted-foreground">
                                     {isOutgoing ? (msg.is_bot ? 'Bot' : 'Enviado') : 'Recibido'}
                                   </span>
                                 </div>
@@ -423,7 +423,7 @@ const LandingChat = () => {
                                   {msg.content || ''}
                                 </p>
                                 {msg.created_at && (
-                                  <p className="text-[10px] text-[#8696a0] mt-1 text-right">
+                                  <p className="text-[10px] text-muted-foreground mt-1 text-right">
                                     {formatMessageTime(msg.created_at)}
                                   </p>
                                 )}
@@ -436,7 +436,7 @@ const LandingChat = () => {
                     </ScrollArea>
                     
                     {/* Input Area */}
-                    <div className="p-3 border-t border-border bg-[#202c33]">
+                    <div className="p-3 border-t border-border bg-muted">
                       <input 
                         type="file" 
                         ref={webChatFileInputRef}
@@ -450,7 +450,7 @@ const LandingChat = () => {
                           size="icon"
                           onClick={() => webChatFileInputRef.current?.click()}
                           disabled={uploadingAttachment}
-                          className="text-[#8696a0] hover:text-foreground hover:bg-[#2a3942]"
+                          className="text-muted-foreground hover:text-foreground hover:bg-accent"
                           title="Adjuntar archivo"
                         >
                           <Paperclip className="h-5 w-5" />
@@ -460,7 +460,7 @@ const LandingChat = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-[#8696a0] hover:text-foreground hover:bg-[#2a3942]"
+                              className="text-muted-foreground hover:text-foreground hover:bg-accent"
                               title="Emojis"
                             >
                               <Smile className="h-5 w-5" />
@@ -475,7 +475,7 @@ const LandingChat = () => {
                           value={webChatNewMessage}
                           onChange={(e) => setWebChatNewMessage(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendWebChatMessage()}
-                          className="flex-1 bg-[#2a3942] border-none text-[#e9edef] placeholder:text-[#8696a0]"
+                          className="flex-1 bg-input border-border"
                         />
                         <Button 
                           onClick={() => sendWebChatMessage()} 
@@ -490,8 +490,8 @@ const LandingChat = () => {
                   </CardContent>
                 </>
               ) : (
-                <CardContent className="flex-1 flex items-center justify-center bg-[#0d1418]">
-                  <div className="text-center text-[#8696a0]">
+                <CardContent className="flex-1 flex items-center justify-center bg-background">
+                  <div className="text-center text-muted-foreground">
                     <MessageCircle className="h-16 w-16 mx-auto mb-4 opacity-30" />
                     <p className="text-lg">Selecciona una conversación</p>
                     <p className="text-sm mt-1">para ver los mensajes del Web Chat</p>
