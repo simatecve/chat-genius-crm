@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil, Building2, GitBranch } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { supabase } from '@/integrations/supabase/client';
 import WhatsAppConnectionForm from './WhatsAppConnectionForm';
@@ -29,6 +30,22 @@ interface Session {
   identifier: string;
   status: string;
   created_at: string;
+  workspace_id?: string | null;
+  default_column_id?: string | null;
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  position: number;
+}
+
+interface LeadColumn {
+  id: string;
+  name: string;
+  color: string | null;
+  workspace_id: string | null;
+  position: number;
 }
 
 const channels: Channel[] = [
@@ -53,15 +70,52 @@ const SessionsManager = () => {
   const [verifyingSession, setVerifyingSession] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [editedName, setEditedName] = useState('');
+  const [editedWorkspaceId, setEditedWorkspaceId] = useState<string | null>(null);
+  const [editedEmbudoId, setEditedEmbudoId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [embudos, setEmbudos] = useState<LeadColumn[]>([]);
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
 
   useEffect(() => {
     if (!userIdLoading && effectiveUserId) {
       fetchAllSessions();
+      loadWorkspacesAndEmbudos();
     }
   }, [effectiveUserId, userIdLoading]);
+
+  const loadWorkspacesAndEmbudos = async () => {
+    if (!effectiveUserId) return;
+
+    try {
+      // Cargar workspaces del usuario
+      const { data: workspacesData } = await supabase
+        .from('workspaces')
+        .select('id, name, position')
+        .eq('user_id', effectiveUserId)
+        .order('position');
+      
+      setWorkspaces(workspacesData || []);
+      
+      // Cargar embudos del usuario
+      const { data: embudosData } = await supabase
+        .from('lead_columns')
+        .select('id, name, color, workspace_id, position')
+        .eq('user_id', effectiveUserId)
+        .order('position');
+      
+      setEmbudos(embudosData || []);
+    } catch (error) {
+      console.error('Error loading workspaces and embudos:', error);
+    }
+  };
+
+  // Filtrar embudos por workspace seleccionado
+  const filteredEmbudos = useMemo(() => {
+    if (!editedWorkspaceId) return embudos;
+    return embudos.filter(e => e.workspace_id === editedWorkspaceId);
+  }, [editedWorkspaceId, embudos]);
 
   const fetchAllSessions = async () => {
     if (!effectiveUserId) return;
@@ -101,7 +155,9 @@ const SessionsManager = () => {
             type: 'whatsapp',
             identifier: conn.phone_number,
             status: conn.status || 'disconnected',
-            created_at: conn.created_at
+            created_at: conn.created_at,
+            workspace_id: conn.workspace_id,
+            default_column_id: conn.default_column_id
           });
         });
       }
@@ -115,7 +171,9 @@ const SessionsManager = () => {
             type: 'telegram-bot',
             identifier: bot.bot_username || bot.bot_token?.substring(0, 20) + '...',
             status: bot.status || 'active',
-            created_at: bot.created_at
+            created_at: bot.created_at,
+            workspace_id: bot.workspace_id,
+            default_column_id: bot.default_column_id
           });
         });
       }
@@ -129,7 +187,9 @@ const SessionsManager = () => {
             type: 'twilio',
             identifier: conn.phone_number,
             status: conn.status || 'active',
-            created_at: conn.created_at
+            created_at: conn.created_at,
+            workspace_id: conn.workspace_id,
+            default_column_id: conn.default_column_id
           });
         });
       }
@@ -150,7 +210,9 @@ const SessionsManager = () => {
             type: 'webchat',
             identifier: chat.id.substring(0, 8) + '...',
             status: chat.is_active ? 'active' : 'inactive',
-            created_at: chat.created_at
+            created_at: chat.created_at,
+            workspace_id: (chat as any).workspace_id || null,
+            default_column_id: (chat as any).default_column_id || null
           });
         });
       }
@@ -270,6 +332,8 @@ const SessionsManager = () => {
   const handleEditSession = (session: Session) => {
     setEditingSession(session);
     setEditedName(session.name);
+    setEditedWorkspaceId(session.workspace_id || null);
+    setEditedEmbudoId(session.default_column_id || null);
   };
 
   const handleSaveEdit = async () => {
@@ -279,11 +343,16 @@ const SessionsManager = () => {
     try {
       let error = null;
 
+      const commonData = {
+        workspace_id: editedWorkspaceId || null,
+        default_column_id: editedEmbudoId || null
+      };
+
       switch (editingSession.type) {
         case 'whatsapp':
           const { error: waError } = await supabase
             .from('whatsapp_connections')
-            .update({ name: editedName.trim() })
+            .update({ name: editedName.trim(), ...commonData })
             .eq('id', editingSession.id);
           error = waError;
           break;
@@ -291,7 +360,7 @@ const SessionsManager = () => {
         case 'telegram-bot':
           const { error: tgError } = await supabase
             .from('telegram_bots')
-            .update({ bot_name: editedName.trim() })
+            .update({ bot_name: editedName.trim(), ...commonData })
             .eq('id', editingSession.id);
           error = tgError;
           break;
@@ -299,7 +368,7 @@ const SessionsManager = () => {
         case 'twilio':
           const { error: twError } = await supabase
             .from('twilio_connections')
-            .update({ connection_name: editedName.trim() })
+            .update({ connection_name: editedName.trim(), ...commonData })
             .eq('id', editingSession.id);
           error = twError;
           break;
@@ -307,7 +376,7 @@ const SessionsManager = () => {
         case 'webchat':
           const { error: wcError } = await supabase
             .from('web_chatbots')
-            .update({ name: editedName.trim() })
+            .update({ name: editedName.trim(), ...commonData })
             .eq('id', editingSession.id);
           error = wcError;
           break;
@@ -316,17 +385,17 @@ const SessionsManager = () => {
       if (error) throw error;
 
       toast({
-        title: "Nombre actualizado",
-        description: "El nombre de la sesión ha sido actualizado correctamente",
+        title: "Sesión actualizada",
+        description: "La sesión ha sido actualizada correctamente",
       });
 
       setEditingSession(null);
       fetchAllSessions();
     } catch (error: any) {
-      console.error('Error updating session name:', error);
+      console.error('Error updating session:', error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el nombre de la sesión",
+        description: "No se pudo actualizar la sesión",
         variant: "destructive",
       });
     } finally {
@@ -605,9 +674,10 @@ const SessionsManager = () => {
       <Dialog open={!!editingSession} onOpenChange={(open) => !open && setEditingSession(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar nombre de sesión</DialogTitle>
+            <DialogTitle>Editar Sesión</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Nombre */}
             <div className="space-y-2">
               <Label htmlFor="session-name">Nombre</Label>
               <Input
@@ -616,6 +686,67 @@ const SessionsManager = () => {
                 onChange={(e) => setEditedName(e.target.value)}
                 placeholder="Nombre de la sesión"
               />
+            </div>
+
+            {/* Workspace */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Espacio de Trabajo
+              </Label>
+              <Select 
+                value={editedWorkspaceId || 'none'} 
+                onValueChange={(val) => {
+                  setEditedWorkspaceId(val === 'none' ? null : val);
+                  // Reset embudo when workspace changes
+                  setEditedEmbudoId(null);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar espacio..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {workspaces.map(ws => (
+                    <SelectItem key={ws.id} value={ws.id}>{ws.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Embudo */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <GitBranch className="h-4 w-4" />
+                Embudo por Defecto
+              </Label>
+              <Select 
+                value={editedEmbudoId || 'none'} 
+                onValueChange={(val) => setEditedEmbudoId(val === 'none' ? null : val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar embudo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {filteredEmbudos.map(embudo => (
+                    <SelectItem key={embudo.id} value={embudo.id}>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: embudo.color || '#3b82f6' }} 
+                        />
+                        <span>{embudo.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editedWorkspaceId && filteredEmbudos.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No hay embudos en este espacio de trabajo
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
