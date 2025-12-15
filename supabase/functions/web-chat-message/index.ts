@@ -282,9 +282,17 @@ serve(async (req) => {
 
     // AUTO-DETECT NAME AND CREATE USER AUTOMATICALLY (only once per conversation)
     if (webchatAISettings && webchatAISettings.is_enabled && !casinoUserAlreadyCreated && message) {
+      // Patrones para detectar nombres SOLO con prefijos explícitos
       const nombrePatterns = [
         /(?:me llamo|soy|mi nombre es)\s+([a-záéíóúñ]+)/i,
-        /^([a-záéíóúñ]{2,12})$/i  // Solo un nombre corto (2-12 caracteres)
+      ];
+
+      // Palabras que NO son nombres (saludos, palabras comunes)
+      const palabrasExcluidas = [
+        'hola', 'buenas', 'buenos', 'hey', 'ey', 'que', 'tal',
+        'gracias', 'gracia', 'como', 'bien', 'mal', 'si', 'no',
+        'ok', 'dale', 'listo', 'perfecto', 'genial', 'bueno',
+        'quiero', 'necesito', 'tengo', 'puedo', 'ayuda', 'soy'
       ];
 
       let nombreDetectado = null;
@@ -292,8 +300,12 @@ serve(async (req) => {
       for (const pattern of nombrePatterns) {
         const match = trimmedMessage.match(pattern);
         if (match && match[1]) {
-          nombreDetectado = match[1].toLowerCase();
-          break;
+          const posibleNombre = match[1].toLowerCase();
+          // Verificar que no sea una palabra excluida
+          if (!palabrasExcluidas.includes(posibleNombre)) {
+            nombreDetectado = posibleNombre;
+            break;
+          }
         }
       }
 
