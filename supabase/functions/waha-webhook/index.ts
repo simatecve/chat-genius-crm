@@ -511,6 +511,13 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
 
     // Usar remoteJidAlt si está disponible (contiene el número correcto), sino usar from
     const rawPhoneNumber = messageData._data?.key?.remoteJidAlt || messageData.from;
+    
+    // Ignorar mensajes de grupos (@g.us)
+    if (rawPhoneNumber && rawPhoneNumber.includes('@g.us')) {
+      console.log(`Ignoring group message from: ${rawPhoneNumber}`);
+      return;
+    }
+    
     const phoneNumber = normalizePhoneNumber(rawPhoneNumber);
     const pushName = messageData._data?.pushName || null;
     
