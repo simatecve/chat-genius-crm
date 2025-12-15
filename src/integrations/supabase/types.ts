@@ -1592,6 +1592,7 @@ export type Database = {
       }
       telegram_bots: {
         Row: {
+          ai_enabled: boolean | null
           bot_id: number | null
           bot_name: string
           bot_token: string
@@ -1606,6 +1607,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          ai_enabled?: boolean | null
           bot_id?: number | null
           bot_name: string
           bot_token: string
@@ -1620,6 +1622,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          ai_enabled?: boolean | null
           bot_id?: number | null
           bot_name?: string
           bot_token?: string
@@ -1653,6 +1656,7 @@ export type Database = {
       twilio_connections: {
         Row: {
           account_sid: string
+          ai_enabled: boolean | null
           auth_token: string
           connection_name: string
           created_at: string | null
@@ -1667,6 +1671,7 @@ export type Database = {
         }
         Insert: {
           account_sid: string
+          ai_enabled?: boolean | null
           auth_token: string
           connection_name: string
           created_at?: string | null
@@ -1681,6 +1686,7 @@ export type Database = {
         }
         Update: {
           account_sid?: string
+          ai_enabled?: boolean | null
           auth_token?: string
           connection_name?: string
           created_at?: string | null
@@ -2006,6 +2012,7 @@ export type Database = {
       web_chatbots: {
         Row: {
           ai_agent_id: string | null
+          ai_enabled: boolean | null
           allowed_domains: string[] | null
           background_image_url: string | null
           created_at: string | null
@@ -2027,6 +2034,7 @@ export type Database = {
         }
         Insert: {
           ai_agent_id?: string | null
+          ai_enabled?: boolean | null
           allowed_domains?: string[] | null
           background_image_url?: string | null
           created_at?: string | null
@@ -2048,6 +2056,7 @@ export type Database = {
         }
         Update: {
           ai_agent_id?: string | null
+          ai_enabled?: boolean | null
           allowed_domains?: string[] | null
           background_image_url?: string | null
           created_at?: string | null
@@ -2132,6 +2141,7 @@ export type Database = {
       }
       whatsapp_connections: {
         Row: {
+          ai_enabled: boolean | null
           created_at: string | null
           default_column_id: string | null
           id: string
@@ -2145,6 +2155,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          ai_enabled?: boolean | null
           created_at?: string | null
           default_column_id?: string | null
           id?: string
@@ -2158,6 +2169,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          ai_enabled?: boolean | null
           created_at?: string | null
           default_column_id?: string | null
           id?: string
