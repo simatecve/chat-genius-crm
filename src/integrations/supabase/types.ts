@@ -2009,6 +2009,7 @@ export type Database = {
           allowed_domains: string[] | null
           background_image_url: string | null
           created_at: string | null
+          default_column_id: string | null
           height: string | null
           id: string
           is_active: boolean | null
@@ -2022,12 +2023,14 @@ export type Database = {
           welcome_message: string | null
           widget_type: string | null
           width: string | null
+          workspace_id: string | null
         }
         Insert: {
           ai_agent_id?: string | null
           allowed_domains?: string[] | null
           background_image_url?: string | null
           created_at?: string | null
+          default_column_id?: string | null
           height?: string | null
           id?: string
           is_active?: boolean | null
@@ -2041,12 +2044,14 @@ export type Database = {
           welcome_message?: string | null
           widget_type?: string | null
           width?: string | null
+          workspace_id?: string | null
         }
         Update: {
           ai_agent_id?: string | null
           allowed_domains?: string[] | null
           background_image_url?: string | null
           created_at?: string | null
+          default_column_id?: string | null
           height?: string | null
           id?: string
           is_active?: boolean | null
@@ -2060,6 +2065,7 @@ export type Database = {
           welcome_message?: string | null
           widget_type?: string | null
           width?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -2067,6 +2073,20 @@ export type Database = {
             columns: ["ai_agent_id"]
             isOneToOne: false
             referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_chatbots_default_column_id_fkey"
+            columns: ["default_column_id"]
+            isOneToOne: false
+            referencedRelation: "lead_columns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_chatbots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
