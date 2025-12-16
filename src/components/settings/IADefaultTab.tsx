@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { unifiedAIService, UnifiedAISettings, SessionAIStatus } from '@/services/unifiedAIService';
 import { MessageSquare, Phone, Bot, Globe, Loader2 } from 'lucide-react';
+import AIUsageStats from './AIUsageStats';
 
 const channelIcons: Record<string, React.ReactNode> = {
   whatsapp: <Phone className="h-4 w-4 text-green-500" />,
@@ -143,6 +144,9 @@ const IADefaultTab: React.FC = () => {
         <span className="h-6 w-6 text-primary">🧠</span>
         <h2 className="text-2xl font-bold">Inteligencia Artificial Unificada</h2>
       </div>
+
+      {/* AI Usage Statistics */}
+      <AIUsageStats userId={effectiveUserId} />
 
       {/* Activación por Sesión */}
       <Card>
