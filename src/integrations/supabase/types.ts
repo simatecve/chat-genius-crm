@@ -623,6 +623,7 @@ export type Database = {
       conversations: {
         Row: {
           casino_user_created: boolean | null
+          casino_username: string | null
           channel_type: string | null
           contact_name: string | null
           created_at: string | null
@@ -630,6 +631,8 @@ export type Database = {
           last_message: string | null
           last_message_time: string | null
           lead_id: string | null
+          payment_receipt_detected_at: string | null
+          payment_receipt_sent: boolean | null
           phone_number: string
           pushname: string | null
           status: string | null
@@ -642,6 +645,7 @@ export type Database = {
         }
         Insert: {
           casino_user_created?: boolean | null
+          casino_username?: string | null
           channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
@@ -649,6 +653,8 @@ export type Database = {
           last_message?: string | null
           last_message_time?: string | null
           lead_id?: string | null
+          payment_receipt_detected_at?: string | null
+          payment_receipt_sent?: boolean | null
           phone_number: string
           pushname?: string | null
           status?: string | null
@@ -661,6 +667,7 @@ export type Database = {
         }
         Update: {
           casino_user_created?: boolean | null
+          casino_username?: string | null
           channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
@@ -668,6 +675,8 @@ export type Database = {
           last_message?: string | null
           last_message_time?: string | null
           lead_id?: string | null
+          payment_receipt_detected_at?: string | null
+          payment_receipt_sent?: boolean | null
           phone_number?: string
           pushname?: string | null
           status?: string | null

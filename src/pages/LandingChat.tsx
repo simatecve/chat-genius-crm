@@ -4,16 +4,18 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Trash2, Settings } from 'lucide-react';
+import { ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Trash2, Settings, BarChart3 } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EmojiPicker from 'emoji-picker-react';
 import { FileUploadService } from '@/services/fileUploadService';
 import { Link } from 'react-router-dom';
+import { WebchatConversionStats } from '@/components/landing-chat/WebchatConversionStats';
 
 interface WebChatConversation {
   id: string;
@@ -180,20 +182,32 @@ const LandingChat = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-2">
-        <Globe className="h-6 w-6 text-primary" />
-        <h1 className="text-3xl font-bold">Web Chat</h1>
-      </div>
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>Para configurar la IA, ve a</span>
-        <Link to="/configuracion" className="text-primary hover:underline flex items-center gap-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Globe className="h-6 w-6 text-primary" />
+          <h1 className="text-3xl font-bold">Web Chat</h1>
+        </div>
+        <Link to="/configuracion" className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1">
           <Settings className="h-4 w-4" />
-          Configuración → Inteligencia Artificial
+          Configuración IA
         </Link>
       </div>
 
-      {/* Web Chat Content */}
-      <div className="h-[calc(100vh-280px)] flex gap-4">
+      <Tabs defaultValue="conversations" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="conversations" className="flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" />
+            Conversaciones
+          </TabsTrigger>
+          <TabsTrigger value="stats" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Estadísticas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="conversations">
+          {/* Web Chat Content */}
+          <div className="h-[calc(100vh-320px)] flex gap-4">
             {/* Web Chat Conversations List */}
             <Card className="w-80 flex flex-col bg-card border-border">
               <CardHeader className="py-3 border-b border-border">
@@ -433,7 +447,13 @@ const LandingChat = () => {
                 </CardContent>
               )}
             </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="stats">
+          <WebchatConversionStats />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
