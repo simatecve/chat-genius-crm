@@ -355,10 +355,13 @@ serve(async (req) => {
           const result = await crearJugador(username, password, contactName, sessionId);
           
           if (result.success) {
-            // Mark conversation as user created
+            // Mark conversation as user created and save username
             await supabase
               .from('conversations')
-              .update({ casino_user_created: true })
+              .update({ 
+                casino_user_created: true,
+                casino_username: username 
+              })
               .eq('id', conversation.id);
             
             // Send success messages
@@ -439,11 +442,14 @@ serve(async (req) => {
                 await new Promise(r => setTimeout(r, 500));
               }
 
+              // Mark payment receipt detected
               await supabase
                 .from('conversations')
                 .update({
                   last_message: messages[messages.length - 1],
-                  last_message_time: new Date().toISOString()
+                  last_message_time: new Date().toISOString(),
+                  payment_receipt_sent: true,
+                  payment_receipt_detected_at: new Date().toISOString()
                 })
                 .eq('id', conversation.id);
 
