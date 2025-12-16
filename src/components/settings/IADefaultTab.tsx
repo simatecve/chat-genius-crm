@@ -35,6 +35,7 @@ const IADefaultTab: React.FC = () => {
   const [systemPrompt, setSystemPrompt] = useState('');
   const [cashierNumbers, setCashierNumbers] = useState('');
   const [cbu, setCbu] = useState('');
+  const [casinoLink, setCasinoLink] = useState('https://bet32.fun/');
   const [model, setModel] = useState('google/gemini-2.5-flash');
   const [maxTokens, setMaxTokens] = useState(500);
 
@@ -53,6 +54,7 @@ const IADefaultTab: React.FC = () => {
           setSystemPrompt(settings.system_prompt || unifiedAIService.getDefaultPrompt());
           setCashierNumbers(settings.cashier_numbers || '');
           setCbu(settings.cbu || '');
+          setCasinoLink(settings.casino_link || 'https://bet32.fun/');
           setModel(settings.model || 'google/gemini-2.5-flash');
           setMaxTokens(settings.max_tokens || 500);
         } else {
@@ -87,6 +89,7 @@ const IADefaultTab: React.FC = () => {
         system_prompt: systemPrompt,
         cashier_numbers: cashierNumbers,
         cbu,
+        casino_link: casinoLink,
         model,
         max_tokens: maxTokens,
       });
@@ -215,7 +218,7 @@ const IADefaultTab: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Define las instrucciones y comportamiento de la IA. Usa {'{CBU}'} y {'{CAJERO}'} como placeholders.
+            Define las instrucciones y comportamiento de la IA. Usa {'{CBU}'}, {'{CAJERO}'} y {'{CASINO_LINK}'} como placeholders.
           </p>
           <Textarea
             placeholder="Escribe el prompt del sistema..."
@@ -227,8 +230,8 @@ const IADefaultTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* CBU y Cajero */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* CBU, Cajero y Link del Casino */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
             <CardTitle>CBU</CardTitle>
@@ -257,6 +260,22 @@ const IADefaultTab: React.FC = () => {
               placeholder="Ej: http://wa.link/cargacapibet"
               value={cashierNumbers}
               onChange={(e) => setCashierNumbers(e.target.value)}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Link del Casino</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Link del casino (reemplaza {'{CASINO_LINK}'} en el prompt).
+            </p>
+            <Input
+              placeholder="Ej: https://bet32.fun/"
+              value={casinoLink}
+              onChange={(e) => setCasinoLink(e.target.value)}
             />
           </CardContent>
         </Card>
