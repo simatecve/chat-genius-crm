@@ -118,35 +118,41 @@ async function crearJugador(
   }
 }
 
-// Analyze image for payment receipt
-async function analyzeImageForPaymentReceipt(imageUrl: string, LOVABLE_API_KEY: string): Promise<{ isReceipt: boolean; description: string }> {
+// Analyze image for payment receipt using Google Gemini API directly
+async function analyzeImageForPaymentReceipt(imageUrl: string): Promise<{ isReceipt: boolean; description: string }> {
   try {
     console.log("Analyzing image for payment receipt, URL:", imageUrl);
     
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      console.error("GOOGLE_GEMINI_API_KEY not configured");
+      return { isReceipt: false, description: "API key no configurada" };
+    }
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
+        contents: [
           {
-            role: "user",
-            content: [
+            parts: [
               {
-                type: "text",
                 text: "Analizá esta imagen. ¿Es un comprobante de pago, transferencia bancaria, voucher, captura de pago, recibo o prueba de depósito? Respondé SOLO con 'SI' si es cualquier tipo de comprobante/prueba de pago/transferencia, o 'NO' si no lo es. Después agregá una breve descripción de lo que ves."
               },
               {
-                type: "image_url",
-                image_url: { url: imageUrl }
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: imageUrl.startsWith('data:') ? imageUrl.split(',')[1] : imageUrl
+                }
               }
             ]
           }
         ],
-        max_tokens: 150
+        generationConfig: {
+          maxOutputTokens: 150
+        }
       })
     });
 
@@ -154,7 +160,7 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, LOVABLE_API_KEY: 
     
     if (response.ok) {
       const data = await response.json();
-      const analysis = data.choices?.[0]?.message?.content || "";
+      const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       console.log("Image analysis result:", analysis);
       
       // More flexible detection - check for SI at start or payment-related keywords
@@ -327,8 +333,8 @@ serve(async (req) => {
       if (nombreDetectado) {
         console.log(`Auto-detected name: ${nombreDetectado}, creating user automatically`);
         
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (LOVABLE_API_KEY) {
+        const GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
+        if (GEMINI_API_KEY) {
           // Generate username with date DDMMYY
           const now = new Date();
           const dateStr = String(now.getDate()).padStart(2, '0') + 
@@ -389,12 +395,12 @@ serve(async (req) => {
     
     if (shouldProcessAI) {
       try {
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        const GEMINI_API_KEY = Deno.env.get("GOOGLE_GEMINI_API_KEY");
         
-        if (LOVABLE_API_KEY) {
+        if (GEMINI_API_KEY) {
           // Check for payment receipt in image
           if (isImage && attachmentUrl && webchatAISettings) {
-            const imageAnalysis = await analyzeImageForPaymentReceipt(attachmentUrl, LOVABLE_API_KEY);
+            const imageAnalysis = await analyzeImageForPaymentReceipt(attachmentUrl);
             
             if (imageAnalysis.isReceipt) {
               console.log("Payment receipt detected, sending cashier link");
@@ -520,96 +526,114 @@ serve(async (req) => {
             );
           }
 
-          // Call AI with tools
-          const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          // Call Google Gemini API directly
+          // Build contents array with system instruction and conversation
+          const contents = conversationHistory.map((m: any) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }]
+          }));
+
+          // Prepare tools for Gemini format
+          const geminiTools = webchatAISettings ? [{
+            function_declarations: casinoTools.map(t => ({
+              name: t.function.name,
+              description: t.function.description,
+              parameters: t.function.parameters
+            }))
+          }] : undefined;
+
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: model,
-              messages: [
-                { role: "system", content: systemPrompt },
-                ...conversationHistory
-              ],
-              max_tokens: maxTokens,
-              tools: webchatAISettings ? casinoTools : undefined,
-              tool_choice: webchatAISettings ? "auto" : undefined
+              systemInstruction: {
+                parts: [{ text: systemPrompt }]
+              },
+              contents: contents,
+              generationConfig: {
+                maxOutputTokens: maxTokens
+              },
+              tools: geminiTools
             }),
           });
 
           if (response.ok) {
             const data = await response.json();
-            const aiMessage = data.choices?.[0]?.message;
+            const candidate = data.candidates?.[0];
+            const parts = candidate?.content?.parts || [];
             
-            // Check for tool calls
-            if (aiMessage?.tool_calls && aiMessage.tool_calls.length > 0) {
-              for (const toolCall of aiMessage.tool_calls) {
-                if (toolCall.function.name === "crear_jugador") {
-                  const args = JSON.parse(toolCall.function.arguments);
+            // Check for function calls (Gemini format)
+            const functionCall = parts.find((p: any) => p.functionCall);
+            
+            if (functionCall) {
+              const toolCall = functionCall.functionCall;
+              if (toolCall.name === "crear_jugador") {
+                const args = toolCall.args;
+                
+                // Auto-generate username with date if too short
+                let username = args.username;
+                if (username && username.length <= 6) {
+                  const now = new Date();
+                  const dateStr = String(now.getDate()).padStart(2, '0') + 
+                                 String(now.getMonth() + 1).padStart(2, '0') + 
+                                 String(now.getFullYear()).slice(-2);
+                  username = username + dateStr;
+                  console.log(`Auto-generated username: ${username}`);
+                }
+                
+                const password = args.password || "Capibet1234";
+                const contactName = conversation?.contact_name || "Usuario Web Chat";
+                const result = await crearJugador(username, password, contactName, sessionId);
+                
+                if (result.success) {
+                  // Mark conversation as user created to prevent duplicates
+                  await supabase
+                    .from('conversations')
+                    .update({ casino_user_created: true })
+                    .eq('id', conversation.id);
                   
-                  // Auto-generate username with date if too short
-                  let username = args.username;
-                  if (username && username.length <= 6) {
-                    const now = new Date();
-                    const dateStr = String(now.getDate()).padStart(2, '0') + 
-                                   String(now.getMonth() + 1).padStart(2, '0') + 
-                                   String(now.getFullYear()).slice(-2);
-                    username = username + dateStr;
-                    console.log(`Auto-generated username: ${username}`);
+                  // Send messages for successful user creation (NO cashier link yet - only after payment proof)
+                  const successMessages = [
+                    `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
+                    `Entrá acá → http://capibet.fun/`,
+                    `Para recargar fichas, transferí al CBU ↓`,
+                    webchatAISettings?.cbu || "CBU no configurado",
+                    `Cuando hagas la transferencia, enviame el comprobante acá 👍`
+                  ];
+                  
+                  console.log(`Sending ${successMessages.length} success messages for user creation`);
+                  
+                  for (const msg of successMessages) {
+                    await supabase.from('messages').insert({
+                      conversation_id: conversation.id,
+                      user_id: webchat.user_id,
+                      content: msg,
+                      direction: 'outbound',
+                      message_type: 'text',
+                      is_bot: true
+                    });
+                    await new Promise(r => setTimeout(r, 500));
                   }
                   
-                  const password = args.password || "Capibet1234";
-                  const contactName = conversation?.contact_name || "Usuario Web Chat";
-                  const result = await crearJugador(username, password, contactName, sessionId);
+                  await supabase.from('conversations').update({
+                    last_message: successMessages[successMessages.length - 1],
+                    last_message_time: new Date().toISOString()
+                  }).eq('id', conversation.id);
                   
-                  if (result.success) {
-                    // Mark conversation as user created to prevent duplicates
-                    await supabase
-                      .from('conversations')
-                      .update({ casino_user_created: true })
-                      .eq('id', conversation.id);
-                    
-                    // Send messages for successful user creation (NO cashier link yet - only after payment proof)
-                    const successMessages = [
-                      `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
-                      `Entrá acá → http://capibet.fun/`,
-                      `Para recargar fichas, transferí al CBU ↓`,
-                      webchatAISettings?.cbu || "CBU no configurado",
-                      `Cuando hagas la transferencia, enviame el comprobante acá 👍`
-                    ];
-                    
-                    console.log(`Sending ${successMessages.length} success messages for user creation`);
-                    
-                    for (const msg of successMessages) {
-                      await supabase.from('messages').insert({
-                        conversation_id: conversation.id,
-                        user_id: webchat.user_id,
-                        content: msg,
-                        direction: 'outbound',
-                        message_type: 'text',
-                        is_bot: true
-                      });
-                      await new Promise(r => setTimeout(r, 500));
-                    }
-                    
-                    await supabase.from('conversations').update({
-                      last_message: successMessages[successMessages.length - 1],
-                      last_message_time: new Date().toISOString()
-                    }).eq('id', conversation.id);
-                    
-                    return new Response(
-                      JSON.stringify({ success: true, botReply: successMessages.join('\n') }),
-                      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                    );
-                  } else {
-                    botReply = result.message;
-                  }
+                  return new Response(
+                    JSON.stringify({ success: true, botReply: successMessages.join('\n') }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                  );
+                } else {
+                  botReply = result.message;
                 }
               }
             } else {
-              botReply = aiMessage?.content;
+              // Get text response
+              const textPart = parts.find((p: any) => p.text);
+              botReply = textPart?.text || null;
             }
 
             if (botReply) {
@@ -639,7 +663,7 @@ serve(async (req) => {
             console.error('AI Gateway error:', response.status, errorText);
           }
         } else {
-          console.log('LOVABLE_API_KEY not configured');
+          console.log('GOOGLE_GEMINI_API_KEY not configured');
         }
       } catch (aiError) {
         console.error('Error generating AI response:', aiError);
