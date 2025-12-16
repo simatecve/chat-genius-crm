@@ -744,6 +744,7 @@ export type Database = {
       ia_default_settings: {
         Row: {
           cashier_numbers: string
+          casino_link: string | null
           cbu: string
           created_at: string | null
           id: number
@@ -752,6 +753,7 @@ export type Database = {
         }
         Insert: {
           cashier_numbers?: string
+          casino_link?: string | null
           cbu?: string
           created_at?: string | null
           id?: number
@@ -760,6 +762,7 @@ export type Database = {
         }
         Update: {
           cashier_numbers?: string
+          casino_link?: string | null
           cbu?: string
           created_at?: string | null
           id?: number
@@ -2112,6 +2115,7 @@ export type Database = {
       webchat_ai_settings: {
         Row: {
           cashier_numbers: string
+          casino_link: string | null
           cbu: string
           created_at: string | null
           id: number
@@ -2124,6 +2128,7 @@ export type Database = {
         }
         Insert: {
           cashier_numbers?: string
+          casino_link?: string | null
           cbu?: string
           created_at?: string | null
           id?: number
@@ -2136,6 +2141,7 @@ export type Database = {
         }
         Update: {
           cashier_numbers?: string
+          casino_link?: string | null
           cbu?: string
           created_at?: string | null
           id?: number

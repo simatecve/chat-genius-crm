@@ -7,6 +7,7 @@ export interface UnifiedAISettings {
   system_prompt: string;
   cashier_numbers: string;
   cbu: string;
+  casino_link: string;
   model: string;
   max_tokens: number;
   created_at?: string | null;
@@ -44,7 +45,7 @@ const DEFAULT_PROMPT = `Sos el asistente virtual del casino online CAPIBET, con 
 - SIEMPRE notificá el username generado al usuario
 
 **INFORMACIÓN DEL CASINO:**
-- Link: http://capibet.fun/
+- Link: {CASINO_LINK}
 - CBU: {CBU}
 - Link cajero (SOLO después de recibir comprobante): {CAJERO}
 
@@ -97,6 +98,7 @@ export const unifiedAIService = {
       system_prompt: settings.system_prompt || DEFAULT_PROMPT,
       cashier_numbers: settings.cashier_numbers || '',
       cbu: settings.cbu || '',
+      casino_link: settings.casino_link || 'https://bet32.fun/',
       model: settings.model || 'google/gemini-2.5-flash',
       max_tokens: settings.max_tokens || 500,
       updated_at: new Date().toISOString(),

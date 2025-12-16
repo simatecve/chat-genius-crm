@@ -167,6 +167,7 @@ serve(async (req) => {
     const isEnabled = !!settings?.is_enabled;
     const cashierNumbersText: string = settings?.cashier_numbers || '';
     const cbu: string = settings?.cbu || '';
+    const casinoLink: string = settings?.casino_link || 'https://bet32.fun/';
 
     // Si la IA global está desactivada, no responde
     if (!isEnabled) {
@@ -316,7 +317,7 @@ serve(async (req) => {
 2. Para consultas sobre depósitos/cargas o retiros, debés proporcionar el CBU y derivar al cajero
 
 **INFORMACIÓN DEL CASINO:**
-- Link del casino: http://capibet.fun/
+- Link del casino: ${casinoLink}
 - CBU para cargas: ${cbu || '[no configurado]'}
 - Número de cajero: ${cashierNumbersText || '[no configurado]'}
 
@@ -329,14 +330,14 @@ serve(async (req) => {
 **CREACIÓN DE CUENTAS:**
 - Contraseña por defecto: "Capibet1234" (si el usuario no especifica una)
 - Después de crear la cuenta, SIEMPRE enviá las credenciales completas: usuario y contraseña
-- Formato de respuesta: "¡Listo! Tu cuenta fue creada. Usuario: [usuario] - Contraseña: [contraseña]. Ingresá desde: http://capibet.fun/"
-- SIEMPRE incluí el link http://capibet.fun/ cuando crees una cuenta o cuando pregunten cómo acceder al casino
+- Formato de respuesta: "¡Listo! Tu cuenta fue creada. Usuario: [usuario] - Contraseña: [contraseña]. Ingresá desde: ${casinoLink}"
+- SIEMPRE incluí el link ${casinoLink} cuando crees una cuenta o cuando pregunten cómo acceder al casino
 
 **REGLAS IMPORTANTES:**
 - Si te piden cargar fichas, depositar o retirar saldo, primero dales el CBU si lo piden, y SIEMPRE indicá que deben enviar el comprobante al cajero: ${cashierNumbersText || '[número del cajero]'}
 - NUNCA inventes información. Si no sabés algo, decilo claramente y recomendá contactar al cajero
 - Si te preguntan por juegos específicos, promociones, o detalles técnicos que no conocés, recomendá que contacten al cajero
-- Si preguntan el link o cómo entrar al casino, respondé: http://capibet.fun/
+- Si preguntan el link o cómo entrar al casino, respondé: ${casinoLink}
 
 Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en cada respuesta.`;
 

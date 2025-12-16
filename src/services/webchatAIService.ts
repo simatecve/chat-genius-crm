@@ -7,6 +7,7 @@ export interface WebchatAISettings {
   system_prompt: string;
   cashier_numbers: string;
   cbu: string;
+  casino_link: string;
   model: string;
   max_tokens: number;
   created_at?: string | null;
@@ -87,6 +88,7 @@ export const webchatAIService = {
       system_prompt: settings.system_prompt || DEFAULT_PROMPT,
       cashier_numbers: settings.cashier_numbers || '',
       cbu: settings.cbu || '',
+      casino_link: settings.casino_link || 'https://bet32.fun/',
       model: settings.model || 'google/gemini-2.5-flash',
       max_tokens: settings.max_tokens || 500,
       updated_at: new Date().toISOString(),

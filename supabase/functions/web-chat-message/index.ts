@@ -30,7 +30,7 @@ const DEFAULT_PROMPT = `Sos el asistente virtual del casino online CAPIBET, con 
 - Contraseña por defecto: "Capibet1234"
 
 **INFORMACIÓN DEL CASINO:**
-- Link: http://capibet.fun/
+- Link: {CASINO_LINK}
 - CBU: {CBU}
 
 **PREGUNTAS FRECUENTES (usá esta info para responder):**
@@ -43,7 +43,7 @@ const DEFAULT_PROMPT = `Sos el asistente virtual del casino online CAPIBET, con 
 
 **FLUJO DESPUÉS DE CREAR CUENTA:**
 1. Enviar credenciales: "Usuario: X - Contraseña: X"
-2. Enviar link: http://capibet.fun/
+2. Enviar link: {CASINO_LINK}
 3. Enviar CBU para recargar
 
 **REGLAS:**
@@ -367,7 +367,7 @@ serve(async (req) => {
             // Send success messages
             const successMessages = [
               `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
-              `Entrá acá → http://capibet.fun/`,
+              `Entrá acá → ${webchatAISettings.casino_link || 'https://bet32.fun/'}`,
               `Para recargar fichas, transferí al CBU ↓`,
               webchatAISettings.cbu || "CBU no configurado",
               `Cuando hagas la transferencia, enviame el comprobante acá 👍`
@@ -489,10 +489,11 @@ serve(async (req) => {
             model = webchatAISettings.model || model;
             maxTokens = webchatAISettings.max_tokens || maxTokens;
             
-            // Replace placeholders - use cashier link directly from DB (already a full URL)
+            // Replace placeholders - use values from DB
             systemPrompt = systemPrompt
               .replace(/{CBU}/g, webchatAISettings.cbu || 'No configurado')
-              .replace(/{CAJERO}/g, webchatAISettings.cashier_numbers || 'No configurado');
+              .replace(/{CAJERO}/g, webchatAISettings.cashier_numbers || 'No configurado')
+              .replace(/{CASINO_LINK}/g, webchatAISettings.casino_link || 'https://bet32.fun/');
             
             console.log('Using Webchat AI Settings with casino prompt');
           }
