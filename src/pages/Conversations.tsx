@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
 import { useTwilioConnections } from '@/hooks/useTwilioConnections';
+import { useTelegramConnections } from '@/hooks/useTelegramConnections';
 import { Database } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
@@ -17,6 +18,15 @@ import { toast } from '@/hooks/use-toast';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
+
+export type FilterMode = 'all' | 'unassigned' | 'funnel';
+
+export interface SessionOption {
+  id: string;
+  name: string;
+  type: 'whatsapp' | 'telegram' | 'twilio';
+  identifier: string;
+}
 
 const Conversations = () => {
   const { user } = useAuth();
@@ -35,13 +45,52 @@ const Conversations = () => {
   const [embudoLeadIds, setEmbudoLeadIds] = useState<string[]>([]);
   const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
   const [selectedTwilioConnection, setSelectedTwilioConnection] = useState<string | null>(null);
+  
+  // Nuevos estados para filtros
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectedSessionFilter, setSelectedSessionFilter] = useState<string | null>(null);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
   const { data: searchResults } = useSearchConversations(searchTerm);
   const { messages, sendMessage, sendMessageWithAttachment, isSending } = useMessages(selectedConversation?.id || null);
-  const { activeConnections, isSessionActive } = useWhatsAppConnections();
+  const { activeConnections, isSessionActive, connections: whatsappConnections } = useWhatsAppConnections();
   const { connections: twilioConnections, activeConnections: activeTwilioConnections, isConnectionActive } = useTwilioConnections();
+  const { connections: telegramConnections } = useTelegramConnections();
+
+  // Construir lista de sesiones disponibles para filtro
+  const sessionOptions: SessionOption[] = React.useMemo(() => {
+    const options: SessionOption[] = [];
+    
+    whatsappConnections.forEach(conn => {
+      options.push({
+        id: conn.phone_number,
+        name: conn.name || conn.phone_number,
+        type: 'whatsapp',
+        identifier: conn.phone_number
+      });
+    });
+    
+    telegramConnections.forEach(conn => {
+      options.push({
+        id: conn.id,
+        name: conn.bot_name,
+        type: 'telegram',
+        identifier: conn.bot_username || conn.id
+      });
+    });
+    
+    twilioConnections.forEach(conn => {
+      options.push({
+        id: conn.id,
+        name: conn.connection_name,
+        type: 'twilio',
+        identifier: conn.phone_number
+      });
+    });
+    
+    return options;
+  }, [whatsappConnections, telegramConnections, twilioConnections]);
 
   console.log('[Conversations] Current state:', {
     selectedConversationId: selectedConversation?.id,
@@ -124,13 +173,38 @@ const Conversations = () => {
   // Determinar qué conversaciones mostrar
   const displayConversations = React.useMemo(() => {
     let filtered = searchTerm ? (searchResults || []) : conversations;
-    if (selectedEmbudo) {
-      filtered = filtered.filter(conv => conv.lead_id && embudoLeadIds.includes(conv.lead_id));
-    } else if (selectedWorkspace) {
-      filtered = filtered.filter(conv => conv.lead_id && workspaceLeadIds.includes(conv.lead_id));
+    
+    // 1. Excluir webchat - tienen su propia página
+    filtered = filtered.filter(conv => conv.channel_type !== 'webchat');
+    
+    // 2. Filtrar por sesión/conexión si está seleccionada
+    if (selectedSessionFilter) {
+      const selectedSession = sessionOptions.find(s => s.id === selectedSessionFilter);
+      if (selectedSession) {
+        if (selectedSession.type === 'whatsapp') {
+          filtered = filtered.filter(conv => conv.whatsapp_number === selectedSession.identifier);
+        } else if (selectedSession.type === 'telegram') {
+          filtered = filtered.filter(conv => conv.telegram_bot_id === selectedSession.id);
+        } else if (selectedSession.type === 'twilio') {
+          filtered = filtered.filter(conv => conv.twilio_connection_id === selectedSession.id);
+        }
+      }
     }
+    
+    // 3. Filtrar por modo de embudo
+    if (filterMode === 'unassigned') {
+      filtered = filtered.filter(conv => !conv.lead_id);
+    } else if (filterMode === 'funnel') {
+      if (selectedEmbudo) {
+        filtered = filtered.filter(conv => conv.lead_id && embudoLeadIds.includes(conv.lead_id));
+      } else if (selectedWorkspace) {
+        filtered = filtered.filter(conv => conv.lead_id && workspaceLeadIds.includes(conv.lead_id));
+      }
+    }
+    // Si filterMode === 'all', no filtra por lead_id
+    
     return filtered;
-  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds]);
+  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds, filterMode, selectedSessionFilter, sessionOptions]);
 
   // Seleccionar conversación automáticamente desde navegación de embudos
   useEffect(() => {
@@ -355,6 +429,11 @@ const Conversations = () => {
             embudos={embudos}
             selectedEmbudo={selectedEmbudo}
             onEmbudoSelect={setSelectedEmbudo}
+            filterMode={filterMode}
+            onFilterModeChange={setFilterMode}
+            sessionOptions={sessionOptions}
+            selectedSessionFilter={selectedSessionFilter}
+            onSessionFilterChange={setSelectedSessionFilter}
           />
         </ResizablePanel>
 
