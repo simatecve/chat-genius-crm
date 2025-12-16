@@ -249,6 +249,31 @@ async function processBuffer(supabase: any, buffer: any) {
           }
         });
 
+        // Si se detectó comprobante de pago, actualizar conversation y cancelar recordatorios
+        if (defaultResult?.comprobanteDetectado) {
+          console.log('[process-ai-buffer] Payment receipt detected, updating conversation and canceling reminders');
+          
+          // Actualizar conversation
+          await supabase
+            .from('conversations')
+            .update({
+              payment_receipt_sent: true,
+              payment_receipt_detected_at: new Date().toISOString()
+            })
+            .eq('id', conversationId);
+          
+          // Cancelar recordatorios pendientes para este contacto
+          await supabase
+            .from('automated_message_logs')
+            .update({ status: 'cancelled' })
+            .eq('phone_number', conversation.phone_number)
+            .eq('user_id', userId)
+            .eq('status', 'pending')
+            .eq('trigger_type', 'payment_reminder');
+          
+          console.log('[process-ai-buffer] Payment receipt flags updated and reminders cancelled');
+        }
+
         // Determinar los mensajes a enviar (múltiples o único)
         const mensajesToSend = defaultResult?.mensajesMultiples && defaultResult.mensajesMultiples.length > 0
           ? defaultResult.mensajesMultiples
@@ -307,6 +332,43 @@ async function processBuffer(supabase: any, buffer: any) {
               await new Promise(resolve => setTimeout(resolve, 1500));
             }
           }
+        }
+
+        // Si se programó recordatorio de pago (después de crear usuario)
+        if (defaultResult?.schedulePaymentReminder && defaultResult?.casinoUsername) {
+          console.log('[process-ai-buffer] Scheduling payment reminder for user:', defaultResult.casinoUsername);
+          
+          // Actualizar conversation con casino_user_created y casino_username
+          await supabase
+            .from('conversations')
+            .update({
+              casino_user_created: true,
+              casino_username: defaultResult.casinoUsername
+            })
+            .eq('id', conversationId);
+          
+          // Calcular delay aleatorio entre 5 y 7 minutos
+          const delayMinutes = Math.floor(Math.random() * 3) + 5; // 5, 6 o 7 minutos
+          const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+          
+          console.log(`[process-ai-buffer] Reminder scheduled for ${delayMinutes} minutes from now: ${scheduledFor}`);
+          
+          // Insertar recordatorio en automated_message_logs
+          const reminderMessage = `Hola! 👋 Te recuerdo que para cargar tus fichas tenés que transferir al CBU que te pasé y enviarme el comprobante acá.\n\n💰 Si transferís hoy, participás del sorteo semanal de $200.000! 🎰`;
+          
+          await supabase
+            .from('automated_message_logs')
+            .insert({
+              user_id: userId,
+              phone_number: conversation.phone_number,
+              message_content: reminderMessage,
+              scheduled_for: scheduledFor,
+              status: 'pending',
+              trigger_type: 'payment_reminder',
+              lead_id: conversation.lead_id || null
+            });
+          
+          console.log('[process-ai-buffer] Payment reminder scheduled successfully');
         }
       } else {
         console.log('[process-ai-buffer] No unified AI settings found for user');

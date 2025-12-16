@@ -61,7 +61,8 @@ Deno.serve(async (req) => {
 
     // 2. Procesar cada mensaje
     for (const message of pendingMessages as ScheduledMessage[]) {
-      console.log(`\n📤 Processing message ${message.id} for ${message.phone_number}`);
+      const triggerType = (message as any).trigger_type || 'campaign';
+      console.log(`\n📤 Processing ${triggerType} message ${message.id} for ${message.phone_number}`);
 
       try {
         // 2.1 Verificar si el contacto está bloqueado del bot
@@ -82,6 +83,28 @@ Deno.serve(async (req) => {
           
           skippedCount++;
           continue;
+        }
+
+        // 2.2 Para recordatorios de pago, verificar si ya envió comprobante
+        if (triggerType === 'payment_reminder') {
+          const { data: conv } = await supabase
+            .from('conversations')
+            .select('payment_receipt_sent')
+            .eq('phone_number', message.phone_number)
+            .eq('user_id', message.user_id)
+            .single();
+
+          if (conv?.payment_receipt_sent) {
+            console.log(`⏭️ Payment receipt already sent for ${message.phone_number}, skipping reminder...`);
+            
+            await supabase
+              .from('automated_message_logs')
+              .update({ status: 'skipped', error_message: 'Payment receipt already sent' })
+              .eq('id', message.id);
+            
+            skippedCount++;
+            continue;
+          }
         }
 
         // 2.2 Formatear número al formato WhatsApp

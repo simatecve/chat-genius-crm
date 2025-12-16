@@ -217,6 +217,7 @@ export type Database = {
           sent_at: string | null
           status: string | null
           trigger_id: string | null
+          trigger_type: string | null
           user_id: string
         }
         Insert: {
@@ -232,6 +233,7 @@ export type Database = {
           sent_at?: string | null
           status?: string | null
           trigger_id?: string | null
+          trigger_type?: string | null
           user_id: string
         }
         Update: {
@@ -247,6 +249,7 @@ export type Database = {
           sent_at?: string | null
           status?: string | null
           trigger_id?: string | null
+          trigger_type?: string | null
           user_id?: string
         }
         Relationships: [

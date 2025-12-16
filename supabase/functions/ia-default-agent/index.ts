@@ -18,6 +18,9 @@ type DefaultAgentResponse = {
     success: boolean;
     result?: any;
   };
+  // Nuevos campos para recordatorios de pago
+  schedulePaymentReminder?: boolean;
+  casinoUsername?: string;
 };
 
 // Función helper para crear jugador en el casino
@@ -386,7 +389,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
             
             if (args) {
               let toolResult;
-              let actionType: 'crear_jugador';
+              let actionType: 'crear_jugador' = 'crear_jugador';
               
               switch (toolCall.function.name) {
                 case 'crear_jugador':
@@ -424,8 +427,38 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
                 
                 console.log('Tool execution result:', toolResult);
                 
-                // Segunda llamada a la IA con el resultado de la tool
-                // para que genere una respuesta amigable al usuario
+                // Si se creó el usuario exitosamente, enviar mensajes estructurados con CBU
+                if (actionType === 'crear_jugador' && toolResult.success) {
+                  const userName = args.userName;
+                  const password = args.password || 'Capibet1234';
+                  
+                  // Mensajes múltiples estructurados post-creación
+                  const mensajesMultiples = [
+                    `¡Listo! Tu cuenta fue creada 🎰\nUsuario: ${userName}\nContraseña: ${password}`,
+                    `Ingresá desde: ${casinoLink}`,
+                    'Para cargar fichas, transferí al siguiente CBU ↓',
+                    cbu || '[CBU no configurado]',
+                    'Una vez que transferiste, enviame la captura del comprobante acá para acreditar tu saldo 💸'
+                  ];
+                  
+                  const payload: DefaultAgentResponse = {
+                    isActivated: true,
+                    intencionCargaFichas: false,
+                    comprobanteDetectado: false,
+                    respuesta: mensajesMultiples[0],
+                    mensajesMultiples,
+                    actionExecuted,
+                    schedulePaymentReminder: true,
+                    casinoUsername: userName
+                  };
+                  
+                  return new Response(JSON.stringify(payload), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200
+                  });
+                }
+                
+                // Para otras tools, segunda llamada a la IA con el resultado
                 const followUpMessages = [
                   { role: 'system', content: systemPrompt },
                   { role: 'user', content: messageContent },
