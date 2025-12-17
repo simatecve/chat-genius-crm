@@ -23,6 +23,24 @@ type DefaultAgentResponse = {
   casinoUsername?: string;
 };
 
+// Función para verificar si un username ya existe GLOBALMENTE
+async function checkUsernameExists(supabase: any, username: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('casino_username')
+    .eq('casino_username', username)
+    .limit(1);
+  
+  if (error) {
+    console.error('Error checking username:', error);
+    return false; // En caso de error, permitir crear (la API del casino validará)
+  }
+  
+  const exists = data && data.length > 0;
+  console.log(`[ia-default-agent] Username "${username}" exists: ${exists}`);
+  return exists;
+}
+
 // Función helper para crear jugador en el casino
 async function crearJugador(userName: string, password: string, contactName: string, phoneNumber: string) {
   try {
@@ -136,7 +154,17 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { userId, messageContent, imageUrls, contactName, phoneNumber, conversationId } = await req.json();
+    // Recibir parámetros incluyendo estado de usuario existente
+    const { 
+      userId, 
+      messageContent, 
+      imageUrls, 
+      contactName, 
+      phoneNumber, 
+      conversationId,
+      existingCasinoUser,      // Si esta conversación ya tiene usuario creado
+      existingCasinoUsername   // El username de esta conversación si existe
+    } = await req.json();
 
     if (!userId || typeof messageContent !== 'string') {
       return new Response(
@@ -152,7 +180,9 @@ serve(async (req) => {
       conversationId, 
       hasImages: !!(imageUrls?.length),
       imageUrlsCount: imageUrls?.length || 0,
-      imageUrls: imageUrls || []
+      imageUrls: imageUrls || [],
+      existingCasinoUser,
+      existingCasinoUsername
     });
 
     // Obtener configuración global de IA
@@ -223,7 +253,69 @@ serve(async (req) => {
 
     const text = (messageContent || '').toLowerCase();
 
-    // Detección de intención real de carga
+    // DETECCIÓN: Usuario dice que YA tiene cuenta
+    const yaTieneCuentaPatterns = [
+      'ya tengo cuenta',
+      'ya tengo usuario',
+      'mi usuario es',
+      'mi cuenta es',
+      'tengo cuenta',
+      'tengo usuario',
+      'ya estoy registrado',
+      'ya me registré',
+      'ya me registre',
+      'tengo una cuenta',
+      'ya tengo una cuenta'
+    ];
+    const yaTieneCuenta = yaTieneCuentaPatterns.some(p => text.includes(p));
+
+    // Detección de intención de recargar
+    const quiereRecargarPatterns = [
+      'cargar', 'cbu', 'fichas', 'saldo', 'recargar', 'depositar', 
+      'deposito', 'depósito', 'transferir', 'transferencia'
+    ];
+    const quiereRecargar = quiereRecargarPatterns.some(p => text.includes(p));
+
+    // FLUJO: Usuario dice que ya tiene cuenta O la conversación tiene casino_user_created
+    if (yaTieneCuenta || (existingCasinoUser && existingCasinoUsername)) {
+      console.log(`[ia-default-agent] User has existing account. yaTieneCuenta: ${yaTieneCuenta}, existingCasinoUser: ${existingCasinoUser}, existingCasinoUsername: ${existingCasinoUsername}`);
+      
+      // Si dice que ya tiene cuenta, asumimos que quiere recargar
+      if (yaTieneCuenta || quiereRecargar) {
+        const cajas = cashierNumbersText?.trim() || '';
+        
+        // Mensajes adaptados según si conocemos su username o no
+        const mensajesMultiples = existingCasinoUsername 
+          ? [
+              `Ya tenés tu cuenta ${existingCasinoUsername} 🎰`,
+              'Para cargar fichas, transferí al siguiente CBU ↓',
+              cbu || '[CBU no configurado]',
+              'Una vez que transferiste, enviame la captura del comprobante acá para acreditar tu saldo 💸'
+            ]
+          : [
+              '¡Perfecto! Para cargar fichas, transferí al siguiente CBU ↓',
+              cbu || '[CBU no configurado]',
+              'Una vez que transferiste, enviame la captura del comprobante acá para acreditar tu saldo 💸'
+            ];
+        
+        const payload: DefaultAgentResponse = {
+          isActivated: true,
+          intencionCargaFichas: true,
+          comprobanteDetectado: false,
+          respuesta: mensajesMultiples[0],
+          mensajesMultiples,
+          schedulePaymentReminder: true,
+          casinoUsername: existingCasinoUsername || 'usuario_existente'
+        };
+        
+        return new Response(JSON.stringify(payload), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+    }
+
+    // Detección de intención real de carga (sin ser usuario existente)
     const cargaPatterns = [
       'cargar fichas','cargar saldo','quiero cargar','pasame el cbu','pásame el cbu','alias','qr',
       'ya hice la transferencia','transferi','transferí','transferir','te paso el comprobante','te mando el comprobante',
@@ -307,6 +399,14 @@ serve(async (req) => {
           }));
       }
     }
+
+    // Información adicional para el system prompt si el usuario ya tiene cuenta
+    const existingUserInfo = existingCasinoUser && existingCasinoUsername
+      ? `\n**USUARIO CON CUENTA EXISTENTE:**
+- Este contacto ya tiene cuenta de casino: ${existingCasinoUsername}
+- NO crear cuenta nueva para este usuario
+- Si quiere cargar fichas, darle el CBU directamente`
+      : '';
     
     const systemPrompt = `Sos el asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.
 
@@ -314,6 +414,7 @@ serve(async (req) => {
 - NO saludes con "Hola" en cada mensaje. Solo saludá si es la primera vez que hablas con este contacto.
 - Mantené el hilo natural de la conversación sin repetir información ya dada.
 - Sé breve y directo, como una conversación real por WhatsApp.
+${existingUserInfo}
 
 🎰 **TUS CAPACIDADES:**
 1. Podés crear cuentas de jugadores usando la función crear_jugador
@@ -394,7 +495,40 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
               switch (toolCall.function.name) {
                 case 'crear_jugador':
                   actionType = 'crear_jugador';
-                  // Usar contraseña por defecto si no se proporciona
+                  
+                  // VERIFICACIÓN 1: Si esta conversación ya tiene usuario creado, NO crear otro
+                  if (existingCasinoUser) {
+                    console.log(`[ia-default-agent] Conversation already has casino user: ${existingCasinoUsername}`);
+                    const payload: DefaultAgentResponse = {
+                      isActivated: true,
+                      intencionCargaFichas: false,
+                      comprobanteDetectado: false,
+                      respuesta: `¡Ya tenés tu cuenta creada! Tu usuario es: ${existingCasinoUsername}. ¿Querés cargar fichas?`
+                    };
+                    return new Response(JSON.stringify(payload), {
+                      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                      status: 200
+                    });
+                  }
+                  
+                  // VERIFICACIÓN 2: Verificar duplicado GLOBAL del username
+                  const usernameExists = await checkUsernameExists(supabase, args.userName);
+                  
+                  if (usernameExists) {
+                    console.log(`[ia-default-agent] Username "${args.userName}" already exists globally`);
+                    const payload: DefaultAgentResponse = {
+                      isActivated: true,
+                      intencionCargaFichas: false,
+                      comprobanteDetectado: false,
+                      respuesta: `El usuario "${args.userName}" ya está en uso 🚫. Probá con otro nombre, por ejemplo agregando más números o letras.`
+                    };
+                    return new Response(JSON.stringify(payload), {
+                      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                      status: 200
+                    });
+                  }
+                  
+                  // Si no existe, proceder con la creación normal
                   const password = args.password || 'Capibet1234';
                   toolResult = await crearJugador(
                     args.userName, 
