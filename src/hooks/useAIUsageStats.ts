@@ -51,7 +51,8 @@ export const useAIUsageStats = (userId: string | null, period: number = 30) => {
           .select('id, created_at, conversation_id')
           .eq('user_id', userId)
           .eq('is_bot', true)
-          .gte('created_at', startDate.toISOString());
+          .gte('created_at', startDate.toISOString())
+          .limit(50000);
 
         if (messagesError) throw messagesError;
 
