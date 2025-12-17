@@ -607,15 +607,60 @@ serve(async (req) => {
                   console.log(`Auto-generated username: ${username}`);
                 }
                 
+                // ✅ VERIFICACIÓN GLOBAL: Comprobar si username ya existe en alguna conversación
+                const { data: existingUser } = await supabase
+                  .from('conversations')
+                  .select('casino_username')
+                  .eq('casino_username', username)
+                  .maybeSingle();
+                
+                if (existingUser) {
+                  console.log(`Username ${username} already exists globally, skipping creation`);
+                  
+                  const casinoLink = webchatAISettings?.casino_link || 'https://bet32.fun/';
+                  const existingUserMessages = [
+                    `El usuario ${username} ya está registrado 🎰`,
+                    `Si es tuyo, entrá acá → ${casinoLink}`,
+                    `Para cargar fichas, transferí al CBU ↓`,
+                    webchatAISettings?.cbu || "CBU no configurado",
+                    `Cuando hagas la transferencia, enviame el comprobante acá 👍`
+                  ];
+                  
+                  for (const msg of existingUserMessages) {
+                    await supabase.from('messages').insert({
+                      conversation_id: conversation.id,
+                      user_id: webchat.user_id,
+                      content: msg,
+                      direction: 'outbound',
+                      message_type: 'text',
+                      is_bot: true
+                    });
+                    await new Promise(r => setTimeout(r, 500));
+                  }
+                  
+                  await supabase.from('conversations').update({
+                    last_message: existingUserMessages[existingUserMessages.length - 1],
+                    last_message_time: new Date().toISOString()
+                  }).eq('id', conversation.id);
+                  
+                  return new Response(
+                    JSON.stringify({ success: true, botReply: existingUserMessages.join('\n') }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                  );
+                }
+                
                 const password = args.password || "Capibet1234";
                 const contactName = conversation?.contact_name || "Usuario Web Chat";
                 const result = await crearJugador(username, password, contactName, sessionId);
                 
                 if (result.success) {
-                  // Mark conversation as user created to prevent duplicates
+                  // Mark conversation as user created and save username for global duplicate check
                   await supabase
                     .from('conversations')
-                    .update({ casino_user_created: true })
+                    .update({ 
+                      casino_user_created: true,
+                      casino_username: username  // ✅ Guardar para verificación futura
+                    })
                     .eq('id', conversation.id);
                   
                   // Send messages for successful user creation (NO cashier link yet - only after payment proof)
