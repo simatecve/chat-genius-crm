@@ -240,6 +240,9 @@ async function processBuffer(supabase: any, buffer: any) {
             contactName: conversation.contact_name || conversation.pushname,
             phoneNumber: conversation.phone_number,
             conversationId,
+            // Estado de usuario existente en ESTA conversación
+            existingCasinoUser: conversation.casino_user_created || false,
+            existingCasinoUsername: conversation.casino_username || null,
             // Pass unified settings
             systemPrompt: unifiedSettings.system_prompt,
             cashierNumbers: unifiedSettings.cashier_numbers,
