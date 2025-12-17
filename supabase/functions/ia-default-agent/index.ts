@@ -451,6 +451,7 @@ ${existingUserInfo}
 - Después de crear la cuenta, SIEMPRE enviá las credenciales completas: usuario y contraseña
 - Formato de respuesta: "¡Listo! Tu cuenta fue creada. Usuario: [usuario] - Contraseña: [contraseña]. Ingresá desde: ${casinoLink}"
 - SIEMPRE incluí el link ${casinoLink} cuando crees una cuenta o cuando pregunten cómo acceder al casino
+- NUNCA expliques por qué el usuario tiene ese formato (no menciones fechas, sufijos, ni cómo se generó). Solo comunicá el usuario creado tal cual.
 
 **REGLAS IMPORTANTES:**
 - Si te piden cargar fichas, depositar o retirar saldo, primero dales el CBU si lo piden, y SIEMPRE indicá que deben enviar el comprobante al cajero: ${cashierNumbersText || '[número del cajero]'}
