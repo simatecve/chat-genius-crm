@@ -265,7 +265,22 @@ serve(async (req) => {
       'ya me registré',
       'ya me registre',
       'tengo una cuenta',
-      'ya tengo una cuenta'
+      'ya tengo una cuenta',
+      // Patrones adicionales
+      'ya tengo',           // Respuesta directa común
+      'ya tengo creado',
+      'tengo creado',
+      'ya lo tengo',
+      'ya cree',
+      'ya creé',
+      'tengo mi usuario',
+      'tengo mi cuenta',
+      'ya hice la cuenta',
+      'ya hice mi cuenta',
+      'soy jugador',
+      'ya soy jugador',
+      'si tengo',
+      'sí tengo'
     ];
     const yaTieneCuenta = yaTieneCuentaPatterns.some(p => text.includes(p));
 
