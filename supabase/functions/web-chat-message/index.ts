@@ -508,12 +508,21 @@ serve(async (req) => {
                           lowerMessage.includes('transferir') ||
                           lowerMessage.includes('fichas');
 
-          if (wantsCBU && webchatAISettings) {
-            // Send CBU info only - NO CASHIER LINK and NO instructions about comprobante
-            const cbuMessages = [
-              "Para transferir te dejo el CBU ↓",
-              webchatAISettings.cbu || "CBU no configurado"
-            ];
+          // Detect "ya tengo" - user who already has an account
+          const hasExistingAccount = lowerMessage.includes('ya tengo');
+
+          if ((wantsCBU || hasExistingAccount) && webchatAISettings) {
+            // Send CBU info - adapt message based on context
+            const cbuMessages = hasExistingAccount
+              ? [
+                  "¡Genial! Para cargar fichas, transferí al siguiente CBU ↓",
+                  webchatAISettings.cbu || "CBU no configurado",
+                  "Cuando hagas la transferencia, enviame el comprobante acá 👍"
+                ]
+              : [
+                  "Para transferir te dejo el CBU ↓",
+                  webchatAISettings.cbu || "CBU no configurado"
+                ];
 
             for (const msg of cbuMessages) {
               await supabase.from('messages').insert({
@@ -610,9 +619,10 @@ serve(async (req) => {
                     .eq('id', conversation.id);
                   
                   // Send messages for successful user creation (NO cashier link yet - only after payment proof)
+                  const casinoLink = webchatAISettings?.casino_link || 'https://bet32.fun/';
                   const successMessages = [
                     `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
-                    `Entrá acá → http://capibet.fun/`,
+                    `Entrá acá → ${casinoLink}`,
                     `Para recargar fichas, transferí al CBU ↓`,
                     webchatAISettings?.cbu || "CBU no configurado",
                     `Cuando hagas la transferencia, enviame el comprobante acá 👍`
