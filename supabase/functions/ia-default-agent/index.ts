@@ -303,15 +303,12 @@ serve(async (req) => {
         const mensajesMultiples = existingCasinoUsername 
           ? [
               `Ya tenés tu cuenta ${existingCasinoUsername} 🎰`,
-              `Entrá al casino acá → ${casinoLink}`,
               'Para cargar fichas, transferí al siguiente CBU ↓',
               cbu || '[CBU no configurado]',
               'Una vez que transferiste, enviame la captura del comprobante acá para acreditar tu saldo 💸'
             ]
           : [
-              '¡Perfecto! Entrá al casino acá ↓',
-              casinoLink,
-              'Para cargar fichas, transferí al siguiente CBU ↓',
+              '¡Perfecto! Para cargar fichas, transferí al siguiente CBU ↓',
               cbu || '[CBU no configurado]',
               'Una vez que transferiste, enviame la captura del comprobante acá para acreditar tu saldo 💸'
             ];
