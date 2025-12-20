@@ -1861,6 +1861,7 @@ export type Database = {
           puede_exportar_datos: boolean | null
           puede_gestionar_etiquetas: boolean | null
           puede_gestionar_facebook: boolean | null
+          puede_gestionar_ia: boolean | null
           puede_gestionar_instagram: boolean | null
           puede_gestionar_integraciones: boolean | null
           puede_gestionar_plantillas: boolean | null
@@ -1925,6 +1926,7 @@ export type Database = {
           puede_exportar_datos?: boolean | null
           puede_gestionar_etiquetas?: boolean | null
           puede_gestionar_facebook?: boolean | null
+          puede_gestionar_ia?: boolean | null
           puede_gestionar_instagram?: boolean | null
           puede_gestionar_integraciones?: boolean | null
           puede_gestionar_plantillas?: boolean | null
@@ -1989,6 +1991,7 @@ export type Database = {
           puede_exportar_datos?: boolean | null
           puede_gestionar_etiquetas?: boolean | null
           puede_gestionar_facebook?: boolean | null
+          puede_gestionar_ia?: boolean | null
           puede_gestionar_instagram?: boolean | null
           puede_gestionar_integraciones?: boolean | null
           puede_gestionar_plantillas?: boolean | null

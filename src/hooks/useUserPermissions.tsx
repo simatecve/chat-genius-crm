@@ -98,6 +98,8 @@ export const useUserPermissions = () => {
             // Chat Interno
             puede_ver_chat_interno: true,
             puede_enviar_chat_interno: true,
+            // IA Default
+            puede_gestionar_ia: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           } as UserPermissions);

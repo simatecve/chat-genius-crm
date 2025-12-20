@@ -94,22 +94,37 @@ const PERMISSION_FIELDS: PermissionField[] = [
   { key: 'puede_exportar_datos', label: 'Exportar Datos', group: 'Reportes' },
   { key: 'puede_ver_analytics', label: 'Ver Analytics', group: 'Reportes' },
   
-  // Configuración
-  { key: 'puede_gestionar_usuarios', label: 'Gestionar Usuarios', group: 'Configuración' },
-  { key: 'puede_ver_configuracion', label: 'Ver Configuración', group: 'Configuración' },
-  { key: 'puede_editar_configuracion', label: 'Editar Configuración', group: 'Configuración' },
-  { key: 'puede_gestionar_plantillas', label: 'Gestionar Plantillas', group: 'Configuración' },
-  { key: 'puede_gestionar_respuestas_rapidas', label: 'Gestionar Respuestas Rápidas', group: 'Configuración' },
-  { key: 'puede_configurar_bot', label: 'Configurar Bot', group: 'Configuración' },
-  { key: 'puede_gestionar_etiquetas', label: 'Gestionar Etiquetas', group: 'Configuración' },
-  { key: 'puede_gestionar_workspaces', label: 'Gestionar Espacios de Trabajo', group: 'Configuración' },
-  { key: 'puede_gestionar_integraciones', label: 'Gestionar Integraciones', group: 'Configuración' },
+  // Config: Espacios de Trabajo
+  { key: 'puede_gestionar_workspaces', label: 'Gestionar Espacios', group: 'Config: Espacios' },
   
-  // Canales
-  { key: 'puede_gestionar_whatsapp', label: 'Gestionar WhatsApp', group: 'Canales' },
-  { key: 'puede_gestionar_instagram', label: 'Gestionar Instagram', group: 'Canales' },
-  { key: 'puede_gestionar_facebook', label: 'Gestionar Facebook', group: 'Canales' },
-  { key: 'puede_gestionar_telegram', label: 'Gestionar Telegram', group: 'Canales' },
+  // Config: Sesiones/Conexiones
+  { key: 'puede_gestionar_whatsapp', label: 'Gestionar WhatsApp', group: 'Config: Sesiones' },
+  { key: 'puede_gestionar_telegram', label: 'Gestionar Telegram', group: 'Config: Sesiones' },
+  { key: 'puede_gestionar_instagram', label: 'Gestionar Instagram', group: 'Config: Sesiones' },
+  { key: 'puede_gestionar_facebook', label: 'Gestionar Facebook', group: 'Config: Sesiones' },
+  
+  // Config: Respuestas Rápidas
+  { key: 'puede_gestionar_respuestas_rapidas', label: 'Gestionar Respuestas', group: 'Config: Respuestas' },
+  
+  // Config: Usuarios
+  { key: 'puede_gestionar_usuarios', label: 'Gestionar Usuarios', group: 'Config: Usuarios' },
+  
+  // Config: Bot
+  { key: 'puede_configurar_bot', label: 'Configurar Bot', group: 'Config: Bot' },
+  
+  // Config: Integraciones
+  { key: 'puede_gestionar_integraciones', label: 'Gestionar Integraciones', group: 'Config: Integraciones' },
+  
+  // Config: IA Default
+  { key: 'puede_gestionar_ia', label: 'Gestionar IA Default', group: 'Config: IA' },
+  
+  // Config: Etiquetas
+  { key: 'puede_gestionar_etiquetas', label: 'Gestionar Etiquetas', group: 'Config: Etiquetas' },
+  
+  // Config: General
+  { key: 'puede_ver_configuracion', label: 'Ver Configuración', group: 'Config: General' },
+  { key: 'puede_editar_configuracion', label: 'Editar Configuración', group: 'Config: General' },
+  { key: 'puede_gestionar_plantillas', label: 'Gestionar Plantillas', group: 'Config: General' },
 ];
 
 export default function EditPermissionsDialog({
