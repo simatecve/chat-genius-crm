@@ -28,7 +28,9 @@ export default function CreateMassCampaign() {
   const { user } = useAuth();
   
   const [loading, setLoading] = useState(false);
+  const [loadingCampaign, setLoadingCampaign] = useState(false);
   const [contactLists, setContactLists] = useState<any[]>([]);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   const [campaignName, setCampaignName] = useState('');
   const [channelType, setChannelType] = useState<'whatsapp' | 'telegram' | 'twilio'>('whatsapp');
@@ -51,6 +53,13 @@ export default function CreateMassCampaign() {
   useEffect(() => {
     loadData();
   }, [user]);
+
+  // Cargar campaña existente si hay ID
+  useEffect(() => {
+    if (user && id) {
+      loadCampaign();
+    }
+  }, [user, id, whatsappConnections, telegramConnections, twilioConnections]);
 
   // Cleanup preview URLs on unmount
   useEffect(() => {
@@ -80,6 +89,49 @@ export default function CreateMassCampaign() {
     }
   };
 
+  const loadCampaign = async () => {
+    if (!id || !user) return;
+    
+    setLoadingCampaign(true);
+    try {
+      const { data: campaign, error } = await supabase
+        .from('mass_campaigns')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      if (!campaign) return;
+
+      setIsEditMode(true);
+      setCampaignName(campaign.name || '');
+      setMessage(campaign.message || '');
+      setChannelType((campaign.channel_type as 'whatsapp' | 'telegram' | 'twilio') || 'whatsapp');
+      setSelectedContactList(campaign.contact_list_id || '');
+      setEditWithAi(campaign.edit_with_ai || false);
+      setWaitTime(String(campaign.min_delay || 30));
+      setWaitTimeEnabled((campaign.min_delay || 0) > 0);
+
+      // Cargar conexión según el tipo de canal
+      if (campaign.channel_type === 'whatsapp' && campaign.whatsapp_connection_id) {
+        setSelectedConnection(campaign.whatsapp_connection_id);
+      } else if (campaign.channel_type === 'telegram' && campaign.telegram_bot_id) {
+        setSelectedConnection(campaign.telegram_bot_id);
+      } else if (campaign.channel_type === 'twilio' && campaign.twilio_connection_id) {
+        setSelectedConnection(campaign.twilio_connection_id);
+      }
+    } catch (error) {
+      console.error('Error loading campaign:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la campaña",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCampaign(false);
+    }
+  };
+
   // Obtener las conexiones activas según el canal seleccionado
   const getCurrentConnections = () => {
     if (channelType === 'whatsapp') return whatsappConnections;
@@ -88,9 +140,11 @@ export default function CreateMassCampaign() {
     return [];
   };
 
-  // Resetear la conexión seleccionada cuando cambia el tipo de canal
+  // Resetear la conexión seleccionada cuando cambia el tipo de canal (solo si no estamos en modo edición cargando)
   useEffect(() => {
-    setSelectedConnection('');
+    if (!loadingCampaign && !isEditMode) {
+      setSelectedConnection('');
+    }
   }, [channelType]);
 
   const isAudioFile = (mimeType: string) => {
@@ -244,26 +298,42 @@ export default function CreateMassCampaign() {
         campaignData.whatsapp_connection_name = selectedConn?.connection_name || selectedConn?.phone_number || 'Twilio';
       }
 
-      // Crear campaña
-      const { data: campaign, error } = await supabase
-        .from('mass_campaigns')
-        .insert(campaignData)
-        .select()
-        .single();
+      // Crear o actualizar campaña
+      if (id) {
+        // Actualizar campaña existente
+        const { error } = await supabase
+          .from('mass_campaigns')
+          .update(campaignData)
+          .eq('id', id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Éxito",
-        description: "Campaña creada correctamente",
-      });
+        toast({
+          title: "Éxito",
+          description: "Campaña actualizada correctamente",
+        });
+      } else {
+        // Crear nueva campaña
+        const { data: campaign, error } = await supabase
+          .from('mass_campaigns')
+          .insert(campaignData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        toast({
+          title: "Éxito",
+          description: "Campaña creada correctamente",
+        });
+      }
 
       navigate('/campanas-masivas');
     } catch (error: any) {
-      console.error('Error creating campaign:', error);
+      console.error('Error saving campaign:', error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear la campaña",
+        description: error.message || "No se pudo guardar la campaña",
         variant: "destructive",
       });
     } finally {
@@ -288,10 +358,20 @@ export default function CreateMassCampaign() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Nuevo envío masivo</h1>
-            <p className="text-muted-foreground mt-1">Configura tu campaña de mensajería</p>
+            <h1 className="text-3xl font-bold text-foreground">
+              {id ? 'Editar campaña' : 'Nuevo envío masivo'}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {id ? 'Modifica los datos de tu campaña' : 'Configura tu campaña de mensajería'}
+            </p>
           </div>
         </div>
+
+        {loadingCampaign && (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        )}
 
         {/* Nombre de la campaña */}
         <div className="mb-4">
@@ -575,10 +655,10 @@ export default function CreateMassCampaign() {
         {/* Botón de envío */}
         <Button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || loadingCampaign}
           className="w-full bg-gradient-to-r from-primary to-primary/90 font-semibold py-6 text-lg rounded-xl"
         >
-          {loading ? 'PROCESANDO...' : 'INICIAR ENVÍO MASIVO'}
+          {loading ? 'PROCESANDO...' : id ? 'GUARDAR CAMBIOS' : 'INICIAR ENVÍO MASIVO'}
         </Button>
       </div>
     </div>
