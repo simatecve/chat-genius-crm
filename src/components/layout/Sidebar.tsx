@@ -124,8 +124,8 @@ export const Sidebar = () => {
     items: [{
       label: 'Configuración',
       icon: Settings,
-      href: '/configuracion',
-      permission: 'puede_ver_configuracion'
+      href: '/configuracion'
+      // No requiere permiso específico - todos pueden acceder a su perfil
     }]
   }];
 
@@ -234,7 +234,7 @@ export const Sidebar = () => {
                 </div>}
             </div>
             {!isCollapsed && <div className="text-xs text-muted-foreground text-center mt-3">
-                Versión 2.2 (01-12)
+                Versión 2.3 (20-12)
               </div>}
           </div>
         </div>

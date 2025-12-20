@@ -55,8 +55,15 @@ const Settings = () => {
   const { effectiveUserId } = useEffectiveUserId();
   const { hasPermission, isAdmin } = useUserPermissions();
   
-  // Verificar permisos para gestionar usuarios
+  // Verificar permisos para cada sección
   const canManageUsers = isAdmin || hasPermission('puede_gestionar_usuarios');
+  const canManageWorkspaces = isAdmin || hasPermission('puede_gestionar_workspaces');
+  const canManageWhatsApp = isAdmin || hasPermission('puede_gestionar_whatsapp');
+  const canConfigureBot = isAdmin || hasPermission('puede_configurar_bot');
+  const canManageIntegrations = isAdmin || hasPermission('puede_gestionar_integraciones');
+  const canManageTags = isAdmin || hasPermission('puede_gestionar_etiquetas');
+  const canManageQuickReplies = isAdmin || hasPermission('puede_gestionar_respuestas_rapidas');
+  
   const { autoStopEnabled, botEnabled, isLoading: isBotLoading, toggleAutoStop, toggleBotEnabled } = useBotAutoStop();
 
   useEffect(() => {
@@ -200,69 +207,61 @@ const Settings = () => {
         <h1 className="text-3xl font-bold">Configuración</h1>
       </div>
 
-      <Tabs defaultValue="workspaces" className="w-full">
+      <Tabs defaultValue="profile" className="w-full">
         <TabsList className="inline-flex w-auto overflow-x-auto overflow-y-hidden whitespace-nowrap">
-          <TabsTrigger value="workspaces" className="flex items-center space-x-2 flex-shrink-0">
-            <Briefcase className="h-4 w-4" />
-            <span>Espacios</span>
+          <TabsTrigger value="profile" className="flex items-center space-x-2 flex-shrink-0">
+            <User className="h-4 w-4" />
+            <span>Perfil</span>
           </TabsTrigger>
-          <TabsTrigger value="sessions" className="flex items-center space-x-2 flex-shrink-0">
-            <Smartphone className="h-4 w-4" />
-            <span>Sesiones</span>
-          </TabsTrigger>
-          <TabsTrigger value="quick-replies" className="flex items-center space-x-2 flex-shrink-0">
-            <MessageSquare className="h-4 w-4" />
-            <span>Respuestas</span>
-          </TabsTrigger>
+          {canManageWorkspaces && (
+            <TabsTrigger value="workspaces" className="flex items-center space-x-2 flex-shrink-0">
+              <Briefcase className="h-4 w-4" />
+              <span>Espacios</span>
+            </TabsTrigger>
+          )}
+          {canManageWhatsApp && (
+            <TabsTrigger value="sessions" className="flex items-center space-x-2 flex-shrink-0">
+              <Smartphone className="h-4 w-4" />
+              <span>Sesiones</span>
+            </TabsTrigger>
+          )}
+          {canManageQuickReplies && (
+            <TabsTrigger value="quick-replies" className="flex items-center space-x-2 flex-shrink-0">
+              <MessageSquare className="h-4 w-4" />
+              <span>Respuestas</span>
+            </TabsTrigger>
+          )}
           {canManageUsers && (
             <TabsTrigger value="users" className="flex items-center space-x-2 flex-shrink-0">
               <UsersIcon className="h-4 w-4" />
               <span>Usuarios</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="profile" className="flex items-center space-x-2 flex-shrink-0">
-            <User className="h-4 w-4" />
-            <span>Perfil</span>
-          </TabsTrigger>
-          <TabsTrigger value="bot" className="flex items-center space-x-2 flex-shrink-0">
-            <Bot className="h-4 w-4" />
-            <span>Bot</span>
-          </TabsTrigger>
-          <TabsTrigger value="integrations" className="flex items-center space-x-2 flex-shrink-0">
-            <Key className="h-4 w-4" />
-            <span>Integraciones</span>
-          </TabsTrigger>
-          <TabsTrigger value="ia-default" className="flex items-center space-x-2 flex-shrink-0">
-            <Brain className="h-4 w-4" />
-            <span>Inteligencia artificial</span>
-          </TabsTrigger>
-          <TabsTrigger value="tags" className="flex items-center space-x-2 flex-shrink-0">
-            <Tag className="h-4 w-4" />
-            <span>Etiquetas</span>
-          </TabsTrigger>
+          {canConfigureBot && (
+            <TabsTrigger value="bot" className="flex items-center space-x-2 flex-shrink-0">
+              <Bot className="h-4 w-4" />
+              <span>Bot</span>
+            </TabsTrigger>
+          )}
+          {canManageIntegrations && (
+            <TabsTrigger value="integrations" className="flex items-center space-x-2 flex-shrink-0">
+              <Key className="h-4 w-4" />
+              <span>Integraciones</span>
+            </TabsTrigger>
+          )}
+          {canManageIntegrations && (
+            <TabsTrigger value="ia-default" className="flex items-center space-x-2 flex-shrink-0">
+              <Brain className="h-4 w-4" />
+              <span>Inteligencia artificial</span>
+            </TabsTrigger>
+          )}
+          {canManageTags && (
+            <TabsTrigger value="tags" className="flex items-center space-x-2 flex-shrink-0">
+              <Tag className="h-4 w-4" />
+              <span>Etiquetas</span>
+            </TabsTrigger>
+          )}
         </TabsList>
-
-        <TabsContent value="workspaces" className="mt-6">
-          <WorkspaceManagement />
-        </TabsContent>
-
-        <TabsContent value="tags" className="mt-6">
-          <TagsTab />
-        </TabsContent>
-
-        <TabsContent value="sessions" className="mt-6">
-          <SessionsManager />
-        </TabsContent>
-
-        <TabsContent value="quick-replies" className="mt-6">
-          <QuickReplies />
-        </TabsContent>
-
-        {canManageUsers && (
-          <TabsContent value="users" className="mt-6">
-            <UserManagement />
-          </TabsContent>
-        )}
 
         <TabsContent value="profile" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -524,6 +523,36 @@ const Settings = () => {
         <TabsContent value="ia-default" className="mt-6">
           <IADefaultTab />
         </TabsContent>
+
+        {canManageWorkspaces && (
+          <TabsContent value="workspaces" className="mt-6">
+            <WorkspaceManagement />
+          </TabsContent>
+        )}
+
+        {canManageWhatsApp && (
+          <TabsContent value="sessions" className="mt-6">
+            <SessionsManager />
+          </TabsContent>
+        )}
+
+        {canManageQuickReplies && (
+          <TabsContent value="quick-replies" className="mt-6">
+            <QuickReplies />
+          </TabsContent>
+        )}
+
+        {canManageUsers && (
+          <TabsContent value="users" className="mt-6">
+            <UserManagement />
+          </TabsContent>
+        )}
+
+        {canManageTags && (
+          <TabsContent value="tags" className="mt-6">
+            <TagsTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
 
