@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0";
 
+// Declarar EdgeRuntime para TypeScript
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void;
+};
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Configuración de lotes
+const BATCH_SIZE = 200; // Máximo 200 mensajes por lote
 
 // Función de delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -44,13 +51,13 @@ serve(async (req) => {
   }
 
   try {
-    const { campaign_id, retry_failed } = await req.json();
+    const { campaign_id, retry_failed, batch_offset = 0 } = await req.json();
 
     if (!campaign_id) {
       throw new Error('campaign_id is required');
     }
 
-    console.log(`Request received - campaign_id: ${campaign_id}, retry_failed: ${retry_failed}`);
+    console.log(`Request received - campaign_id: ${campaign_id}, retry_failed: ${retry_failed}, batch_offset: ${batch_offset}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -71,8 +78,22 @@ serve(async (req) => {
       throw new Error('Campaign not found');
     }
 
+    // Verificar si la campaña fue pausada (solo para lotes subsecuentes)
+    if (batch_offset > 0 && campaign.status === 'paused') {
+      console.log(`Campaign ${campaign_id} is paused, stopping batch processing`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Campaign paused, batch processing stopped',
+          batch_offset,
+          paused: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const channelType = campaign.channel_type || 'whatsapp';
-    console.log(`Starting campaign ${campaign_id} on channel: ${channelType}`);
+    console.log(`Starting campaign ${campaign_id} on channel: ${channelType}, batch_offset: ${batch_offset}`);
 
     // Obtener el agente de IA si edit_with_ai está activo
     let aiAgent = null;
@@ -190,7 +211,7 @@ serve(async (req) => {
       throw new Error('No contacts found in list');
     }
 
-    let contacts = listMembers
+    let allContacts = listMembers
       .map((m: any) => m.contacts)
       .filter((c: any) => c && c.phone_number);
 
@@ -208,10 +229,10 @@ serve(async (req) => {
       const sentSet = new Set(sentNumbers?.map(s => s.phone_number.replace(/\D/g, '')) || []);
       
       // Filtrar contactos: solo los que NO fueron enviados exitosamente
-      const originalCount = contacts.length;
-      contacts = contacts.filter((c: any) => !sentSet.has(c.phone_number.replace(/\D/g, '')));
+      const originalCount = allContacts.length;
+      allContacts = allContacts.filter((c: any) => !sentSet.has(c.phone_number.replace(/\D/g, '')));
       
-      console.log(`Retry mode: ${contacts.length} contacts to retry (excluded ${sentSet.size} already sent successfully)`);
+      console.log(`Retry mode: ${allContacts.length} contacts to retry (excluded ${sentSet.size} already sent successfully)`);
       
       // Eliminar registros fallidos previos para reintentarlos
       const { error: deleteError } = await supabase
@@ -226,7 +247,7 @@ serve(async (req) => {
         console.log('Previous failed/pending records deleted for retry');
       }
       
-      if (contacts.length === 0) {
+      if (allContacts.length === 0) {
         // Todos los contactos ya fueron enviados exitosamente
         await supabase
           .from('mass_campaigns')
@@ -247,33 +268,63 @@ serve(async (req) => {
 
     // Limitar contactos según límite de Twilio
     if (channelType === 'twilio') {
-      const originalCount = contacts.length;
-      contacts = contacts.slice(0, twilioRemainingMessages);
+      const originalCount = allContacts.length;
+      allContacts = allContacts.slice(0, twilioRemainingMessages);
       if (originalCount > twilioRemainingMessages) {
-        console.log(`Twilio limit: Reduced contacts from ${originalCount} to ${contacts.length}`);
+        console.log(`Twilio limit: Reduced contacts from ${originalCount} to ${allContacts.length}`);
       }
     }
 
-    // Actualizar campaña a estado 'sending'
-    await supabase
-      .from('mass_campaigns')
-      .update({ 
-        status: 'sending',
-        total_count: contacts.length,
-        sent_count: 0
-      })
-      .eq('id', campaign_id);
+    const totalContacts = allContacts.length;
+    const totalBatches = Math.ceil(totalContacts / BATCH_SIZE);
+    const currentBatch = Math.floor(batch_offset / BATCH_SIZE) + 1;
 
-    console.log(`Campaign ${campaign_id} with ${contacts.length} contacts, ${campaign.attachment_urls?.length || 0} attachments`);
+    // Obtener solo los contactos para este lote
+    const batchContacts = allContacts.slice(batch_offset, batch_offset + BATCH_SIZE);
+    const isLastBatch = batch_offset + BATCH_SIZE >= totalContacts;
+
+    console.log(`📦 Processing batch ${currentBatch}/${totalBatches}: contacts ${batch_offset + 1}-${batch_offset + batchContacts.length} of ${totalContacts}`);
+
+    // Actualizar campaña a estado 'sending' (solo en el primer lote)
+    if (batch_offset === 0) {
+      await supabase
+        .from('mass_campaigns')
+        .update({ 
+          status: 'sending',
+          total_count: totalContacts,
+          sent_count: 0
+        })
+        .eq('id', campaign_id);
+    }
+
+    console.log(`Campaign ${campaign_id} with ${batchContacts.length} contacts in this batch, ${campaign.attachment_urls?.length || 0} attachments`);
 
     const minDelayMs = (campaign.min_delay || 3) * 1000;
     const maxDelayMs = (campaign.max_delay || 8) * 1000;
     let sentCount = 0;
     let failedCount = 0;
 
-    // Procesar cada contacto
-    for (let i = 0; i < contacts.length; i++) {
-      const contact = contacts[i];
+    // Obtener el sent_count actual para acumular
+    const currentSentCount = campaign.sent_count || 0;
+
+    // Procesar cada contacto del lote
+    for (let i = 0; i < batchContacts.length; i++) {
+      const contact = batchContacts[i];
+      const globalIndex = batch_offset + i;
+      
+      // Verificar si la campaña fue pausada (cada 10 mensajes)
+      if (i > 0 && i % 10 === 0) {
+        const { data: currentCampaign } = await supabase
+          .from('mass_campaigns')
+          .select('status')
+          .eq('id', campaign_id)
+          .single();
+        
+        if (currentCampaign?.status === 'paused') {
+          console.log(`Campaign ${campaign_id} was paused, stopping current batch`);
+          break;
+        }
+      }
       
       try {
         let messageToSend = campaign.message || '';
@@ -330,7 +381,7 @@ ${campaign.message}`
         // Formatear número
         const cleanNumber = contact.phone_number.replace(/\D/g, '');
         
-        console.log(`Sending message ${i + 1}/${contacts.length} to ${cleanNumber} via ${channelType}`);
+        console.log(`Sending message ${globalIndex + 1}/${totalContacts} to ${cleanNumber} via ${channelType}`);
 
         let sendSuccess = false;
         let errorDetail = '';
@@ -745,14 +796,15 @@ ${campaign.message}`
               .upsert({
                 twilio_connection_id: campaign.twilio_connection_id,
                 usage_date: today,
-                messages_sent: twilioSentToday + sentCount,
+                messages_sent: twilioSentToday + currentSentCount + sentCount,
                 user_id: campaign.user_id
               }, { onConflict: 'twilio_connection_id,usage_date' });
           }
           
+          // Actualizar progreso de la campaña
           await supabase
             .from('mass_campaigns')
-            .update({ sent_count: sentCount })
+            .update({ sent_count: currentSentCount + sentCount })
             .eq('id', campaign_id);
 
         } else {
@@ -773,8 +825,8 @@ ${campaign.message}`
           failedCount++;
         }
 
-        // Delay antes del siguiente mensaje (excepto el último)
-        if (i < contacts.length - 1) {
+        // Delay antes del siguiente mensaje (excepto el último del lote)
+        if (i < batchContacts.length - 1) {
           const randomDelay = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
           console.log(`Waiting ${randomDelay}ms before next message...`);
           await delay(randomDelay);
@@ -786,23 +838,81 @@ ${campaign.message}`
       }
     }
 
-    // Marcar campaña como completada
+    const batchTotalSent = currentSentCount + sentCount;
+
+    // Determinar si hay más lotes y programar el siguiente
+    if (!isLastBatch) {
+      console.log(`📦 Batch ${currentBatch}/${totalBatches} completed. Scheduling next batch...`);
+      
+      // Programar siguiente lote como background task
+      EdgeRuntime.waitUntil((async () => {
+        // Pequeña pausa entre lotes
+        await delay(2000);
+        
+        // Verificar si la campaña sigue activa antes de continuar
+        const { data: currentCampaign } = await supabase
+          .from('mass_campaigns')
+          .select('status')
+          .eq('id', campaign_id)
+          .single();
+        
+        if (currentCampaign?.status === 'sending') {
+          console.log(`📦 Starting batch ${currentBatch + 1}/${totalBatches}...`);
+          await supabase.functions.invoke('send-mass-campaign', {
+            body: { 
+              campaign_id, 
+              batch_offset: batch_offset + BATCH_SIZE 
+            }
+          });
+        } else {
+          console.log(`Campaign ${campaign_id} status is ${currentCampaign?.status}, not continuing to next batch`);
+        }
+      })());
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          batch_sent: sentCount,
+          batch_failed: failedCount,
+          batch_offset: batch_offset,
+          batch_size: batchContacts.length,
+          total_contacts: totalContacts,
+          total_batches: totalBatches,
+          current_batch: currentBatch,
+          has_more: true,
+          next_batch_offset: batch_offset + BATCH_SIZE,
+          total_sent_so_far: batchTotalSent,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Este es el último lote - marcar campaña como completada
+    console.log(`📦 Final batch ${currentBatch}/${totalBatches} completed. Campaign finished!`);
+    
     await supabase
       .from('mass_campaigns')
       .update({ 
         status: 'completed',
-        sent_count: sentCount,
+        sent_count: batchTotalSent,
       })
       .eq('id', campaign_id);
 
-    console.log(`Campaign ${campaign_id} completed: ${sentCount} sent, ${failedCount} failed`);
+    console.log(`Campaign ${campaign_id} completed: ${batchTotalSent} total sent, ${failedCount} failed in last batch`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        sent_count: sentCount,
-        failed_count: failedCount,
-        total_count: contacts.length,
+        batch_sent: sentCount,
+        batch_failed: failedCount,
+        batch_offset: batch_offset,
+        batch_size: batchContacts.length,
+        total_contacts: totalContacts,
+        total_batches: totalBatches,
+        current_batch: currentBatch,
+        has_more: false,
+        total_sent: batchTotalSent,
+        campaign_completed: true,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
