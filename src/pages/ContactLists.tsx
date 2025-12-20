@@ -53,6 +53,10 @@ const ContactLists = () => {
   const [manualPhone, setManualPhone] = useState('');
   const [manualContacts, setManualContacts] = useState<ParsedContact[]>([]);
 
+  // Estados para pegar texto masivo
+  const [bulkText, setBulkText] = useState('');
+  const [parsedBulkContacts, setParsedBulkContacts] = useState<ParsedContact[]>([]);
+
   useEffect(() => {
     if (user) {
       fetchContactLists();
@@ -233,7 +237,139 @@ const ContactLists = () => {
     setManualContacts([]);
     setManualName('');
     setManualPhone('');
+    setBulkText('');
+    setParsedBulkContacts([]);
     resetForm();
+  };
+
+  // Parsear texto pegado masivo
+  const handleParseBulkText = () => {
+    if (!bulkText.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Pega el texto con los contactos',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const lines = bulkText.split('\n').filter(l => l.trim());
+    const parsed: ParsedContact[] = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      // Parsear formato: nombre, telefono o nombre;telefono o nombre\ttelefono
+      const parts = trimmed.split(/[,;\t]/).map(p => p.trim());
+      
+      if (parts.length >= 2) {
+        // nombre, telefono
+        const cleanPhone = parts[1].replace(/\D/g, '');
+        if (cleanPhone) {
+          parsed.push({ name: parts[0] || cleanPhone, phone_number: cleanPhone });
+        }
+      } else if (parts.length === 1) {
+        // Solo número, usar como nombre
+        const cleanPhone = parts[0].replace(/\D/g, '');
+        if (cleanPhone) {
+          parsed.push({ name: cleanPhone, phone_number: cleanPhone });
+        }
+      }
+    }
+    
+    // Eliminar duplicados por teléfono
+    const uniqueContacts = parsed.filter((contact, index, self) =>
+      index === self.findIndex(c => c.phone_number === contact.phone_number)
+    );
+    
+    setParsedBulkContacts(uniqueContacts);
+    
+    if (uniqueContacts.length === 0) {
+      toast({
+        title: 'Sin contactos',
+        description: 'No se encontraron contactos válidos en el texto',
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Texto procesado',
+        description: `Se encontraron ${uniqueContacts.length} contactos`
+      });
+    }
+  };
+
+  // Agregar contactos del texto pegado a la lista
+  const handleAddBulkContacts = async () => {
+    if (!addingToList || parsedBulkContacts.length === 0) return;
+
+    setImportLoading(true);
+    try {
+      let addedCount = 0;
+      
+      for (const contact of parsedBulkContacts) {
+        // Buscar o crear contacto
+        let { data: existing } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('user_id', user?.id)
+          .eq('phone_number', contact.phone_number)
+          .maybeSingle();
+        
+        let contactId = existing?.id;
+        
+        if (!contactId) {
+          const { data: created } = await supabase
+            .from('contacts')
+            .insert({
+              user_id: user?.id!,
+              phone_number: contact.phone_number,
+              name: contact.name,
+              first_name: contact.name,
+              origin: 'bulk_paste'
+            })
+            .select('id')
+            .single();
+          contactId = created?.id;
+        }
+        
+        if (contactId) {
+          // Verificar si ya está en la lista
+          const { data: existing_member } = await supabase
+            .from('contact_list_members')
+            .select('id')
+            .eq('contact_list_id', addingToList.id)
+            .eq('contact_id', contactId)
+            .maybeSingle();
+          
+          if (!existing_member) {
+            await supabase.from('contact_list_members').insert({
+              contact_list_id: addingToList.id,
+              contact_id: contactId
+            });
+            addedCount++;
+          }
+        }
+      }
+
+      toast({
+        title: 'Éxito',
+        description: `${addedCount} contacto(s) agregado(s) a la lista`
+      });
+
+      setParsedBulkContacts([]);
+      setBulkText('');
+      fetchContactLists();
+    } catch (error) {
+      console.error('Error adding bulk contacts:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron agregar los contactos',
+        variant: 'destructive'
+      });
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   const openAddContactsDialog = async (list: ContactList) => {
@@ -761,7 +897,7 @@ const ContactLists = () => {
             </DialogHeader>
             
             <Tabs defaultValue="existing" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="existing" className="flex items-center gap-1">
                   <Users className="w-4 h-4" />
                   Existentes
@@ -773,6 +909,10 @@ const ContactLists = () => {
                 <TabsTrigger value="manual" className="flex items-center gap-1">
                   <User className="w-4 h-4" />
                   Manual
+                </TabsTrigger>
+                <TabsTrigger value="bulk" className="flex items-center gap-1">
+                  <FileText className="w-4 h-4" />
+                  Pegar Texto
                 </TabsTrigger>
               </TabsList>
 
@@ -918,6 +1058,57 @@ const ContactLists = () => {
                       className="w-full bg-gradient-to-r from-primary to-primary/90"
                     >
                       {importLoading ? 'Agregando...' : `Agregar ${manualContacts.length} Contacto(s)`}
+                    </Button>
+                  </>
+                )}
+              </TabsContent>
+
+              {/* Tab: Pegar Texto Masivo */}
+              <TabsContent value="bulk" className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Pega los contactos, uno por línea. Formato: <strong>nombre, telefono</strong>
+                  </p>
+                  <Textarea
+                    placeholder={`Ejemplo:\nJuan Pérez, 5491123456789\nMaría García, 5491198765432\nPedro, 5491155555555`}
+                    value={bulkText}
+                    onChange={(e) => setBulkText(e.target.value)}
+                    className="min-h-[150px] bg-background border-border font-mono text-sm"
+                  />
+                  <Button 
+                    onClick={handleParseBulkText} 
+                    variant="outline" 
+                    className="w-full"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Procesar Texto
+                  </Button>
+                </div>
+
+                {parsedBulkContacts.length > 0 && (
+                  <>
+                    <div className="max-h-[200px] overflow-y-auto space-y-1">
+                      <p className="text-sm font-medium text-foreground mb-2">
+                        Vista previa ({parsedBulkContacts.length} contactos):
+                      </p>
+                      {parsedBulkContacts.slice(0, 15).map((contact, idx) => (
+                        <div key={idx} className="flex justify-between text-sm p-2 bg-muted rounded">
+                          <span className="text-foreground">{contact.name}</span>
+                          <span className="text-muted-foreground">{contact.phone_number}</span>
+                        </div>
+                      ))}
+                      {parsedBulkContacts.length > 15 && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          ... y {parsedBulkContacts.length - 15} más
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      onClick={handleAddBulkContacts}
+                      disabled={importLoading}
+                      className="w-full bg-gradient-to-r from-primary to-primary/90"
+                    >
+                      {importLoading ? 'Agregando...' : `Agregar ${parsedBulkContacts.length} Contacto(s)`}
                     </Button>
                   </>
                 )}
