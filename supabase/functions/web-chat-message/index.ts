@@ -398,8 +398,11 @@ serve(async (req) => {
       }
     }
 
-    // Process AI response: AI Agent takes priority, then webchat AI settings
-    const shouldProcessAI = aiAgent || (webchatAISettings && webchatAISettings.is_enabled);
+    // Process AI response: First check if AI is enabled on the webchat itself, then check for AI Agent or webchat AI settings
+    const webchatAIEnabledOnSession = webchat.ai_enabled ?? false;
+    const shouldProcessAI = webchatAIEnabledOnSession && (aiAgent || (webchatAISettings && webchatAISettings.is_enabled));
+    
+    console.log(`[web-chat-message] AI check: webchat.ai_enabled=${webchatAIEnabledOnSession}, aiAgent=${!!aiAgent}, webchatAISettings.is_enabled=${webchatAISettings?.is_enabled}`);
     
     if (shouldProcessAI) {
       try {
