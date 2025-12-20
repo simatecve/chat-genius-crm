@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Users, Clock } from 'lucide-react';
+import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Users, Clock, Eye } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { CampaignSendSummaryModal } from '@/components/campaigns/CampaignSendSummaryModal';
 
 type Campaign = Database['public']['Tables']['mass_campaigns']['Row'];
 
@@ -20,7 +21,9 @@ export function MassCampaigns() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null);
-  const [progressMap, setProgressMap] = useState<Record<string, { queued: number; sent: number; failed: number }>>({});
+  const [progressMap, setProgressMap] = useState<Record<string, { queued: number; sent: number; failed: number; pending: number }>>({});
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [selectedCampaignName, setSelectedCampaignName] = useState<string>('');
 
   useEffect(() => {
     if (effectiveUserId) {
@@ -62,7 +65,8 @@ export function MassCampaigns() {
       const queued = (data || []).filter(d => d.status === 'queued').length;
       const sent = (data || []).filter(d => d.status === 'sent').length;
       const failed = (data || []).filter(d => d.status === 'failed').length;
-      return [c.id, { queued, sent, failed }] as const;
+      const pending = (data || []).filter(d => d.status === 'pending').length;
+      return [c.id, { queued, sent, failed, pending }] as const;
     }));
     setProgressMap(Object.fromEntries(entries));
   };
@@ -283,13 +287,47 @@ export function MassCampaigns() {
                         <span className="text-xs text-primary">✨ Con IA</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-foreground">
-                        {progressMap[campaign.id]?.sent || 0}/{campaign.total_count || progressMap[campaign.id]?.queued || 0} enviados
-                        {progressMap[campaign.id]?.failed ? ` • ${progressMap[campaign.id]?.failed} fallidos` : ''}
-                      </span>
-                    </div>
+                    
+                    {/* Progress Bar Visual */}
+                    {(() => {
+                      const progress = progressMap[campaign.id];
+                      const sent = progress?.sent || 0;
+                      const failed = progress?.failed || 0;
+                      const pending = (progress?.pending || 0) + (progress?.queued || 0);
+                      const total = sent + failed + pending || campaign.total_count || 1;
+                      
+                      const sentPercent = (sent / total) * 100;
+                      const failedPercent = (failed / total) * 100;
+                      const pendingPercent = (pending / total) * 100;
+                      
+                      return (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Progreso</span>
+                            <span>{sent + failed}/{total}</span>
+                          </div>
+                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
+                            <div 
+                              className="h-full bg-green-500 transition-all duration-300" 
+                              style={{ width: `${sentPercent}%` }} 
+                            />
+                            <div 
+                              className="h-full bg-red-500 transition-all duration-300" 
+                              style={{ width: `${failedPercent}%` }} 
+                            />
+                            <div 
+                              className="h-full bg-yellow-500 transition-all duration-300" 
+                              style={{ width: `${pendingPercent}%` }} 
+                            />
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-green-500">✓ {sent}</span>
+                            <span className="text-red-500">✗ {failed}</span>
+                            <span className="text-yellow-500">⏳ {pending}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex gap-2">
@@ -301,6 +339,18 @@ export function MassCampaigns() {
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCampaignId(campaign.id);
+                        setSelectedCampaignName(campaign.name);
+                      }}
+                      className="border-border hover:bg-muted"
+                      title="Ver detalles de envío"
+                    >
+                      <Eye className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
@@ -337,6 +387,14 @@ export function MassCampaigns() {
           </div>
         )}
       </div>
+
+      {/* Modal de resumen */}
+      <CampaignSendSummaryModal
+        isOpen={!!selectedCampaignId}
+        onClose={() => setSelectedCampaignId(null)}
+        campaignId={selectedCampaignId || ''}
+        campaignName={selectedCampaignName}
+      />
     </div>
   );
 }
