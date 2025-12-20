@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Paperclip, Smile, Clock, Plus, Upload, X, Mic, FileAudio, Play, Pause } from 'lucide-react';
+import { ArrowLeft, Paperclip, Smile, Clock, Plus, Upload, X, Mic, FileAudio, Play, Pause, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
 import { useTelegramConnections } from '@/hooks/useTelegramConnections';
 import { useTwilioConnections } from '@/hooks/useTwilioConnections';
-
+import { useTwilioUsage } from '@/hooks/useTwilioUsage';
 interface AttachmentFile {
   file: File;
   mimeType: string;
@@ -49,6 +51,7 @@ export default function CreateMassCampaign() {
   const { activeConnections: whatsappConnections } = useWhatsAppConnections();
   const { activeConnections: telegramConnections } = useTelegramConnections();
   const { activeConnections: twilioConnections } = useTwilioConnections();
+  const { getUsageByConnectionId, getRemainingMessages, getUsagePercentage, dailyLimit, isNearLimit } = useTwilioUsage(selectedConnection);
 
   useEffect(() => {
     loadData();
@@ -422,6 +425,30 @@ export default function CreateMassCampaign() {
                 ))}
               </SelectContent>
             </Select>
+            
+            {/* Twilio Usage Warning */}
+            {channelType === 'twilio' && selectedConnection && (
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Uso hoy: {getUsageByConnectionId(selectedConnection)}/{dailyLimit}</span>
+                  <span className={isNearLimit(selectedConnection) ? 'text-warning font-medium' : ''}>
+                    {getRemainingMessages(selectedConnection)} restantes
+                  </span>
+                </div>
+                <Progress 
+                  value={getUsagePercentage(selectedConnection)} 
+                  className={`h-1.5 ${isNearLimit(selectedConnection) ? '[&>div]:bg-warning' : ''}`}
+                />
+                {isNearLimit(selectedConnection) && (
+                  <Alert variant="destructive" className="py-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      ¡Atención! Has usado más del 80% del límite diario de Twilio.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

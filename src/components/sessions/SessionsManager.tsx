@@ -5,8 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil, Building2, GitBranch } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil, Building2, GitBranch, MessageSquare } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
+import { useTwilioUsage } from '@/hooks/useTwilioUsage';
 import { supabase } from '@/integrations/supabase/client';
 import WhatsAppConnectionForm from './WhatsAppConnectionForm';
 import TelegramConnectionForm from './TelegramConnectionForm';
@@ -14,7 +16,6 @@ import TelegramBotConnectionForm from './TelegramBotConnectionForm';
 import TwilioConnectionForm from './TwilioConnectionForm';
 import WebChatConnectionForm from './WebChatConnectionForm';
 import { useToast } from '@/hooks/use-toast';
-
 interface Channel {
   id: string;
   name: string;
@@ -77,6 +78,7 @@ const SessionsManager = () => {
   const [embudos, setEmbudos] = useState<LeadColumn[]>([]);
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
+  const { getUsageByConnectionId, getUsagePercentage, getRemainingMessages, dailyLimit, isNearLimit } = useTwilioUsage();
 
   useEffect(() => {
     if (!userIdLoading && effectiveUserId) {
@@ -552,6 +554,29 @@ const SessionsManager = () => {
                 <div className="text-sm text-muted-foreground">
                   <span className="font-medium">ID:</span> {session.identifier}
                 </div>
+                
+                {/* Twilio Usage Stats */}
+                {session.type === 'twilio' && (
+                  <div className="space-y-1.5 p-2 rounded-lg bg-muted/50">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <MessageSquare className="h-3 w-3" />
+                        Mensajes hoy
+                      </span>
+                      <span className={`font-medium ${isNearLimit(session.id) ? 'text-warning' : 'text-foreground'}`}>
+                        {getUsageByConnectionId(session.id)} / {dailyLimit}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={getUsagePercentage(session.id)} 
+                      className={`h-1.5 ${isNearLimit(session.id) ? '[&>div]:bg-warning' : ''}`}
+                    />
+                    <div className="text-[10px] text-muted-foreground text-right">
+                      {getRemainingMessages(session.id)} restantes
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
                     {new Date(session.created_at).toLocaleDateString('es-ES')}
