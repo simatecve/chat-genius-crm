@@ -68,7 +68,7 @@ serve(async (req) => {
           webhooks: [
             {
               url: webhookUrl,
-              events: ['session.status', 'message'],
+              events: ['session.status', 'message', 'message.any'],
               hmac: null,
               retries: null,
               customHeaders: null
