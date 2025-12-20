@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { salesService } from '@/services/salesService';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -50,6 +51,7 @@ interface Lead {
 
 export default function Sales() {
   const { user } = useAuth();
+  const { hasPermission, isAdmin } = useUserPermissions();
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -57,6 +59,11 @@ export default function Sales() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isNewSaleOpen, setIsNewSaleOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
+
+  // Permisos específicos de ventas
+  const canCreateSales = isAdmin || hasPermission('puede_crear_ventas');
+  const canEditSales = isAdmin || hasPermission('puede_editar_ventas');
+  const canDeleteSales = isAdmin || hasPermission('puede_eliminar_ventas');
   
   const [newSale, setNewSale] = useState({
     seller_id: user?.id || '',
@@ -230,6 +237,7 @@ export default function Sales() {
               <Button 
                 onClick={() => setIsNewSaleOpen(true)}
                 className="bg-[#f97316] hover:bg-[#ea580c] text-white"
+                disabled={!canCreateSales}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nueva Venta
@@ -307,6 +315,7 @@ export default function Sales() {
               <Button 
                 onClick={() => setIsNewProductOpen(true)}
                 className="bg-[#f97316] hover:bg-[#ea580c] text-white"
+                disabled={!canCreateSales}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Producto

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useProfile } from '@/hooks/useProfile';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +52,7 @@ export default function ContactsNew() {
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
   const { isCajero } = useProfile();
+  const { hasPermission, isAdmin } = useUserPermissions();
   const { toast } = useToast();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,13 @@ export default function ContactsNew() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 20;
+
+  // Permisos específicos de contactos
+  const canCreate = isAdmin || hasPermission('puede_crear_contactos');
+  const canEdit = isAdmin || hasPermission('puede_editar_contactos');
+  const canDelete = isAdmin || hasPermission('puede_eliminar_contactos');
+  const canImport = isAdmin || hasPermission('puede_importar_contactos');
+  const canExport = isAdmin || hasPermission('puede_exportar_datos');
 
   // Función para enmascarar números de teléfono
   const maskPhoneNumber = (phone: string) => {
@@ -202,18 +211,24 @@ export default function ContactsNew() {
           <p className="text-muted-foreground mt-1">Gestiona tu base de datos de contactos</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Importar
-          </Button>
-          <Button onClick={() => setIsFormOpen(true)} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
-            <Plus className="mr-2 h-4 w-4" />
-            Agregar Contacto
-          </Button>
+          {canExport && (
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar
+            </Button>
+          )}
+          {canImport && (
+            <Button variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              Importar
+            </Button>
+          )}
+          {canCreate && (
+            <Button onClick={() => setIsFormOpen(true)} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Contacto
+            </Button>
+          )}
         </div>
       </div>
 
@@ -311,20 +326,24 @@ export default function ContactsNew() {
                   <TableCell>{formatDate(contact.created_at)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(contact)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setContactToDelete(contact.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(contact)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setContactToDelete(contact.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

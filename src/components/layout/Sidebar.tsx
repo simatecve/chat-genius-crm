@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
 import { useTheme } from 'next-themes';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{
@@ -13,23 +15,23 @@ interface SidebarItem {
   }>;
   href: string;
   badge?: number;
+  permission?: string;
 }
+
 interface SidebarGroup {
   label: string;
   items: SidebarItem[];
 }
+
 export const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
   const currentPath = location.pathname;
-  const {
-    user
-  } = useAuth();
-  const {
-    unreadCount
-  } = useConversations();
+  const { user } = useAuth();
+  const { unreadCount } = useConversations();
   const { resolvedTheme } = useTheme();
+  const { hasPermission, isAdmin, loading: permissionsLoading } = useUserPermissions();
   const logoLightUrl = 'http://nocodeveloper.site/capibet/logocapinegro.png';
   const logoDarkUrl = 'https://nocodeveloper.site/capibet/logocapi.png';
 
@@ -41,13 +43,29 @@ export const Sidebar = () => {
     return currentPath.startsWith(href);
   };
 
+  // Mapeo de rutas a permisos
+  const permissionMap: Record<string, string> = {
+    '/': 'puede_ver_dashboard',
+    '/conversaciones': 'puede_ver_chats',
+    '/chat-landing': 'puede_ver_chats',
+    '/chat-interno': 'puede_ver_chats',
+    '/campanas-masivas': 'puede_enviar_mensajes',
+    '/leads': 'puede_ver_embudos',
+    '/contactos': 'puede_ver_contactos',
+    '/listas-contactos': 'puede_ver_contactos',
+    '/asistente-ia': 'puede_ver_configuracion',
+    '/ventas': 'puede_ver_ventas',
+    '/configuracion': 'puede_ver_configuracion',
+  };
+
   // Crear grupos de sidebar dinámicamente con el contador de conversaciones
-  const sidebarGroups: SidebarGroup[] = [{
+  const allSidebarGroups: SidebarGroup[] = [{
     label: 'Principal',
     items: [{
       label: 'Panel Principal',
       icon: LayoutDashboard,
-      href: '/'
+      href: '/',
+      permission: 'puede_ver_dashboard'
     }]
   }, {
     label: 'Comunicaciones',
@@ -55,51 +73,80 @@ export const Sidebar = () => {
       label: 'Conversaciones',
       icon: MessageSquare,
       href: '/conversaciones',
-      badge: unreadCount > 0 ? unreadCount : undefined
+      badge: unreadCount > 0 ? unreadCount : undefined,
+      permission: 'puede_ver_chats'
     }, {
       label: 'Chat - Landing',
       icon: Globe,
-      href: '/chat-landing'
+      href: '/chat-landing',
+      permission: 'puede_ver_chats'
     }, {
       label: 'Chat Interno',
       icon: MessagesSquare,
-      href: '/chat-interno'
+      href: '/chat-interno',
+      permission: 'puede_ver_chats'
     }, {
       label: 'Campañas Masivas',
       icon: Send,
-      href: '/campanas-masivas'
+      href: '/campanas-masivas',
+      permission: 'puede_enviar_mensajes'
     }]
   }, {
     label: 'Gestión',
     items: [{
       label: 'Embudos',
       icon: UserPlus,
-      href: '/leads'
+      href: '/leads',
+      permission: 'puede_ver_embudos'
     }, {
       label: 'Contactos',
       icon: Users,
-      href: '/contactos'
+      href: '/contactos',
+      permission: 'puede_ver_contactos'
     }, {
       label: 'Listas de Contactos',
       icon: Users,
-      href: '/listas-contactos'
+      href: '/listas-contactos',
+      permission: 'puede_ver_contactos'
     }, {
       label: 'Asistente IA',
       icon: Bot,
-      href: '/asistente-ia'
+      href: '/asistente-ia',
+      permission: 'puede_ver_configuracion'
     }, {
       label: 'Ventas',
       icon: ShoppingCart,
-      href: '/ventas'
+      href: '/ventas',
+      permission: 'puede_ver_ventas'
     }]
   }, {
     label: 'Sistema',
     items: [{
       label: 'Configuración',
       icon: Settings,
-      href: '/configuracion'
+      href: '/configuracion',
+      permission: 'puede_ver_configuracion'
     }]
   }];
+
+  // Filtrar items del sidebar según permisos
+  const sidebarGroups = useMemo(() => {
+    if (permissionsLoading) return allSidebarGroups;
+    
+    return allSidebarGroups.map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        // Admins ven todo
+        if (isAdmin) return true;
+        
+        // Si no hay permiso requerido, mostrar
+        if (!item.permission) return true;
+        
+        // Verificar permiso
+        return hasPermission(item.permission as any);
+      })
+    })).filter(group => group.items.length > 0);
+  }, [isAdmin, hasPermission, permissionsLoading, unreadCount]);
   return <TooltipProvider delayDuration={300}>
       {/* Mobile overlay */}
       {isMobileOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsMobileOpen(false)} />}

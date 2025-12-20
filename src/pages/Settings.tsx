@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 import Integrations from '@/components/Integrations';
 import WorkspaceManagement from '@/components/WorkspaceManagement';
@@ -52,6 +53,10 @@ const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
+  const { hasPermission, isAdmin } = useUserPermissions();
+  
+  // Verificar permisos para gestionar usuarios
+  const canManageUsers = isAdmin || hasPermission('puede_gestionar_usuarios');
   const { autoStopEnabled, botEnabled, isLoading: isBotLoading, toggleAutoStop, toggleBotEnabled } = useBotAutoStop();
 
   useEffect(() => {
@@ -209,10 +214,12 @@ const Settings = () => {
             <MessageSquare className="h-4 w-4" />
             <span>Respuestas</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center space-x-2 flex-shrink-0">
-            <UsersIcon className="h-4 w-4" />
-            <span>Usuarios</span>
-          </TabsTrigger>
+          {canManageUsers && (
+            <TabsTrigger value="users" className="flex items-center space-x-2 flex-shrink-0">
+              <UsersIcon className="h-4 w-4" />
+              <span>Usuarios</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="profile" className="flex items-center space-x-2 flex-shrink-0">
             <User className="h-4 w-4" />
             <span>Perfil</span>
@@ -251,9 +258,11 @@ const Settings = () => {
           <QuickReplies />
         </TabsContent>
 
-        <TabsContent value="users" className="mt-6">
-          <UserManagement />
-        </TabsContent>
+        {canManageUsers && (
+          <TabsContent value="users" className="mt-6">
+            <UserManagement />
+          </TabsContent>
+        )}
 
         <TabsContent value="profile" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
