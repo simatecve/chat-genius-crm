@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Clock, Eye, Pause, Play, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Clock, Eye, Pause, Play, RotateCcw, Copy } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { CampaignSendSummaryModal } from '@/components/campaigns/CampaignSendSummaryModal';
 
@@ -245,6 +245,40 @@ export function MassCampaigns() {
     }
   };
 
+  const handleDuplicateCampaign = async (campaign: Campaign) => {
+    try {
+      const { id, created_at, updated_at, sent_count, total_count, status, ...campaignData } = campaign;
+      
+      const { data: newCampaign, error } = await supabase
+        .from('mass_campaigns')
+        .insert({
+          ...campaignData,
+          name: `Copia de ${campaign.name}`,
+          status: 'draft',
+          sent_count: 0,
+          total_count: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: 'Campaña duplicada',
+        description: 'Se creó una copia de la campaña',
+      });
+      
+      navigate(`/crear-campana-masiva/${newCampaign.id}`);
+    } catch (error) {
+      console.error('Error duplicating campaign:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo duplicar la campaña',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const filteredCampaigns = campaigns.filter(campaign =>
     campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     campaign.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -458,6 +492,15 @@ export function MassCampaigns() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleDuplicateCampaign(campaign)}
+                      className="border-border hover:bg-muted"
+                      title="Duplicar campaña"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleDeleteCampaign(campaign.id)}
                       className="border-border hover:bg-destructive hover:text-destructive-foreground"
                     >
@@ -496,7 +539,7 @@ export function MassCampaigns() {
                     )}
 
                     {/* Reintentar fallidos - si completada con errores */}
-                    {(campaign.status === 'completed' || campaign.status === 'sent') && 
+                    {(campaign.status === 'completed' || campaign.status === 'sent' || campaign.status === 'partial') && 
                      progressMap[campaign.id]?.failed > 0 && (
                       <Button
                         variant="outline"
