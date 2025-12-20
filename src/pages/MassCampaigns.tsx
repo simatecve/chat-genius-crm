@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Users, Clock, Eye } from 'lucide-react';
+import { Loader2, Plus, Search, Send, Edit, Trash2, MessageSquare, Clock, Eye, Pause, Play, RotateCcw } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { CampaignSendSummaryModal } from '@/components/campaigns/CampaignSendSummaryModal';
 
@@ -149,6 +149,102 @@ export function MassCampaigns() {
     }
   };
 
+  const handlePauseCampaign = async (campaignId: string) => {
+    try {
+      const { error } = await supabase
+        .from('mass_campaigns')
+        .update({ status: 'paused' })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(c => 
+        c.id === campaignId ? { ...c, status: 'paused' } : c
+      ));
+
+      toast({
+        title: 'Campaña pausada',
+        description: 'La campaña ha sido pausada',
+      });
+    } catch (error) {
+      console.error('Error pausing campaign:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo pausar la campaña',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleResumeCampaign = async (campaign: Campaign) => {
+    setSendingCampaign(campaign.id);
+    
+    try {
+      // Reanudar envío
+      const { data, error } = await supabase.functions.invoke('send-mass-campaign', {
+        body: { campaign_id: campaign.id }
+      });
+
+      if (error) throw error;
+
+      setCampaigns(campaigns.map(c => 
+        c.id === campaign.id ? { ...c, status: 'sending' } : c
+      ));
+
+      toast({
+        title: 'Campaña reanudada',
+        description: 'La campaña se está enviando nuevamente',
+      });
+
+      setTimeout(() => fetchCampaigns(), 1000);
+    } catch (error) {
+      console.error('Error resuming campaign:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo reanudar la campaña',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCampaign(null);
+    }
+  };
+
+  const handleRetryCampaign = async (campaign: Campaign) => {
+    if (!confirm('¿Reintentar enviar a los contactos que fallaron?')) return;
+    
+    setSendingCampaign(campaign.id);
+    
+    try {
+      // Marcar campaña como sending y reintentar
+      await supabase
+        .from('mass_campaigns')
+        .update({ status: 'sending' })
+        .eq('id', campaign.id);
+
+      const { data, error } = await supabase.functions.invoke('send-mass-campaign', {
+        body: { campaign_id: campaign.id, retry_failed: true }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Reintentando envío',
+        description: 'Se están reenviando los mensajes fallidos',
+      });
+
+      setTimeout(() => fetchCampaigns(), 1000);
+    } catch (error) {
+      console.error('Error retrying campaign:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo reintentar la campaña',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCampaign(null);
+    }
+  };
+
   const filteredCampaigns = campaigns.filter(campaign =>
     campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     campaign.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -171,7 +267,8 @@ export function MassCampaigns() {
     const statusConfig = {
       draft: { label: 'Borrador', variant: 'secondary' as const },
       ready: { label: 'Lista', variant: 'default' as const },
-      sending: { label: isStuck ? '⚠️ Atascada' : 'Enviando', variant: isStuck ? 'destructive' as const : 'default' as const },
+      sending: { label: isStuck ? '⚠️ Atascada' : 'Enviando...', variant: isStuck ? 'destructive' as const : 'default' as const },
+      paused: { label: '⏸️ Pausada', variant: 'secondary' as const },
       sent: { label: 'Enviada', variant: 'default' as const },
       completed: { label: 'Completada', variant: 'default' as const },
       partial: { label: 'Parcial', variant: 'secondary' as const },
@@ -368,25 +465,76 @@ export function MassCampaigns() {
                     </Button>
                   </div>
 
-                  {campaign.status !== 'sent' && campaign.status !== 'completed' && campaign.status !== 'sending' && (
-                    <Button
-                      onClick={() => handleSendCampaign(campaign)}
-                      disabled={sendingCampaign === campaign.id}
-                      className="w-full bg-gradient-to-r from-primary to-primary/90"
-                    >
-                      {sendingCampaign === campaign.id ? (
-                        <>
+                  {/* Botones de acción según estado */}
+                  <div className="space-y-2">
+                    {/* Pausar - solo si está enviando */}
+                    {campaign.status === 'sending' && (
+                      <Button
+                        variant="outline"
+                        onClick={() => handlePauseCampaign(campaign.id)}
+                        className="w-full border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+                      >
+                        <Pause className="h-4 w-4 mr-2" />
+                        Pausar Campaña
+                      </Button>
+                    )}
+
+                    {/* Reanudar - si está pausada */}
+                    {campaign.status === 'paused' && (
+                      <Button
+                        onClick={() => handleResumeCampaign(campaign)}
+                        disabled={sendingCampaign === campaign.id}
+                        className="w-full bg-gradient-to-r from-green-600 to-green-500"
+                      >
+                        {sendingCampaign === campaign.id ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Enviando...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4 mr-2" />
-                          Enviar Campaña
-                        </>
-                      )}
-                    </Button>
-                  )}
+                        ) : (
+                          <Play className="h-4 w-4 mr-2" />
+                        )}
+                        Reanudar Campaña
+                      </Button>
+                    )}
+
+                    {/* Reintentar fallidos - si completada con errores */}
+                    {(campaign.status === 'completed' || campaign.status === 'sent') && 
+                     progressMap[campaign.id]?.failed > 0 && (
+                      <Button
+                        variant="outline"
+                        onClick={() => handleRetryCampaign(campaign)}
+                        disabled={sendingCampaign === campaign.id}
+                        className="w-full border-orange-500 text-orange-600 hover:bg-orange-50"
+                      >
+                        {sendingCampaign === campaign.id ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                        )}
+                        Reintentar Fallidos ({progressMap[campaign.id]?.failed})
+                      </Button>
+                    )}
+
+                    {/* Enviar - si no está enviada ni enviando */}
+                    {campaign.status !== 'sent' && campaign.status !== 'completed' && 
+                     campaign.status !== 'sending' && campaign.status !== 'paused' && (
+                      <Button
+                        onClick={() => handleSendCampaign(campaign)}
+                        disabled={sendingCampaign === campaign.id}
+                        className="w-full bg-gradient-to-r from-primary to-primary/90"
+                      >
+                        {sendingCampaign === campaign.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Enviar Campaña
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
