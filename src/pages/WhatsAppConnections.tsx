@@ -382,13 +382,27 @@ const WhatsAppConnections = () => {
 
     setDeleting(connectionId);
     try {
-      const { error } = await supabase
-        .from('whatsapp_connections')
-        .delete()
-        .eq('id', connectionId)
-        .eq('user_id', effectiveUserId);
+      // 1. Primero eliminar la sesión de WAHA
+      const { error: wahaError } = await supabase.functions.invoke('waha-delete-session', {
+        body: { 
+          session_name: connectionName,
+          connection_id: connectionId 
+        }
+      });
 
-      if (error) throw error;
+      // Si WAHA devuelve error, intentamos eliminar de BD de todas formas
+      if (wahaError) {
+        console.warn('Error deleting from WAHA (continuing with DB deletion):', wahaError);
+        
+        // Fallback: eliminar directamente de la BD
+        const { error: dbError } = await supabase
+          .from('whatsapp_connections')
+          .delete()
+          .eq('id', connectionId)
+          .eq('user_id', effectiveUserId);
+
+        if (dbError) throw dbError;
+      }
 
       toast({
         title: "Conexión eliminada",

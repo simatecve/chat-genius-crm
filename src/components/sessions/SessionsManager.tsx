@@ -417,7 +417,15 @@ const SessionsManager = () => {
               connection_id: session.id 
             }
           });
-          if (wahaError) throw wahaError;
+          // Si hay error en WAHA, hacer fallback a eliminación directa de BD
+          if (wahaError) {
+            console.warn('WAHA delete error, attempting direct DB delete:', wahaError);
+            const { error: dbError } = await supabase
+              .from('whatsapp_connections')
+              .delete()
+              .eq('id', session.id);
+            if (dbError) throw dbError;
+          }
           break;
 
         case 'telegram-bot':
