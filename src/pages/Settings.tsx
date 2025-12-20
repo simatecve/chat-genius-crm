@@ -63,6 +63,7 @@ const Settings = () => {
   const canManageIntegrations = isAdmin || hasPermission('puede_gestionar_integraciones');
   const canManageTags = isAdmin || hasPermission('puede_gestionar_etiquetas');
   const canManageQuickReplies = isAdmin || hasPermission('puede_gestionar_respuestas_rapidas');
+  const canManageIA = isAdmin || hasPermission('puede_gestionar_ia');
   
   const { autoStopEnabled, botEnabled, isLoading: isBotLoading, toggleAutoStop, toggleBotEnabled } = useBotAutoStop();
 
@@ -249,7 +250,7 @@ const Settings = () => {
               <span>Integraciones</span>
             </TabsTrigger>
           )}
-          {canManageIntegrations && (
+          {canManageIA && (
             <TabsTrigger value="ia-default" className="flex items-center space-x-2 flex-shrink-0">
               <Brain className="h-4 w-4" />
               <span>Inteligencia artificial</span>
