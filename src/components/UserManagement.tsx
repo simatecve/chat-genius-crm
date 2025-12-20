@@ -108,8 +108,9 @@ const UserManagement = () => {
     puede_ver_contactos: true,
     puede_ver_chats: true,
     puede_enviar_mensajes: true,
-    puede_ver_embudos: true,
-    puede_mover_contactos_embudos: true,
+    puede_ver_embudos: false,
+    puede_mover_contactos_embudos: false,
+    puede_gestionar_workspaces: false,
     puede_ver_tareas: true
   });
 
@@ -177,8 +178,9 @@ const UserManagement = () => {
         puede_ver_contactos: true,
         puede_ver_chats: true,
         puede_enviar_mensajes: true,
-        puede_ver_embudos: true,
-        puede_mover_contactos_embudos: true,
+        puede_ver_embudos: false,
+        puede_mover_contactos_embudos: false,
+        puede_gestionar_workspaces: false,
         puede_ver_tareas: true
       });
       refetch();
