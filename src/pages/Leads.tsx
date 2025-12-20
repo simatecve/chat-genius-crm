@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,7 @@ interface LeadWithColumn extends Lead {
 const Leads = () => {
   const { user } = useAuth();
   const { hasPermission, isAdmin } = useUserPermissions();
+  const { effectiveUserId, loading: effectiveUserIdLoading } = useEffectiveUserId();
   const navigate = useNavigate();
   
   // Permisos específicos de embudos
@@ -165,18 +167,18 @@ const Leads = () => {
     }
   };
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId && !effectiveUserIdLoading) {
       loadData();
     }
-  }, [user]);
+  }, [effectiveUserId, effectiveUserIdLoading]);
 
   // Reload columns when workspace changes
   useEffect(() => {
-    if (user && selectedWorkspace) {
+    if (effectiveUserId && !effectiveUserIdLoading && selectedWorkspace) {
       loadColumns();
       loadLeads();
     }
-  }, [selectedWorkspace]);
+  }, [selectedWorkspace, effectiveUserId, effectiveUserIdLoading]);
 
   // Filtrar leads en tiempo real
   useEffect(() => {
@@ -208,10 +210,12 @@ const Leads = () => {
     }
   };
   const loadWorkspaces = async () => {
+    if (!effectiveUserId) return;
+    
     const {
       data,
       error
-    } = await supabase.from('workspaces').select('*').eq('user_id', user?.id).order('position');
+    } = await supabase.from('workspaces').select('*').eq('user_id', effectiveUserId).order('position');
     if (error) {
       console.error('Error loading workspaces:', error);
       return;
@@ -223,7 +227,7 @@ const Leads = () => {
         data: newWorkspace,
         error: createError
       } = await supabase.from('workspaces').insert({
-        user_id: user?.id,
+        user_id: effectiveUserId,
         name: 'Mi Espacio de Trabajo',
         position: 0
       }).select().single();
@@ -234,7 +238,7 @@ const Leads = () => {
 
       // Crear columna por defecto en el nuevo workspace
       await supabase.from('lead_columns').insert({
-        user_id: user?.id,
+        user_id: effectiveUserId,
         workspace_id: newWorkspace.id,
         name: 'Nuevos Contactos',
         color: '#22c55e',
@@ -252,7 +256,9 @@ const Leads = () => {
     }
   };
   const loadColumns = async () => {
-    let query = supabase.from('lead_columns').select('*').eq('user_id', user?.id);
+    if (!effectiveUserId) return;
+    
+    let query = supabase.from('lead_columns').select('*').eq('user_id', effectiveUserId);
 
     // Filtrar por workspace si está seleccionado (incluir también columnas sin workspace)
     if (selectedWorkspace) {
@@ -274,6 +280,8 @@ const Leads = () => {
     setColumns(data);
   };
   const createDefaultColumn = async () => {
+    if (!effectiveUserId) return;
+    
     const {
       data,
       error
@@ -282,7 +290,7 @@ const Leads = () => {
       color: '#22c55e',
       position: 0,
       is_default: true,
-      user_id: user?.id,
+      user_id: effectiveUserId,
       workspace_id: selectedWorkspace
     }).select().single();
     if (error) {
@@ -292,6 +300,8 @@ const Leads = () => {
     setColumns([data]);
   };
   const loadLeads = async () => {
+    if (!effectiveUserId) return;
+    
     // Si hay workspace seleccionado, primero obtener los IDs de las columnas
     let columnIds: string[] = [];
     if (selectedWorkspace) {
@@ -299,7 +309,7 @@ const Leads = () => {
       const {
         data: columnsData,
         error: columnsError
-      } = await supabase.from('lead_columns').select('id').eq('user_id', user?.id).or(`workspace_id.eq.${selectedWorkspace},workspace_id.is.null`);
+      } = await supabase.from('lead_columns').select('id').eq('user_id', effectiveUserId).or(`workspace_id.eq.${selectedWorkspace},workspace_id.is.null`);
       if (columnsError) {
         console.error('Error loading columns for leads:', columnsError);
         return;
@@ -366,7 +376,7 @@ const Leads = () => {
       color: newColumnColor,
       position: columns.length,
       is_default: false,
-      user_id: user?.id,
+      user_id: effectiveUserId,
       workspace_id: selectedWorkspace
     }).select().single();
     if (error) {
@@ -478,7 +488,7 @@ const Leads = () => {
       value: newLead.value ? parseFloat(newLead.value) : null,
       notes: newLead.notes || null,
       column_id: targetColumnId,
-      user_id: user?.id,
+      user_id: effectiveUserId,
       position: leads.filter(l => l.column_id === targetColumnId).length
     }).select(`
         *,
@@ -621,7 +631,7 @@ const Leads = () => {
       } = await supabase.from('contact_lists').insert({
         name: contactListName,
         description: `Lista creada desde la columna: ${convertingColumn.name}`,
-        user_id: user?.id
+        user_id: effectiveUserId
       }).select().single();
       if (listError) {
         console.error('Error creating contact list:', listError);
@@ -647,7 +657,7 @@ const Leads = () => {
             name: lead.name,
             phone_number: lead.phone,
             email: lead.email,
-            user_id: user?.id
+            user_id: effectiveUserId
           }).select().single();
           if (contactError) {
             console.error('Error creating contact:', contactError);
