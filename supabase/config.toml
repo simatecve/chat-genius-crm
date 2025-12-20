@@ -22,10 +22,10 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.telegram-send-message]
-verify_jwt = true
+verify_jwt = false
 
 [functions.telegram-send-file]
-verify_jwt = true
+verify_jwt = false
 
 [functions.waha-create-session]
 verify_jwt = true
@@ -37,10 +37,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.waha-send-message]
-verify_jwt = true
+verify_jwt = false
 
 [functions.waha-send-file]
-verify_jwt = true
+verify_jwt = false
 
 [functions.waha-session-status]
 verify_jwt = true
@@ -55,10 +55,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.twilio-send-message]
-verify_jwt = true
+verify_jwt = false
 
 [functions.twilio-send-file]
-verify_jwt = true
+verify_jwt = false
 
 [functions.twilio-ai-agent-response]
 verify_jwt = false
@@ -83,3 +83,6 @@ verify_jwt = true
 
 [functions.web-chat-poll]
 verify_jwt = false
+
+[functions.twilio-get-file]
+verify_jwt = true

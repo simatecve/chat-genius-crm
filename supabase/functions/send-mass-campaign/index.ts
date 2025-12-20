@@ -280,6 +280,7 @@ ${campaign.message}`
         console.log(`Sending message ${i + 1}/${contacts.length} to ${cleanNumber} via ${channelType}`);
 
         let sendSuccess = false;
+        let errorDetail = '';
         let conversationId: string | null = null;
 
         // Buscar o crear conversación
@@ -541,7 +542,7 @@ ${campaign.message}`
               const mimeType = campaign.attachment_mime_types?.[j] || getMimeTypeFromFileName(fileName);
               const caption = j === 0 ? messageToSend : '';
               
-              const { error: fileError } = await supabase.functions.invoke('telegram-send-file', {
+              const { data: fileResult, error: fileError } = await supabase.functions.invoke('telegram-send-file', {
                 body: {
                   chatId: telegramChatId,
                   fileUrl,
@@ -553,7 +554,11 @@ ${campaign.message}`
                 }
               });
               
-              if (!fileError) {
+              if (fileError) {
+                console.error(`Telegram file error:`, fileError);
+              } else if (fileResult?.success === false) {
+                console.error(`Telegram file failed:`, fileResult.error);
+              } else {
                 sendSuccess = true;
               }
               
@@ -565,7 +570,7 @@ ${campaign.message}`
           
           // Enviar texto si no hay archivos o si los archivos no llevaron caption
           if (messageToSend && (!campaign.attachment_urls || campaign.attachment_urls.length === 0)) {
-            const { error: msgError } = await supabase.functions.invoke('telegram-send-message', {
+            const { data: msgResult, error: msgError } = await supabase.functions.invoke('telegram-send-message', {
               body: {
                 chatId: telegramChatId,
                 message: messageToSend,
@@ -575,7 +580,11 @@ ${campaign.message}`
               }
             });
             
-            if (!msgError) {
+            if (msgError) {
+              console.error(`Telegram message error:`, msgError);
+            } else if (msgResult?.success === false) {
+              console.error(`Telegram message failed:`, msgResult.error);
+            } else {
               sendSuccess = true;
             }
           } else if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
@@ -592,7 +601,7 @@ ${campaign.message}`
               const mimeType = campaign.attachment_mime_types?.[j] || getMimeTypeFromFileName(fileName);
               const msgBody = j === 0 ? messageToSend : '';
               
-              const { error: fileError } = await supabase.functions.invoke('twilio-send-file', {
+              const { data: fileResult, error: fileError } = await supabase.functions.invoke('twilio-send-file', {
                 body: {
                   twilioConnectionId: campaign.twilio_connection_id,
                   phoneNumber: cleanNumber,
@@ -605,7 +614,13 @@ ${campaign.message}`
                 }
               });
               
-              if (!fileError) {
+              if (fileError) {
+                console.error(`Twilio file error:`, fileError);
+                errorDetail = fileError.message || 'Error enviando archivo';
+              } else if (fileResult?.success === false) {
+                console.error(`Twilio file failed:`, fileResult.error);
+                errorDetail = fileResult.error || 'Fallo de Twilio';
+              } else {
                 sendSuccess = true;
               }
               
@@ -617,7 +632,7 @@ ${campaign.message}`
           
           // Enviar texto si no hay archivos
           if (messageToSend && (!campaign.attachment_urls || campaign.attachment_urls.length === 0)) {
-            const { error: msgError } = await supabase.functions.invoke('twilio-send-message', {
+            const { data: msgResult, error: msgError } = await supabase.functions.invoke('twilio-send-message', {
               body: {
                 twilioConnectionId: campaign.twilio_connection_id,
                 phoneNumber: cleanNumber,
@@ -627,10 +642,16 @@ ${campaign.message}`
               }
             });
             
-            if (!msgError) {
+            if (msgError) {
+              console.error(`Twilio message error:`, msgError);
+              errorDetail = msgError.message || 'Error de conexión';
+            } else if (msgResult?.success === false) {
+              console.error(`Twilio message failed:`, msgResult.error);
+              errorDetail = msgResult.error || 'Fallo de Twilio';
+            } else {
               sendSuccess = true;
             }
-          } else if (campaign.attachment_urls && campaign.attachment_urls.length > 0) {
+          } else if (campaign.attachment_urls && campaign.attachment_urls.length > 0 && !errorDetail) {
             sendSuccess = true;
           }
         }
@@ -682,7 +703,7 @@ ${campaign.message}`
             .eq('id', campaign_id);
 
         } else {
-          console.error(`❌ Failed to send to ${contact.name}`);
+          console.error(`❌ Failed to send to ${contact.name}: ${errorDetail || 'Unknown error'}`);
           
           await supabase.from('campaign_sends').insert({
             campaign_id: campaign_id,
@@ -692,7 +713,7 @@ ${campaign.message}`
             message_sent: messageToSend || '📎 Archivo adjunto',
             was_personalized: campaign.edit_with_ai,
             status: 'failed',
-            error_message: 'Send failed',
+            error_message: errorDetail || 'Error desconocido al enviar',
             user_id: campaign.user_id,
           });
           

@@ -163,14 +163,20 @@ export function MassCampaigns() {
     return () => clearInterval(interval);
   }, [campaigns]);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, updatedAt?: string | null) => {
+    // Check if campaign is stuck in "sending" for more than 10 minutes
+    const isStuck = status === 'sending' && updatedAt && 
+      (Date.now() - new Date(updatedAt).getTime()) > 10 * 60 * 1000;
+    
     const statusConfig = {
       draft: { label: 'Borrador', variant: 'secondary' as const },
       ready: { label: 'Lista', variant: 'default' as const },
-      sending: { label: 'Enviando', variant: 'default' as const },
+      sending: { label: isStuck ? '⚠️ Atascada' : 'Enviando', variant: isStuck ? 'destructive' as const : 'default' as const },
       sent: { label: 'Enviada', variant: 'default' as const },
+      completed: { label: 'Completada', variant: 'default' as const },
       partial: { label: 'Parcial', variant: 'secondary' as const },
       failed: { label: 'Fallida', variant: 'destructive' as const },
+      error: { label: 'Error', variant: 'destructive' as const },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
@@ -256,7 +262,7 @@ export function MassCampaigns() {
                         </CardDescription>
                       )}
                     </div>
-                    {getStatusBadge(campaign.status)}
+                    {getStatusBadge(campaign.status || 'draft', campaign.updated_at)}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -362,7 +368,7 @@ export function MassCampaigns() {
                     </Button>
                   </div>
 
-                  {campaign.status !== 'sent' && campaign.status !== 'sending' && (
+                  {campaign.status !== 'sent' && campaign.status !== 'completed' && campaign.status !== 'sending' && (
                     <Button
                       onClick={() => handleSendCampaign(campaign)}
                       disabled={sendingCampaign === campaign.id}
