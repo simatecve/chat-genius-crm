@@ -44,11 +44,13 @@ serve(async (req) => {
   }
 
   try {
-    const { campaign_id } = await req.json();
+    const { campaign_id, retry_failed } = await req.json();
 
     if (!campaign_id) {
       throw new Error('campaign_id is required');
     }
+
+    console.log(`Request received - campaign_id: ${campaign_id}, retry_failed: ${retry_failed}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -191,6 +193,57 @@ serve(async (req) => {
     let contacts = listMembers
       .map((m: any) => m.contacts)
       .filter((c: any) => c && c.phone_number);
+
+    // Si es retry_failed, filtrar solo contactos fallidos o no enviados
+    if (retry_failed) {
+      console.log(`Retry mode enabled - filtering contacts that were not successfully sent`);
+      
+      // Obtener números que ya fueron enviados exitosamente
+      const { data: sentNumbers } = await supabase
+        .from('campaign_sends')
+        .select('phone_number')
+        .eq('campaign_id', campaign_id)
+        .eq('status', 'sent');
+      
+      const sentSet = new Set(sentNumbers?.map(s => s.phone_number.replace(/\D/g, '')) || []);
+      
+      // Filtrar contactos: solo los que NO fueron enviados exitosamente
+      const originalCount = contacts.length;
+      contacts = contacts.filter((c: any) => !sentSet.has(c.phone_number.replace(/\D/g, '')));
+      
+      console.log(`Retry mode: ${contacts.length} contacts to retry (excluded ${sentSet.size} already sent successfully)`);
+      
+      // Eliminar registros fallidos previos para reintentarlos
+      const { error: deleteError } = await supabase
+        .from('campaign_sends')
+        .delete()
+        .eq('campaign_id', campaign_id)
+        .in('status', ['failed', 'pending']);
+      
+      if (deleteError) {
+        console.log('Error deleting previous failed records:', deleteError);
+      } else {
+        console.log('Previous failed/pending records deleted for retry');
+      }
+      
+      if (contacts.length === 0) {
+        // Todos los contactos ya fueron enviados exitosamente
+        await supabase
+          .from('mass_campaigns')
+          .update({ status: 'completed' })
+          .eq('id', campaign_id);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Todos los contactos ya fueron enviados exitosamente',
+            total_count: 0,
+            enqueued_count: 0
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     // Limitar contactos según límite de Twilio
     if (channelType === 'twilio') {

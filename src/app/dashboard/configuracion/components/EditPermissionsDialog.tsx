@@ -19,43 +19,93 @@ interface EditPermissionsDialogProps {
 }
 
 type PermissionField = {
-  key: keyof UserPermissions;
+  key: string;
   label: string;
   group: string;
 };
 
 const PERMISSION_FIELDS: PermissionField[] = [
+  // General
   { key: 'puede_ver_dashboard', label: 'Ver Dashboard', group: 'General' },
+  
+  // Contactos
   { key: 'puede_ver_contactos', label: 'Ver Contactos', group: 'Contactos' },
   { key: 'puede_crear_contactos', label: 'Crear Contactos', group: 'Contactos' },
   { key: 'puede_editar_contactos', label: 'Editar Contactos', group: 'Contactos' },
   { key: 'puede_eliminar_contactos', label: 'Eliminar Contactos', group: 'Contactos' },
   { key: 'puede_importar_contactos', label: 'Importar Contactos', group: 'Contactos' },
+  
+  // Listas de Contactos
+  { key: 'puede_ver_listas_contactos', label: 'Ver Listas', group: 'Listas de Contactos' },
+  { key: 'puede_crear_listas_contactos', label: 'Crear Listas', group: 'Listas de Contactos' },
+  { key: 'puede_editar_listas_contactos', label: 'Editar Listas', group: 'Listas de Contactos' },
+  { key: 'puede_eliminar_listas_contactos', label: 'Eliminar Listas', group: 'Listas de Contactos' },
+  
+  // Chats
   { key: 'puede_ver_chats', label: 'Ver Chats', group: 'Chats' },
   { key: 'puede_enviar_mensajes', label: 'Enviar Mensajes', group: 'Chats' },
   { key: 'puede_ver_mensajes_otros', label: 'Ver Mensajes de Otros', group: 'Chats' },
   { key: 'puede_eliminar_mensajes', label: 'Eliminar Mensajes', group: 'Chats' },
+  
+  // Chat Landing
+  { key: 'puede_ver_chat_landing', label: 'Ver Chat Landing', group: 'Chat Web' },
+  { key: 'puede_responder_chat_landing', label: 'Responder Chat Landing', group: 'Chat Web' },
+  
+  // Chat Interno
+  { key: 'puede_ver_chat_interno', label: 'Ver Chat Interno', group: 'Chat Interno' },
+  { key: 'puede_enviar_chat_interno', label: 'Enviar Mensajes Internos', group: 'Chat Interno' },
+  
+  // Campañas Masivas
+  { key: 'puede_ver_campanas_masivas', label: 'Ver Campañas', group: 'Campañas Masivas' },
+  { key: 'puede_crear_campanas_masivas', label: 'Crear Campañas', group: 'Campañas Masivas' },
+  { key: 'puede_editar_campanas_masivas', label: 'Editar Campañas', group: 'Campañas Masivas' },
+  { key: 'puede_eliminar_campanas_masivas', label: 'Eliminar Campañas', group: 'Campañas Masivas' },
+  { key: 'puede_enviar_campanas_masivas', label: 'Enviar Campañas', group: 'Campañas Masivas' },
+  
+  // Embudos
   { key: 'puede_ver_embudos', label: 'Ver Embudos', group: 'Embudos' },
   { key: 'puede_crear_embudos', label: 'Crear Embudos', group: 'Embudos' },
   { key: 'puede_editar_embudos', label: 'Editar Embudos', group: 'Embudos' },
   { key: 'puede_eliminar_embudos', label: 'Eliminar Embudos', group: 'Embudos' },
   { key: 'puede_mover_contactos_embudos', label: 'Mover Contactos en Embudos', group: 'Embudos' },
+  
+  // Ventas
   { key: 'puede_ver_ventas', label: 'Ver Ventas', group: 'Ventas' },
   { key: 'puede_crear_ventas', label: 'Crear Ventas', group: 'Ventas' },
   { key: 'puede_editar_ventas', label: 'Editar Ventas', group: 'Ventas' },
   { key: 'puede_eliminar_ventas', label: 'Eliminar Ventas', group: 'Ventas' },
-  { key: 'puede_ver_tareas', label: 'Ver Tareas', group: 'Tareas' },
-  { key: 'puede_crear_tareas', label: 'Crear Tareas', group: 'Tareas' },
-  { key: 'puede_asignar_tareas', label: 'Asignar Tareas', group: 'Tareas' },
-  { key: 'puede_eliminar_tareas', label: 'Eliminar Tareas', group: 'Tareas' },
+  
+  // Calendario/Tareas
+  { key: 'puede_ver_calendario', label: 'Ver Calendario', group: 'Calendario' },
+  { key: 'puede_ver_tareas', label: 'Ver Tareas', group: 'Calendario' },
+  { key: 'puede_crear_tareas', label: 'Crear Tareas', group: 'Calendario' },
+  { key: 'puede_editar_tareas', label: 'Editar Tareas', group: 'Calendario' },
+  { key: 'puede_asignar_tareas', label: 'Asignar Tareas', group: 'Calendario' },
+  { key: 'puede_eliminar_tareas', label: 'Eliminar Tareas', group: 'Calendario' },
+  
+  // Agentes IA
+  { key: 'puede_ver_agentes_ia', label: 'Ver Agentes IA', group: 'Agentes IA' },
+  { key: 'puede_crear_agentes_ia', label: 'Crear Agentes IA', group: 'Agentes IA' },
+  { key: 'puede_editar_agentes_ia', label: 'Editar Agentes IA', group: 'Agentes IA' },
+  { key: 'puede_eliminar_agentes_ia', label: 'Eliminar Agentes IA', group: 'Agentes IA' },
+  
+  // Reportes
   { key: 'puede_ver_reportes', label: 'Ver Reportes', group: 'Reportes' },
   { key: 'puede_exportar_datos', label: 'Exportar Datos', group: 'Reportes' },
   { key: 'puede_ver_analytics', label: 'Ver Analytics', group: 'Reportes' },
+  
+  // Configuración
   { key: 'puede_gestionar_usuarios', label: 'Gestionar Usuarios', group: 'Configuración' },
   { key: 'puede_ver_configuracion', label: 'Ver Configuración', group: 'Configuración' },
   { key: 'puede_editar_configuracion', label: 'Editar Configuración', group: 'Configuración' },
   { key: 'puede_gestionar_plantillas', label: 'Gestionar Plantillas', group: 'Configuración' },
   { key: 'puede_gestionar_respuestas_rapidas', label: 'Gestionar Respuestas Rápidas', group: 'Configuración' },
+  { key: 'puede_configurar_bot', label: 'Configurar Bot', group: 'Configuración' },
+  { key: 'puede_gestionar_etiquetas', label: 'Gestionar Etiquetas', group: 'Configuración' },
+  { key: 'puede_gestionar_workspaces', label: 'Gestionar Espacios de Trabajo', group: 'Configuración' },
+  { key: 'puede_gestionar_integraciones', label: 'Gestionar Integraciones', group: 'Configuración' },
+  
+  // Canales
   { key: 'puede_gestionar_whatsapp', label: 'Gestionar WhatsApp', group: 'Canales' },
   { key: 'puede_gestionar_instagram', label: 'Gestionar Instagram', group: 'Canales' },
   { key: 'puede_gestionar_facebook', label: 'Gestionar Facebook', group: 'Canales' },
@@ -69,7 +119,7 @@ export default function EditPermissionsDialog({
   roleName
 }: EditPermissionsDialogProps) {
   const { users: accountUsers, loading: loadingUsers, refetch } = useAccountUsers();
-  const [permsByUser, setPermsByUser] = useState<Record<string, Partial<UserPermissions>>>({});
+  const [permsByUser, setPermsByUser] = useState<Record<string, Record<string, boolean>>>({});
   const [loading, setLoading] = useState(false);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
 
@@ -91,19 +141,40 @@ export default function EditPermissionsDialog({
     return acc;
   }, {} as Record<string, PermissionField[]>);
 
+  // Crear objeto con todos los permisos en false
+  const createDefaultPermissions = (): Record<string, boolean> => {
+    const defaultPerms: Record<string, boolean> = {};
+    PERMISSION_FIELDS.forEach(field => {
+      defaultPerms[field.key] = false;
+    });
+    return defaultPerms;
+  };
+
   const loadPermissions = async () => {
     if (users.length === 0) return;
     
     setLoading(true);
     try {
-      const permsMap: Record<string, Partial<UserPermissions>> = {};
+      const permsMap: Record<string, Record<string, boolean>> = {};
       await Promise.all(
         users.map(async (user) => {
           try {
             const perms = await userPermissionsService.getByUserId(user.id);
-            permsMap[user.id] = perms || {};
+            if (perms) {
+              // Combinar permisos existentes con defaults (para campos nuevos)
+              const defaultPerms = createDefaultPermissions();
+              Object.keys(perms).forEach(key => {
+                if (key in defaultPerms && typeof (perms as any)[key] === 'boolean') {
+                  defaultPerms[key] = (perms as any)[key];
+                }
+              });
+              permsMap[user.id] = defaultPerms;
+            } else {
+              // Sin permisos existentes, usar todos en false
+              permsMap[user.id] = createDefaultPermissions();
+            }
           } catch (e) {
-            permsMap[user.id] = {};
+            permsMap[user.id] = createDefaultPermissions();
           }
         })
       );
@@ -122,20 +193,20 @@ export default function EditPermissionsDialog({
     }
   }, [open, users.length]);
 
-  const toggleField = (userId: string, field: keyof UserPermissions) => {
+  const toggleField = (userId: string, fieldKey: string) => {
     setPermsByUser(prev => ({
       ...prev,
       [userId]: {
         ...prev[userId],
-        [field]: !(prev[userId]?.[field] as boolean)
+        [fieldKey]: !(prev[userId]?.[fieldKey])
       }
     }));
   };
 
   const setAllForUser = (userId: string, value: boolean) => {
-    const next: Partial<UserPermissions> = { ...permsByUser[userId] };
+    const next: Record<string, boolean> = {};
     PERMISSION_FIELDS.forEach(f => {
-      (next as any)[f.key] = value;
+      next[f.key] = value;
     });
     setPermsByUser(prev => ({ ...prev, [userId]: next }));
   };
@@ -143,11 +214,15 @@ export default function EditPermissionsDialog({
   const saveUserPerms = async (userId: string) => {
     setSavingUserId(userId);
     try {
-      const current = permsByUser[userId];
-      await userPermissionsService.upsert({
-        user_id: userId,
-        ...current
-      } as any);
+      const current = permsByUser[userId] || {};
+      
+      // Construir objeto completo con TODOS los permisos
+      const fullPermissions: Record<string, any> = { user_id: userId };
+      PERMISSION_FIELDS.forEach(field => {
+        fullPermissions[field.key] = current[field.key] ?? false;
+      });
+      
+      await userPermissionsService.upsert(fullPermissions as any);
       
       toast.success('Permisos guardados correctamente');
     } catch (e: any) {
@@ -210,14 +285,14 @@ export default function EditPermissionsDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
                   {Object.entries(groupedFields).map(([groupName, fields]) => (
                     <div key={groupName} className="space-y-2">
                       <div className="text-sm font-medium text-foreground">{groupName}</div>
                       <div className="space-y-1.5">
                         {fields.map(field => (
                           <label
-                            key={String(field.key)}
+                            key={field.key}
                             className="flex items-center gap-2 text-sm cursor-pointer"
                           >
                             <input

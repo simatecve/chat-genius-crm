@@ -1831,36 +1831,59 @@ export type Database = {
           created_at: string | null
           id: string
           puede_asignar_tareas: boolean | null
+          puede_configurar_bot: boolean | null
+          puede_crear_agentes_ia: boolean | null
+          puede_crear_campanas_masivas: boolean | null
           puede_crear_contactos: boolean | null
           puede_crear_embudos: boolean | null
+          puede_crear_listas_contactos: boolean | null
           puede_crear_tareas: boolean | null
           puede_crear_ventas: boolean | null
+          puede_editar_agentes_ia: boolean | null
+          puede_editar_campanas_masivas: boolean | null
           puede_editar_configuracion: boolean | null
           puede_editar_contactos: boolean | null
           puede_editar_embudos: boolean | null
+          puede_editar_listas_contactos: boolean | null
+          puede_editar_tareas: boolean | null
           puede_editar_ventas: boolean | null
+          puede_eliminar_agentes_ia: boolean | null
+          puede_eliminar_campanas_masivas: boolean | null
           puede_eliminar_contactos: boolean | null
           puede_eliminar_embudos: boolean | null
+          puede_eliminar_listas_contactos: boolean | null
           puede_eliminar_mensajes: boolean | null
           puede_eliminar_tareas: boolean | null
           puede_eliminar_ventas: boolean | null
+          puede_enviar_campanas_masivas: boolean | null
+          puede_enviar_chat_interno: boolean | null
           puede_enviar_mensajes: boolean | null
           puede_exportar_datos: boolean | null
+          puede_gestionar_etiquetas: boolean | null
           puede_gestionar_facebook: boolean | null
           puede_gestionar_instagram: boolean | null
+          puede_gestionar_integraciones: boolean | null
           puede_gestionar_plantillas: boolean | null
           puede_gestionar_respuestas_rapidas: boolean | null
           puede_gestionar_telegram: boolean | null
           puede_gestionar_usuarios: boolean | null
           puede_gestionar_whatsapp: boolean | null
+          puede_gestionar_workspaces: boolean | null
           puede_importar_contactos: boolean | null
           puede_mover_contactos_embudos: boolean | null
+          puede_responder_chat_landing: boolean | null
+          puede_ver_agentes_ia: boolean | null
           puede_ver_analytics: boolean | null
+          puede_ver_calendario: boolean | null
+          puede_ver_campanas_masivas: boolean | null
+          puede_ver_chat_interno: boolean | null
+          puede_ver_chat_landing: boolean | null
           puede_ver_chats: boolean | null
           puede_ver_configuracion: boolean | null
           puede_ver_contactos: boolean | null
           puede_ver_dashboard: boolean | null
           puede_ver_embudos: boolean | null
+          puede_ver_listas_contactos: boolean | null
           puede_ver_mensajes_otros: boolean | null
           puede_ver_reportes: boolean | null
           puede_ver_tareas: boolean | null
@@ -1872,36 +1895,59 @@ export type Database = {
           created_at?: string | null
           id?: string
           puede_asignar_tareas?: boolean | null
+          puede_configurar_bot?: boolean | null
+          puede_crear_agentes_ia?: boolean | null
+          puede_crear_campanas_masivas?: boolean | null
           puede_crear_contactos?: boolean | null
           puede_crear_embudos?: boolean | null
+          puede_crear_listas_contactos?: boolean | null
           puede_crear_tareas?: boolean | null
           puede_crear_ventas?: boolean | null
+          puede_editar_agentes_ia?: boolean | null
+          puede_editar_campanas_masivas?: boolean | null
           puede_editar_configuracion?: boolean | null
           puede_editar_contactos?: boolean | null
           puede_editar_embudos?: boolean | null
+          puede_editar_listas_contactos?: boolean | null
+          puede_editar_tareas?: boolean | null
           puede_editar_ventas?: boolean | null
+          puede_eliminar_agentes_ia?: boolean | null
+          puede_eliminar_campanas_masivas?: boolean | null
           puede_eliminar_contactos?: boolean | null
           puede_eliminar_embudos?: boolean | null
+          puede_eliminar_listas_contactos?: boolean | null
           puede_eliminar_mensajes?: boolean | null
           puede_eliminar_tareas?: boolean | null
           puede_eliminar_ventas?: boolean | null
+          puede_enviar_campanas_masivas?: boolean | null
+          puede_enviar_chat_interno?: boolean | null
           puede_enviar_mensajes?: boolean | null
           puede_exportar_datos?: boolean | null
+          puede_gestionar_etiquetas?: boolean | null
           puede_gestionar_facebook?: boolean | null
           puede_gestionar_instagram?: boolean | null
+          puede_gestionar_integraciones?: boolean | null
           puede_gestionar_plantillas?: boolean | null
           puede_gestionar_respuestas_rapidas?: boolean | null
           puede_gestionar_telegram?: boolean | null
           puede_gestionar_usuarios?: boolean | null
           puede_gestionar_whatsapp?: boolean | null
+          puede_gestionar_workspaces?: boolean | null
           puede_importar_contactos?: boolean | null
           puede_mover_contactos_embudos?: boolean | null
+          puede_responder_chat_landing?: boolean | null
+          puede_ver_agentes_ia?: boolean | null
           puede_ver_analytics?: boolean | null
+          puede_ver_calendario?: boolean | null
+          puede_ver_campanas_masivas?: boolean | null
+          puede_ver_chat_interno?: boolean | null
+          puede_ver_chat_landing?: boolean | null
           puede_ver_chats?: boolean | null
           puede_ver_configuracion?: boolean | null
           puede_ver_contactos?: boolean | null
           puede_ver_dashboard?: boolean | null
           puede_ver_embudos?: boolean | null
+          puede_ver_listas_contactos?: boolean | null
           puede_ver_mensajes_otros?: boolean | null
           puede_ver_reportes?: boolean | null
           puede_ver_tareas?: boolean | null
@@ -1913,36 +1959,59 @@ export type Database = {
           created_at?: string | null
           id?: string
           puede_asignar_tareas?: boolean | null
+          puede_configurar_bot?: boolean | null
+          puede_crear_agentes_ia?: boolean | null
+          puede_crear_campanas_masivas?: boolean | null
           puede_crear_contactos?: boolean | null
           puede_crear_embudos?: boolean | null
+          puede_crear_listas_contactos?: boolean | null
           puede_crear_tareas?: boolean | null
           puede_crear_ventas?: boolean | null
+          puede_editar_agentes_ia?: boolean | null
+          puede_editar_campanas_masivas?: boolean | null
           puede_editar_configuracion?: boolean | null
           puede_editar_contactos?: boolean | null
           puede_editar_embudos?: boolean | null
+          puede_editar_listas_contactos?: boolean | null
+          puede_editar_tareas?: boolean | null
           puede_editar_ventas?: boolean | null
+          puede_eliminar_agentes_ia?: boolean | null
+          puede_eliminar_campanas_masivas?: boolean | null
           puede_eliminar_contactos?: boolean | null
           puede_eliminar_embudos?: boolean | null
+          puede_eliminar_listas_contactos?: boolean | null
           puede_eliminar_mensajes?: boolean | null
           puede_eliminar_tareas?: boolean | null
           puede_eliminar_ventas?: boolean | null
+          puede_enviar_campanas_masivas?: boolean | null
+          puede_enviar_chat_interno?: boolean | null
           puede_enviar_mensajes?: boolean | null
           puede_exportar_datos?: boolean | null
+          puede_gestionar_etiquetas?: boolean | null
           puede_gestionar_facebook?: boolean | null
           puede_gestionar_instagram?: boolean | null
+          puede_gestionar_integraciones?: boolean | null
           puede_gestionar_plantillas?: boolean | null
           puede_gestionar_respuestas_rapidas?: boolean | null
           puede_gestionar_telegram?: boolean | null
           puede_gestionar_usuarios?: boolean | null
           puede_gestionar_whatsapp?: boolean | null
+          puede_gestionar_workspaces?: boolean | null
           puede_importar_contactos?: boolean | null
           puede_mover_contactos_embudos?: boolean | null
+          puede_responder_chat_landing?: boolean | null
+          puede_ver_agentes_ia?: boolean | null
           puede_ver_analytics?: boolean | null
+          puede_ver_calendario?: boolean | null
+          puede_ver_campanas_masivas?: boolean | null
+          puede_ver_chat_interno?: boolean | null
+          puede_ver_chat_landing?: boolean | null
           puede_ver_chats?: boolean | null
           puede_ver_configuracion?: boolean | null
           puede_ver_contactos?: boolean | null
           puede_ver_dashboard?: boolean | null
           puede_ver_embudos?: boolean | null
+          puede_ver_listas_contactos?: boolean | null
           puede_ver_mensajes_otros?: boolean | null
           puede_ver_reportes?: boolean | null
           puede_ver_tareas?: boolean | null
