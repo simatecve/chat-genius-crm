@@ -1731,6 +1731,44 @@ export type Database = {
           },
         ]
       }
+      twilio_daily_usage: {
+        Row: {
+          created_at: string | null
+          id: string
+          messages_sent: number | null
+          twilio_connection_id: string
+          updated_at: string | null
+          usage_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          messages_sent?: number | null
+          twilio_connection_id: string
+          updated_at?: string | null
+          usage_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          messages_sent?: number | null
+          twilio_connection_id?: string
+          updated_at?: string | null
+          usage_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twilio_daily_usage_twilio_connection_id_fkey"
+            columns: ["twilio_connection_id"]
+            isOneToOne: false
+            referencedRelation: "twilio_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_tracking: {
         Row: {
           amount: number

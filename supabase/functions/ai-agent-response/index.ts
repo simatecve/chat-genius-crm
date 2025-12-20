@@ -15,7 +15,7 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -142,30 +142,41 @@ serve(async (req) => {
       ...conversationHistory
     ];
 
-    console.log('Calling Lovable AI with model:', agent.model || 'google/gemini-2.5-flash');
+    console.log('Calling Google Gemini with model:', agent.model || 'gemini-2.0-flash');
 
     let aiResponseText: string | null = null;
-    if (LOVABLE_API_KEY) {
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    if (GOOGLE_GEMINI_API_KEY) {
+      // Construir el contenido para Gemini
+      const systemContent = enhancedSystemPrompt;
+      const chatHistory = conversationHistory.map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      }));
+
+      const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: agent.model || 'google/gemini-2.5-flash',
-          messages: aiMessages,
-          temperature: agent.temperature || 0.7,
-          max_tokens: agent.max_tokens || 500,
+          contents: [
+            { role: 'user', parts: [{ text: systemContent }] },
+            { role: 'model', parts: [{ text: 'Entendido. Soy el asistente configurado según tus instrucciones.' }] },
+            ...chatHistory
+          ],
+          generationConfig: {
+            temperature: agent.temperature || 0.7,
+            maxOutputTokens: agent.max_tokens || 500
+          }
         }),
       });
 
       if (aiResponse.ok) {
         const aiResult = await aiResponse.json();
-        aiResponseText = aiResult.choices?.[0]?.message?.content || null;
+        aiResponseText = aiResult.candidates?.[0]?.content?.parts?.[0]?.text || null;
       } else {
         const errorText = await aiResponse.text();
-        console.error('Lovable AI error:', errorText);
+        console.error('Google Gemini error:', errorText);
       }
     }
 

@@ -61,23 +61,19 @@ async function crearJugador(userName: string, password: string, contactName: str
 }
 
 // Función para analizar si una imagen es un comprobante de pago usando visión
-async function analyzeImageForPaymentReceipt(imageUrl: string, LOVABLE_API_KEY: string): Promise<boolean> {
+async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API_KEY: string): Promise<boolean> {
   try {
     console.log('Analyzing image for payment receipt:', imageUrl);
     
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{
-          role: 'user',
-          content: [
+        contents: [{
+          parts: [
             {
-              type: 'text',
               text: `Analiza esta imagen y responde ÚNICAMENTE con "SI" o "NO":
 ¿Es esta imagen un comprobante de pago, transferencia bancaria, voucher de depósito, 
 captura de pantalla de una transferencia realizada, recibo de pago, ticket de depósito,
@@ -86,19 +82,23 @@ o cualquier documento/captura que demuestre que se realizó una transacción fin
 Responde SOLO "SI" o "NO", sin explicaciones.`
             },
             {
-              type: 'image_url',
-              image_url: { url: imageUrl }
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: imageUrl.startsWith('data:') ? imageUrl.split(',')[1] : ''
+              }
             }
           ]
         }],
-        max_tokens: 10,
-        temperature: 0.1
+        generationConfig: {
+          maxOutputTokens: 10,
+          temperature: 0.1
+        }
       }),
     });
 
     if (response.ok) {
       const result = await response.json();
-      const answer = (result.choices?.[0]?.message?.content || '').toUpperCase().trim();
+      const answer = (result.candidates?.[0]?.content?.parts?.[0]?.text || '').toUpperCase().trim();
       console.log('Image analysis result:', answer);
       return answer.includes('SI') || answer.includes('SÍ') || answer === 'YES';
     } else {
@@ -146,7 +146,7 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const GOOGLE_GEMINI_API_KEY = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('Missing Supabase environment configuration');
@@ -217,11 +217,11 @@ serve(async (req) => {
     }
 
     // ANÁLISIS DE IMÁGENES: Si hay imágenes, verificar si alguna es comprobante de pago
-    if (imageUrls && imageUrls.length > 0 && LOVABLE_API_KEY) {
+    if (imageUrls && imageUrls.length > 0 && GOOGLE_GEMINI_API_KEY) {
       console.log(`Analyzing ${imageUrls.length} images for payment receipts...`);
       
       for (const imageUrl of imageUrls) {
-        const isReceipt = await analyzeImageForPaymentReceipt(imageUrl, LOVABLE_API_KEY);
+        const isReceipt = await analyzeImageForPaymentReceipt(imageUrl, GOOGLE_GEMINI_API_KEY);
         
         if (isReceipt) {
           console.log('Payment receipt detected in image:', imageUrl);
@@ -467,48 +467,73 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
       { role: 'user', content: messageContent }
     ];
 
-    if (LOVABLE_API_KEY) {
+    if (GOOGLE_GEMINI_API_KEY) {
       try {
-        // Primera llamada a la IA con tools
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        // Construir historial para Gemini
+        const geminiHistory = conversationHistory.map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        }));
+
+        // Primera llamada a la IA con tools (Gemini no soporta tools nativamente igual que OpenAI)
+        // Usamos el prompt para incluir instrucciones de tools
+        const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: aiMessages,
-            tools: casinoTools,
-            tool_choice: 'auto', // La IA decide cuándo usar tools
-            temperature: 0.7,
-            max_tokens: 500,
+            contents: [
+              { role: 'user', parts: [{ text: systemPrompt }] },
+              { role: 'model', parts: [{ text: 'Entendido, soy el asistente de CAPIBET.' }] },
+              ...geminiHistory,
+              { role: 'user', parts: [{ text: messageContent }] }
+            ],
+            tools: [{
+              functionDeclarations: [{
+                name: "crear_jugador",
+                description: "Crear un nuevo jugador en el casino. Usar cuando el usuario quiera registrarse o crear una cuenta.",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    userName: { 
+                      type: "string", 
+                      description: "Nombre de usuario para el casino (username único)" 
+                    },
+                    password: { 
+                      type: "string", 
+                      description: "Contraseña del usuario. Si no se proporciona, usar 'Capibet1234' por defecto"
+                    }
+                  },
+                  required: ["userName"]
+                }
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 500
+            }
           }),
         });
 
         if (aiResponse.ok) {
           const aiResult = await aiResponse.json();
-          const message = aiResult.choices?.[0]?.message;
+          const candidate = aiResult.candidates?.[0];
+          
+          // Verificar si hay function call
+          const functionCall = candidate?.content?.parts?.find((p: any) => p.functionCall)?.functionCall;
           
           // Si la IA quiere ejecutar una tool
-          if (message?.tool_calls && message.tool_calls.length > 0) {
-            const toolCall = message.tool_calls[0];
-            console.log('Tool call detected:', toolCall.function.name, toolCall.function.arguments);
-            
-            let args;
-            try {
-              args = JSON.parse(toolCall.function.arguments);
-            } catch (e) {
-              console.error('Error parsing tool arguments:', e);
-              respuesta = 'Disculpá, hubo un error al procesar tu solicitud. ¿Podés intentar de nuevo?';
-              // No retornar undefined, continuar con el flujo normal
-            }
+          if (functionCall) {
+            const toolCallName = functionCall.name;
+            const args = functionCall.args || {};
+            console.log('Function call detected:', toolCallName, args);
             
             if (args) {
               let toolResult;
               let actionType: 'crear_jugador' = 'crear_jugador';
               
-              switch (toolCall.function.name) {
+              switch (toolCallName) {
                 case 'crear_jugador':
                   actionType = 'crear_jugador';
                   
@@ -561,7 +586,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
                   }
                   break;
                 default:
-                  console.error('Tool no permitida:', toolCall.function.name);
+                  console.error('Tool no permitida:', toolCallName);
                   respuesta = 'Para esa operación necesitás hablar con un asesor humano. Te contactamos enseguida.';
                   toolResult = null;
                   break;
@@ -609,34 +634,29 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
                 }
                 
                 // Para otras tools, segunda llamada a la IA con el resultado
-                const followUpMessages = [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: messageContent },
-                  { role: 'assistant', content: null, tool_calls: [toolCall] },
-                  { 
-                    role: 'tool', 
-                    tool_call_id: toolCall.id,
-                    content: JSON.stringify(toolResult)
-                  }
-                ];
-                
-                const followUpResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+                const followUpResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
                   method: 'POST',
                   headers: {
-                    'Authorization': `Bearer ${LOVABLE_API_KEY}`,
                     'Content-Type': 'application/json',
                   },
                   body: JSON.stringify({
-                    model: 'google/gemini-2.5-flash',
-                    messages: followUpMessages,
-                    temperature: 0.7,
-                    max_tokens: 500,
+                    contents: [
+                      { role: 'user', parts: [{ text: systemPrompt }] },
+                      { role: 'model', parts: [{ text: 'Entendido.' }] },
+                      { role: 'user', parts: [{ text: messageContent }] },
+                      { role: 'model', parts: [{ functionCall: { name: toolCallName, args } }] },
+                      { role: 'function', parts: [{ functionResponse: { name: toolCallName, response: toolResult } }] }
+                    ],
+                    generationConfig: {
+                      temperature: 0.7,
+                      maxOutputTokens: 500
+                    }
                   }),
                 });
                 
                 if (followUpResponse.ok) {
                   const followUpResult = await followUpResponse.json();
-                  respuesta = followUpResult.choices?.[0]?.message?.content || '';
+                  respuesta = followUpResult.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 } else {
                   // Si falla la segunda llamada, generar respuesta básica
                   if (toolResult.success) {
@@ -648,8 +668,8 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
               }
             }
           } else {
-            // No hay tool calls, respuesta normal
-            respuesta = message?.content || '';
+            // No hay function call, respuesta normal de texto
+            respuesta = candidate?.content?.parts?.[0]?.text || '';
           }
         } else {
           const errorText = await aiResponse.text();

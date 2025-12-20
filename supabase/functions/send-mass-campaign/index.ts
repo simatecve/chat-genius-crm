@@ -54,7 +54,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const wahaBaseUrl = Deno.env.get('WAHA_BASE_URL')!;
     const wahaApiKey = Deno.env.get('WAHA_API_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const googleGeminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -145,6 +145,39 @@ serve(async (req) => {
       connectionNumber = twConn.phone_number;
     }
 
+    // Verificar límite diario de Twilio (200 msgs/día)
+    let twilioRemainingMessages = 200;
+    let twilioSentToday = 0;
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (channelType === 'twilio' && campaign.twilio_connection_id) {
+      const { data: usage } = await supabase
+        .from('twilio_daily_usage')
+        .select('messages_sent')
+        .eq('twilio_connection_id', campaign.twilio_connection_id)
+        .eq('usage_date', today)
+        .maybeSingle();
+      
+      twilioSentToday = usage?.messages_sent || 0;
+      twilioRemainingMessages = Math.max(0, 200 - twilioSentToday);
+      
+      console.log(`Twilio usage today: ${twilioSentToday}/200, remaining: ${twilioRemainingMessages}`);
+      
+      if (twilioRemainingMessages === 0) {
+        // Actualizar campaña a error por límite
+        await supabase
+          .from('mass_campaigns')
+          .update({ 
+            status: 'error',
+            total_count: 0,
+            sent_count: 0
+          })
+          .eq('id', campaign_id);
+        
+        throw new Error('Límite diario de 200 mensajes alcanzado para esta conexión de Twilio');
+      }
+    }
+
     // Obtener contactos de la lista
     const { data: listMembers, error: membersError } = await supabase
       .from('contact_list_members')
@@ -155,9 +188,18 @@ serve(async (req) => {
       throw new Error('No contacts found in list');
     }
 
-    const contacts = listMembers
+    let contacts = listMembers
       .map((m: any) => m.contacts)
       .filter((c: any) => c && c.phone_number);
+
+    // Limitar contactos según límite de Twilio
+    if (channelType === 'twilio') {
+      const originalCount = contacts.length;
+      contacts = contacts.slice(0, twilioRemainingMessages);
+      if (originalCount > twilioRemainingMessages) {
+        console.log(`Twilio limit: Reduced contacts from ${originalCount} to ${contacts.length}`);
+      }
+    }
 
     // Actualizar campaña a estado 'sending'
     await supabase
@@ -184,35 +226,35 @@ serve(async (req) => {
         let messageToSend = campaign.message || '';
 
         // Personalizar mensaje con IA si está habilitado
-        if (campaign.edit_with_ai && lovableApiKey && messageToSend) {
+        if (campaign.edit_with_ai && googleGeminiApiKey && messageToSend) {
           try {
             console.log(`Personalizing message for ${contact.name} with AI...`);
-            const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${googleGeminiApiKey}`, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${lovableApiKey}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: aiAgent?.model || 'google/gemini-2.5-flash',
-                messages: [
-                  {
-                    role: 'system',
-                    content: 'Eres un asistente que personaliza mensajes de WhatsApp. Tu tarea es reescribir el mensaje dado de forma ligeramente diferente pero manteniendo EXACTAMENTE el mismo significado, tono y longitud aproximada. Responde ÚNICAMENTE con el mensaje reescrito. NO incluyas explicaciones, opciones alternativas, ni texto adicional.'
-                  },
-                  {
-                    role: 'user',
-                    content: `Reescribe este mensaje para ${contact.name || 'el destinatario'}:\n\n${campaign.message}`
-                  }
-                ],
-                temperature: aiAgent?.temperature || 0.7,
-                max_tokens: aiAgent?.max_tokens || 300,
+                contents: [{
+                  role: 'user',
+                  parts: [{
+                    text: `Eres un asistente que personaliza mensajes de WhatsApp. Tu tarea es reescribir el mensaje dado de forma ligeramente diferente pero manteniendo EXACTAMENTE el mismo significado, tono y longitud aproximada. Responde ÚNICAMENTE con el mensaje reescrito. NO incluyas explicaciones, opciones alternativas, ni texto adicional.
+
+Reescribe este mensaje para ${contact.name || 'el destinatario'}:
+
+${campaign.message}`
+                  }]
+                }],
+                generationConfig: {
+                  temperature: aiAgent?.temperature || 0.7,
+                  maxOutputTokens: aiAgent?.max_tokens || 300
+                }
               }),
             });
 
             if (aiResponse.ok) {
               const aiData = await aiResponse.json();
-              const aiContent = aiData.choices?.[0]?.message?.content;
+              const aiContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text;
               if (aiContent && aiContent.length < campaign.message.length * 3) {
                 messageToSend = aiContent.trim();
                 console.log(`AI personalized message: ${messageToSend.substring(0, 50)}...`);
@@ -511,6 +553,18 @@ serve(async (req) => {
           });
 
           sentCount++;
+          
+          // Actualizar contador de Twilio
+          if (channelType === 'twilio' && campaign.twilio_connection_id) {
+            await supabase
+              .from('twilio_daily_usage')
+              .upsert({
+                twilio_connection_id: campaign.twilio_connection_id,
+                usage_date: today,
+                messages_sent: twilioSentToday + sentCount,
+                user_id: campaign.user_id
+              }, { onConflict: 'twilio_connection_id,usage_date' });
+          }
           
           await supabase
             .from('mass_campaigns')
