@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,10 +35,15 @@ interface LeadWithColumn extends Lead {
   conversations?: ConversationSummary[];
 }
 const Leads = () => {
-  const {
-    user
-  } = useAuth();
+  const { user } = useAuth();
+  const { hasPermission, isAdmin } = useUserPermissions();
   const navigate = useNavigate();
+  
+  // Permisos específicos de embudos
+  const canCreateFunnels = isAdmin || hasPermission('puede_crear_embudos');
+  const canEditFunnels = isAdmin || hasPermission('puede_editar_embudos');
+  const canDeleteFunnels = isAdmin || hasPermission('puede_eliminar_embudos');
+  const canMoveContacts = isAdmin || hasPermission('puede_mover_contactos_embudos');
   const [columns, setColumns] = useState<LeadColumn[]>([]);
   const [leads, setLeads] = useState<LeadWithColumn[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -707,10 +713,12 @@ const Leads = () => {
             </SelectContent>
           </Select>
 
-          <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Columna
-          </Button>
+          {canCreateFunnels && (
+            <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Columna
+            </Button>
+          )}
         </div>
       </div>
 
@@ -728,7 +736,7 @@ const Leads = () => {
           {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No se encontraron resultados</span>}
         </div>}
 
-      <KanbanBoard columns={columns} leads={filteredLeads} onEditColumn={openEditColumnDialog} onDeleteColumn={handleDeleteColumn} onCreateLead={openCreateLeadDialog} onDeleteLead={handleDeleteLead} onMoveLeadToColumn={handleMoveLeadToColumn} onConvertToContactList={openConvertDialog} onManageMessageTriggers={openMessageTriggersDialog} onOpenConversation={handleLeadClick} />
+      <KanbanBoard columns={columns} leads={filteredLeads} onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} onConvertToContactList={openConvertDialog} onManageMessageTriggers={openMessageTriggersDialog} onOpenConversation={handleLeadClick} />
 
       {/* Column Dialog */}
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>

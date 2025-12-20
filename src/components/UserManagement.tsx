@@ -28,10 +28,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserPlus, Trash2, Settings } from 'lucide-react';
+import { UserPlus, Trash2, Settings, ShieldAlert } from 'lucide-react';
 import { usersService } from '@/services/usersService';
 import { userPermissionsService, UserPermissions } from '@/services/userPermissionsService';
 import { useAccountUsers } from '@/hooks/useAccountUsers';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { z } from 'zod';
@@ -82,6 +83,7 @@ const PERMISSION_FIELDS: PermissionField[] = [
 
 const UserManagement = () => {
   const { users, loading, refetch } = useAccountUsers();
+  const { hasPermission, isAdmin } = useUserPermissions();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditPermissionsDialog, setShowEditPermissionsDialog] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -89,6 +91,9 @@ const UserManagement = () => {
   const [creatingUser, setCreatingUser] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
   const { toast } = useToast();
+  
+  // Verificar si tiene permisos para gestionar usuarios
+  const canManageUsers = isAdmin || hasPermission('puede_gestionar_usuarios');
 
   const [newUser, setNewUser] = useState({
     email: '',
@@ -308,6 +313,19 @@ const UserManagement = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Cargando usuarios...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no tiene permisos, mostrar mensaje de acceso denegado
+  if (!canManageUsers) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <ShieldAlert className="h-16 w-16 text-muted-foreground" />
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Acceso Denegado</h2>
+          <p className="text-muted-foreground">No tienes permisos para gestionar usuarios</p>
         </div>
       </div>
     );
