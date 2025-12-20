@@ -123,11 +123,12 @@ const SessionsManager = () => {
     try {
       setLoading(true);
 
-      // Fetch WhatsApp connections
+      // Fetch WhatsApp connections (excluding deleted/stopped/failed)
       const { data: whatsappData } = await supabase
         .from('whatsapp_connections')
         .select('*')
         .eq('user_id', effectiveUserId)
+        .not('status', 'in', '("deleted","STOPPED","FAILED")')
         .order('created_at', { ascending: false });
 
       // Fetch Telegram bots

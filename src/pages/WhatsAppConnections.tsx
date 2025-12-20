@@ -101,6 +101,7 @@ const WhatsAppConnections = () => {
         .from('whatsapp_connections')
         .select('*')
         .eq('user_id', effectiveUserId)
+        .not('status', 'in', '("deleted","STOPPED","FAILED")')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
