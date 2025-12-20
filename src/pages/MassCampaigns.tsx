@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
@@ -12,6 +12,7 @@ import { Database } from '@/integrations/supabase/types';
 import { CampaignSendSummaryModal } from '@/components/campaigns/CampaignSendSummaryModal';
 
 type Campaign = Database['public']['Tables']['mass_campaigns']['Row'];
+type CampaignSend = Database['public']['Tables']['campaign_sends']['Row'];
 
 export function MassCampaigns() {
   const { effectiveUserId } = useEffectiveUserId();
@@ -21,7 +22,7 @@ export function MassCampaigns() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null);
-  const [progressMap, setProgressMap] = useState<Record<string, { queued: number; sent: number; failed: number; pending: number }>>({});
+  const [progressMap, setProgressMap] = useState<Record<string, { queued: number; sent: number; failed: number; pending: number; total: number }>>({});
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [selectedCampaignName, setSelectedCampaignName] = useState<string>('');
 
@@ -56,7 +57,7 @@ export function MassCampaigns() {
     }
   };
 
-  const loadProgress = async (list: Campaign[]) => {
+  const loadProgress = useCallback(async (list: Campaign[]) => {
     const entries = await Promise.all(list.map(async (c) => {
       const { data } = await supabase
         .from('campaign_sends')
@@ -66,10 +67,11 @@ export function MassCampaigns() {
       const sent = (data || []).filter(d => d.status === 'sent').length;
       const failed = (data || []).filter(d => d.status === 'failed').length;
       const pending = (data || []).filter(d => d.status === 'pending').length;
-      return [c.id, { queued, sent, failed, pending }] as const;
+      const total = queued + sent + failed + pending;
+      return [c.id, { queued, sent, failed, pending, total }] as const;
     }));
     setProgressMap(Object.fromEntries(entries));
-  };
+  }, []);
 
   const handleDeleteCampaign = async (campaignId: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar esta campaña?')) {
@@ -284,12 +286,83 @@ export function MassCampaigns() {
     campaign.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Suscripción realtime para actualizar progreso en tiempo real
+  useEffect(() => {
+    const sendingCampaignIds = campaigns
+      .filter(c => c.status === 'sending')
+      .map(c => c.id);
+    
+    if (sendingCampaignIds.length === 0) return;
+    
+    const channel = supabase
+      .channel('campaign-sends-progress')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'campaign_sends'
+        },
+        (payload) => {
+          const record = payload.new as CampaignSend | undefined;
+          const campaignId = record?.campaign_id;
+          
+          if (campaignId && sendingCampaignIds.includes(campaignId)) {
+            // Actualizar progreso para esa campaña específica
+            setProgressMap(prev => {
+              const current = prev[campaignId] || { queued: 0, sent: 0, failed: 0, pending: 0, total: 0 };
+              const status = record?.status;
+              
+              if (payload.eventType === 'INSERT') {
+                return {
+                  ...prev,
+                  [campaignId]: {
+                    ...current,
+                    pending: current.pending + 1,
+                    total: current.total + 1
+                  }
+                };
+              } else if (payload.eventType === 'UPDATE' && status) {
+                // Recalcular basado en el nuevo estado
+                const oldRecord = payload.old as CampaignSend | undefined;
+                const oldStatus = oldRecord?.status || 'pending';
+                
+                const newProgress = { ...current };
+                
+                // Decrementar el contador del estado anterior
+                if (oldStatus === 'sent') newProgress.sent = Math.max(0, newProgress.sent - 1);
+                else if (oldStatus === 'failed') newProgress.failed = Math.max(0, newProgress.failed - 1);
+                else if (oldStatus === 'queued') newProgress.queued = Math.max(0, newProgress.queued - 1);
+                else if (oldStatus === 'pending') newProgress.pending = Math.max(0, newProgress.pending - 1);
+                
+                // Incrementar el contador del nuevo estado
+                if (status === 'sent') newProgress.sent++;
+                else if (status === 'failed') newProgress.failed++;
+                else if (status === 'queued') newProgress.queued++;
+                else if (status === 'pending') newProgress.pending++;
+                
+                return { ...prev, [campaignId]: newProgress };
+              }
+              
+              return prev;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [campaigns]);
+
+  // Polling de respaldo cada 10 segundos para campañas en envío
   useEffect(() => {
     const hasSending = campaigns.some(c => c.status === 'sending');
     if (!hasSending) return;
     const interval = setInterval(() => {
       fetchCampaigns();
-    }, 3000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [campaigns]);
 
@@ -431,37 +504,49 @@ export function MassCampaigns() {
                       const sent = progress?.sent || 0;
                       const failed = progress?.failed || 0;
                       const pending = (progress?.pending || 0) + (progress?.queued || 0);
-                      const total = sent + failed + pending || campaign.total_count || 1;
+                      const total = progress?.total || sent + failed + pending || campaign.total_count || 1;
                       
                       const sentPercent = (sent / total) * 100;
                       const failedPercent = (failed / total) * 100;
                       const pendingPercent = (pending / total) * 100;
+                      const isSending = campaign.status === 'sending';
                       
                       return (
                         <div className="space-y-1.5 pt-1">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Progreso</span>
-                            <span>{sent + failed}/{total}</span>
+                          <div className="flex justify-between text-xs">
+                            <span className={isSending ? "text-primary font-medium" : "text-muted-foreground"}>
+                              {isSending ? '📤 Enviando...' : 'Progreso'}
+                            </span>
+                            <span className="font-bold text-foreground">
+                              {sent}/{total}
+                            </span>
                           </div>
-                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
+                          <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden flex">
                             <div 
-                              className="h-full bg-green-500 transition-all duration-300" 
+                              className="h-full bg-green-500 transition-all duration-150" 
                               style={{ width: `${sentPercent}%` }} 
                             />
                             <div 
-                              className="h-full bg-red-500 transition-all duration-300" 
+                              className="h-full bg-red-500 transition-all duration-150" 
                               style={{ width: `${failedPercent}%` }} 
                             />
                             <div 
-                              className="h-full bg-yellow-500 transition-all duration-300" 
+                              className="h-full bg-yellow-500 transition-all duration-150" 
                               style={{ width: `${pendingPercent}%` }} 
                             />
                           </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-green-500">✓ {sent}</span>
-                            <span className="text-red-500">✗ {failed}</span>
-                            <span className="text-yellow-500">⏳ {pending}</span>
-                          </div>
+                          {isSending && pending > 0 ? (
+                            <div className="flex items-center gap-2 text-xs text-primary animate-pulse">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>Enviando mensaje {sent + 1} de {total}...</span>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-green-500">✓ {sent}</span>
+                              <span className="text-red-500">✗ {failed}</span>
+                              <span className="text-yellow-500">⏳ {pending}</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
