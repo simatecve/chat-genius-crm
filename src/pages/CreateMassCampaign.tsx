@@ -30,6 +30,7 @@ export default function CreateMassCampaign() {
   const [loading, setLoading] = useState(false);
   const [contactLists, setContactLists] = useState<any[]>([]);
   
+  const [campaignName, setCampaignName] = useState('');
   const [channelType, setChannelType] = useState<'whatsapp' | 'telegram' | 'twilio'>('whatsapp');
   const [selectedConnection, setSelectedConnection] = useState('');
   const [selectedContactList, setSelectedContactList] = useState('');
@@ -153,11 +154,31 @@ export default function CreateMassCampaign() {
   };
 
   const handleSubmit = async () => {
-    // Validar que haya mensaje O audio/archivos
-    if (!selectedConnection || (!message && attachments.length === 0)) {
+    // Validar que haya conexión seleccionada
+    if (!selectedConnection) {
       toast({
         title: "Error",
-        description: "Por favor selecciona una sesión y escribe un mensaje o adjunta un archivo",
+        description: "Por favor selecciona una sesión",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar que haya lista de contactos
+    if (!selectedContactList) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona una lista de contactos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar que haya mensaje O audio/archivos
+    if (!message && attachments.length === 0) {
+      toast({
+        title: "Error",
+        description: "Por favor escribe un mensaje o adjunta un archivo",
         variant: "destructive",
       });
       return;
@@ -195,9 +216,9 @@ export default function CreateMassCampaign() {
       // Preparar datos según el canal
       const campaignData: any = {
         user_id: user!.id,
-        name: `Campaña ${new Date().toLocaleDateString()}`,
+        name: campaignName.trim() || `Campaña ${new Date().toLocaleDateString()}`,
         message: message || '📎 Archivo adjunto',
-        contact_list_id: selectedContactList || null,
+        contact_list_id: selectedContactList,
         min_delay: waitTimeEnabled ? parseInt(waitTime) : 0,
         max_delay: waitTimeEnabled ? parseInt(waitTime) + 10 : 10,
         edit_with_ai: editWithAi,
@@ -210,11 +231,17 @@ export default function CreateMassCampaign() {
 
       // Asignar la conexión según el tipo de canal
       if (channelType === 'whatsapp') {
+        const selectedConn = whatsappConnections.find(c => c.id === selectedConnection);
         campaignData.whatsapp_connection_id = selectedConnection;
+        campaignData.whatsapp_connection_name = selectedConn?.name || selectedConn?.phone_number || 'WhatsApp';
       } else if (channelType === 'telegram') {
+        const selectedConn = telegramConnections.find(c => c.id === selectedConnection);
         campaignData.telegram_bot_id = selectedConnection;
+        campaignData.whatsapp_connection_name = selectedConn?.bot_name || 'Telegram';
       } else if (channelType === 'twilio') {
+        const selectedConn = twilioConnections.find(c => c.id === selectedConnection);
         campaignData.twilio_connection_id = selectedConnection;
+        campaignData.whatsapp_connection_name = selectedConn?.connection_name || selectedConn?.phone_number || 'Twilio';
       }
 
       // Crear campaña
@@ -231,7 +258,7 @@ export default function CreateMassCampaign() {
         description: "Campaña creada correctamente",
       });
 
-      navigate('/mass-campaigns');
+      navigate('/campanas-masivas');
     } catch (error: any) {
       console.error('Error creating campaign:', error);
       toast({
@@ -255,7 +282,7 @@ export default function CreateMassCampaign() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/mass-campaigns')}
+            onClick={() => navigate('/campanas-masivas')}
             className="hover:bg-muted"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -264,6 +291,17 @@ export default function CreateMassCampaign() {
             <h1 className="text-3xl font-bold text-foreground">Nuevo envío masivo</h1>
             <p className="text-muted-foreground mt-1">Configura tu campaña de mensajería</p>
           </div>
+        </div>
+
+        {/* Nombre de la campaña */}
+        <div className="mb-4">
+          <Label className="text-foreground mb-2 block">Nombre de la campaña</Label>
+          <Input
+            value={campaignName}
+            onChange={(e) => setCampaignName(e.target.value)}
+            placeholder="Ej: Promoción de Navidad"
+            className="bg-card border-border text-foreground"
+          />
         </div>
 
         {/* Selección de canal */}

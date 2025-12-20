@@ -256,11 +256,20 @@ export function MassCampaigns() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Preview del mensaje */}
+                  {campaign.message && (
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {campaign.message}
+                      </p>
+                    </div>
+                  )}
+                  
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4 text-muted-foreground" />
                       <span className="text-foreground">
-                        {campaign.whatsapp_connection_name || 'Sin conexión'}
+                        {campaign.whatsapp_connection_name || campaign.channel_type || 'Sin conexión'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
