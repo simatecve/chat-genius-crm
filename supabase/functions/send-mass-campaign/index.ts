@@ -290,13 +290,25 @@ ${campaign.message}`
           .eq('user_id', campaign.user_id)
           .maybeSingle();
 
+        // Crear nombre completo del contacto
+        const contactFullName = contact.name || 
+          `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 
+          cleanNumber;
+
         if (existingConv) {
           conversationId = existingConv.id;
+          // Actualizar nombre si no tiene
+          await supabase
+            .from('conversations')
+            .update({ contact_name: contactFullName, pushname: contactFullName })
+            .eq('id', conversationId)
+            .is('contact_name', null);
         } else {
           // Crear nueva conversación
           const newConvData: any = {
             phone_number: cleanNumber,
-            contact_name: contact.name || cleanNumber,
+            contact_name: contactFullName,
+            pushname: contactFullName,
             user_id: campaign.user_id,
             last_message: messageToSend || '📎 Archivo',
             last_message_time: new Date().toISOString(),
@@ -319,6 +331,102 @@ ${campaign.message}`
           
           if (newConv) {
             conversationId = newConv.id;
+          }
+        }
+
+        // ========== CREAR LEAD SI NO EXISTE ==========
+        let leadId: string | null = null;
+        
+        // Buscar lead existente por teléfono
+        const { data: existingLead } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('phone', cleanNumber)
+          .eq('user_id', campaign.user_id)
+          .maybeSingle();
+
+        if (existingLead) {
+          leadId = existingLead.id;
+          console.log(`Lead found: ${leadId}`);
+        } else {
+          // Obtener columna por defecto del usuario
+          const { data: defaultColumn } = await supabase
+            .from('lead_columns')
+            .select('id')
+            .eq('user_id', campaign.user_id)
+            .eq('is_default', true)
+            .maybeSingle();
+
+          if (defaultColumn) {
+            // Obtener posición máxima en la columna
+            const { data: maxPosData } = await supabase
+              .from('leads')
+              .select('position')
+              .eq('column_id', defaultColumn.id)
+              .order('position', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            
+            const newPosition = (maxPosData?.position || 0) + 1;
+
+            // Crear nuevo lead
+            const { data: newLead, error: leadError } = await supabase
+              .from('leads')
+              .insert({
+                phone: cleanNumber,
+                name: contactFullName,
+                user_id: campaign.user_id,
+                column_id: defaultColumn.id,
+                position: newPosition,
+                notes: `Lead creado desde campaña masiva: ${campaign.name}`
+              })
+              .select('id')
+              .single();
+            
+            if (newLead && !leadError) {
+              leadId = newLead.id;
+              console.log(`Lead created: ${leadId}`);
+            } else {
+              console.error('Error creating lead:', leadError);
+            }
+          } else {
+            console.log('No default column found, skipping lead creation');
+          }
+        }
+
+        // Vincular lead a la conversación
+        if (leadId && conversationId) {
+          await supabase
+            .from('conversations')
+            .update({ lead_id: leadId })
+            .eq('id', conversationId);
+        }
+
+        // ========== VERIFICAR/CREAR CONTACTO EN TABLA CONTACTS ==========
+        const { data: existingContact } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('phone_number', contact.phone_number)
+          .eq('user_id', campaign.user_id)
+          .maybeSingle();
+
+        if (!existingContact) {
+          // Crear contacto si no existe (diferente del que viene de la lista)
+          const { error: contactError } = await supabase
+            .from('contacts')
+            .insert({
+              phone_number: contact.phone_number,
+              name: contactFullName,
+              first_name: contact.first_name || null,
+              last_name: contact.last_name || null,
+              email: contact.email || null,
+              user_id: campaign.user_id,
+              origin: 'mass_campaign',
+              notes: `Contacto añadido desde campaña: ${campaign.name}`
+            });
+          
+          if (!contactError) {
+            console.log(`Contact created for ${cleanNumber}`);
           }
         }
 
@@ -399,7 +507,9 @@ ${campaign.message}`
                   metadata: {
                     waha_id: wahaResult.id,
                     campaign_id: campaign_id,
-                    sent_via: 'mass_campaign'
+                    campaign_name: campaign.name,
+                    sent_via: 'mass_campaign',
+                    personalized: campaign.edit_with_ai || false
                   }
                 });
               }
