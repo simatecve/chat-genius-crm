@@ -47,18 +47,17 @@ serve(async (req) => {
 
     console.log('WAHA session deleted successfully');
 
-    // Actualizar estado en la base de datos si connection_id está presente
+    // Eliminar registro de la base de datos si connection_id está presente
     if (connection_id) {
-      const { error: updateError } = await supabase
+      const { error: deleteError } = await supabase
         .from('whatsapp_connections')
-        .update({
-          status: 'deleted',
-          updated_at: new Date().toISOString(),
-        })
+        .delete()
         .eq('id', connection_id);
 
-      if (updateError) {
-        console.error('Database update error:', updateError);
+      if (deleteError) {
+        console.error('Database delete error:', deleteError);
+      } else {
+        console.log('Database record deleted successfully');
       }
     }
 

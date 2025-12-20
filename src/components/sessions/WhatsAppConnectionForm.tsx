@@ -244,14 +244,24 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
     if (!confirmed) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke('waha-delete-session', {
+      const { error: wahaError } = await supabase.functions.invoke('waha-delete-session', {
         body: { 
           session_name: currentSession,
           connection_id: currentConnectionId 
         }
       });
 
-      if (error) throw error;
+      // Si hay error en WAHA pero tenemos connection_id, eliminar de BD como fallback
+      if (wahaError) {
+        console.warn('Error deleting from WAHA:', wahaError);
+        if (currentConnectionId) {
+          const { error: dbError } = await supabase
+            .from('whatsapp_connections')
+            .delete()
+            .eq('id', currentConnectionId);
+          if (dbError) throw dbError;
+        }
+      }
 
       toast({
         title: "Sesión eliminada",
