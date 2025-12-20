@@ -486,6 +486,13 @@ export function MassCampaigns() {
                         {campaign.whatsapp_connection_name || campaign.channel_type || 'Sin conexión'}
                       </span>
                     </div>
+                    
+                    {/* Mostrar información del lote durante el envío */}
+                    {campaign.status === 'sending' && progressMap[campaign.id] && (
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        📦 Lote {Math.ceil((progressMap[campaign.id].sent + progressMap[campaign.id].failed + 1) / 200)} de {Math.ceil((campaign.total_count || progressMap[campaign.id].total || 1) / 200)}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span className="text-foreground">
