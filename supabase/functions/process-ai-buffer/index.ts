@@ -22,23 +22,22 @@ async function isSessionAIEnabled(supabase: any, channelType: string, buffer: an
       sessionId = buffer.twilio_connection_id;
       break;
     case 'webchat':
-      // For webchat, we need to get the web_chatbot_id from the conversation
-      const { data: conv } = await supabase
-        .from('conversations')
-        .select('phone_number')
-        .eq('id', buffer.conversation_id)
-        .single();
+      // For webchat, find active webchat for this user
+      // Note: webchat conversations use phone_number as session_id
+      const { data: webchatList } = await supabase
+        .from('web_chatbots')
+        .select('id, ai_enabled')
+        .eq('user_id', buffer.user_id)
+        .eq('is_active', true);
       
-      if (conv) {
-        // Find webchat by matching session
-        const { data: webchat } = await supabase
-          .from('web_chatbots')
-          .select('id, ai_enabled')
-          .eq('user_id', buffer.user_id)
-          .single();
-        
-        return webchat?.ai_enabled ?? false;
+      if (webchatList && webchatList.length > 0) {
+        // If any active webchat has AI disabled, return false
+        // This handles the case where user might have multiple webchats
+        const enabledWebchat = webchatList.find((w: any) => w.ai_enabled === true);
+        console.log(`[process-ai-buffer] Webchat AI check: found ${webchatList.length} webchats, AI enabled on any: ${!!enabledWebchat}`);
+        return !!enabledWebchat;
       }
+      console.log(`[process-ai-buffer] No active webchats found for user ${buffer.user_id}`);
       return false;
     default:
       // WhatsApp - find by session name
