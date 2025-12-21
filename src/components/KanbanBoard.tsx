@@ -4,11 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag as TagIcon } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { TriggerActivationService } from '@/services/triggerActivationService';
@@ -19,7 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
-type TagType = Tables<'etiquetas'>;
 
 interface ConversationSummary {
   id: string;
@@ -47,8 +42,6 @@ interface KanbanBoardProps {
   onConvertToContactList?: (column: LeadColumn) => void;
   onManageMessageTriggers?: (column: LeadColumn) => void;
   onOpenConversation?: (lead: LeadWithColumn) => void;
-  tags?: TagType[];
-  onUpdateLeadTags?: (leadId: string, tags: string[]) => void;
 }
 
 interface LeadCardProps {
@@ -57,17 +50,15 @@ interface LeadCardProps {
   onEdit?: (lead: Lead) => void;
   onDelete?: (leadId: string) => void;
   onOpenConversation?: (lead: LeadWithColumn) => void;
-  allTags?: TagType[];
-  onUpdateTags?: (tags: string[]) => void;
 }
 
-const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOpenConversation, allTags = [], onUpdateTags }) => {
+const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOpenConversation }) => {
   const navigate = useNavigate();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
     lead.phone || null,
     lead.name || null
   );
-
+  
   const hasConversation = lead.conversations && lead.conversations.length > 0;
   const conversation = hasConversation ? lead.conversations[0] : null;
 
@@ -83,7 +74,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
         .select('id')
         .eq('phone_number', lead.phone.replace(/\D/g, ''))
         .limit(1);
-
+      
       if (conversations && conversations.length > 0) {
         navigate('/conversations', { state: { conversationId: conversations[0].id } });
       } else if (conversation) {
@@ -102,7 +93,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
           {...provided.dragHandleProps}
           className={`mb-3 ${snapshot.isDragging ? 'opacity-50' : ''}`}
         >
-          <Card
+          <Card 
             className="p-2.5 hover:bg-muted/30 transition-all cursor-pointer border-border/40 bg-card/80"
             onClick={(e) => {
               // Solo navegar si no se hizo clic en un botón o menú
@@ -132,9 +123,9 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                 <div className="flex items-center gap-0.5 shrink-0">
                   {lead.phone && (
                     <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
                         className="h-6 w-6 p-0 hover:bg-primary/10"
                         onClick={toggleBotBlock}
                         disabled={isBotToggling}
@@ -146,9 +137,9 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                           <Bot className="h-3 w-3 text-green-500" />
                         )}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
                         className="h-6 w-6 p-0 hover:bg-primary/10"
                         onClick={handleOpenConversation}
                         title="Abrir conversación"
@@ -172,7 +163,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                           </DropdownMenuItem>
                         )}
                         {lead.phone && (
-                          <DropdownMenuItem
+                          <DropdownMenuItem 
                             onClick={toggleBotBlock}
                             disabled={isBotToggling}
                           >
@@ -196,7 +187,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                           </DropdownMenuItem>
                         )}
                         {onDelete && (
-                          <DropdownMenuItem
+                          <DropdownMenuItem 
                             onClick={() => onDelete(lead.id)}
                             className="text-destructive"
                           >
@@ -209,7 +200,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                   )}
                 </div>
               </div>
-
+              
               {(lead.company || lead.email || lead.notes) && (
                 <div className="space-y-1 text-xs text-muted-foreground">
                   {lead.company && (
@@ -226,82 +217,20 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                   )}
                 </div>
               )}
-
-              {/* Tags Section */}
-              <div className="flex flex-wrap gap-1 mt-2">
-                {lead.tags && lead.tags.map(tagId => {
-                  const tag = allTags.find(t => t.id === tagId);
-                  if (!tag) return null;
-                  return (
-                    <Badge
-                      key={tag.id}
-                      variant="outline"
-                      className="text-[10px] px-1.5 py-0 h-5 border-0"
-                      style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
-                    >
-                      {tag.nombre}
-                    </Badge>
-                  );
-                })}
-
-                {onUpdateTags && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-5 w-5 p-0 rounded-full hover:bg-muted">
-                        <Plus className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Buscar etiqueta..." className="h-8 text-xs" />
-                        <CommandList>
-                          <CommandEmpty>No se encontraron etiquetas.</CommandEmpty>
-                          <CommandGroup>
-                            {allTags.map((tag) => {
-                              const isSelected = lead.tags?.includes(tag.id);
-                              return (
-                                <CommandItem
-                                  key={tag.id}
-                                  value={tag.nombre}
-                                  onSelect={() => {
-                                    const currentTags = lead.tags || [];
-                                    const newTags = isSelected
-                                      ? currentTags.filter(t => t !== tag.id)
-                                      : [...currentTags, tag.id];
-                                    onUpdateTags(newTags);
-                                  }}
-                                  className="text-xs"
-                                >
-                                  <div
-                                    className="w-2 h-2 rounded-full mr-2"
-                                    style={{ backgroundColor: tag.color }}
-                                  />
-                                  {tag.nombre}
-                                  {isSelected && <Check className="ml-auto h-3 w-3" />}
-                                </CommandItem>
-                              );
-                            })}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-
+              
               {lead.value && (
                 <Badge variant="secondary" className="text-xs font-medium w-fit">
                   ${lead.value.toLocaleString()}
                 </Badge>
               )}
-
+              
               {hasConversation && conversation && (
                 <div className="flex items-center justify-between pt-2 border-t border-border/40">
                   <div className="flex items-center gap-1.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                     <span className="text-xs text-muted-foreground">
-                      {conversation.last_message && conversation.last_message.length > 25
-                        ? `${conversation.last_message.substring(0, 25)}...`
+                      {conversation.last_message && conversation.last_message.length > 25 
+                        ? `${conversation.last_message.substring(0, 25)}...` 
                         : conversation.last_message || "Activo"}
                     </span>
                   </div>
@@ -331,12 +260,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onMoveLeadToColumn,
   onConvertToContactList,
   onManageMessageTriggers,
-  onOpenConversation,
-  tags = [],
-  onUpdateLeadTags
+  onOpenConversation
 }) => {
   const { user } = useAuth();
-
+  
   const getLeadsByColumn = (columnId: string) => {
     return leads
       .filter(lead => lead.column_id === columnId)
@@ -344,14 +271,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         // Obtener el último mensaje de cada lead
         const lastMessageA = a.conversations?.[0]?.last_message_time;
         const lastMessageB = b.conversations?.[0]?.last_message_time;
-
+        
         // Si ninguno tiene conversación, mantener orden por posición
         if (!lastMessageA && !lastMessageB) return a.position - b.position;
-
+        
         // Leads sin conversación van al final
         if (!lastMessageA) return 1;
         if (!lastMessageB) return -1;
-
+        
         // Ordenar por fecha descendente (más reciente primero)
         return new Date(lastMessageB).getTime() - new Date(lastMessageA).getTime();
       });
@@ -375,7 +302,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (destination.droppableId !== source.droppableId && onMoveLeadToColumn) {
       // Encontrar el lead que se está moviendo
       const movedLead = leads.find(lead => lead.id === draggableId);
-
+      
       if (movedLead && user) {
         try {
           // Activar disparadores antes de mover el lead
@@ -392,7 +319,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           // Continuar con el movimiento aunque falle la activación de disparadores
         }
       }
-
+      
       onMoveLeadToColumn(draggableId, destination.droppableId);
     }
   };
@@ -409,13 +336,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             const conversationsCount = columnLeads.reduce((count, lead) => {
               return count + (lead.conversations?.length || 0);
             }, 0);
-
+            
             return (
-              <div
-                key={column.id}
+              <div 
+                key={column.id} 
                 className="flex-shrink-0 w-64"
               >
-                <Card
+                <Card 
                   className="h-full border-t-4 bg-card/50 backdrop-blur-sm"
                   style={{ borderTopColor: column.color }}
                 >
@@ -434,8 +361,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             )}
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
+                        <TooltipContent 
+                          side="top" 
                           className="bg-[#1f2c34] border-[#2a3942] px-3 py-2"
                         >
                           <div className="flex items-center gap-2">
@@ -448,95 +375,94 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground font-medium">
-                        {columnLeads.length}
-                      </span>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onEditColumn(column)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
+                  <div className="flex items-center gap-2 mt-3">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground font-medium">
+                      {columnLeads.length}
+                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onEditColumn(column)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        {onManageMessageTriggers && (
+                          <DropdownMenuItem onClick={() => onManageMessageTriggers(column)}>
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Disparadores de Mensaje
                           </DropdownMenuItem>
-                          {onManageMessageTriggers && (
-                            <DropdownMenuItem onClick={() => onManageMessageTriggers(column)}>
-                              <MessageSquare className="h-4 w-4 mr-2" />
-                              Disparadores de Mensaje
-                            </DropdownMenuItem>
-                          )}
-                          {onConvertToContactList && (
-                            <DropdownMenuItem onClick={() => onConvertToContactList(column)}>
-                              <Users className="h-4 w-4 mr-2" />
-                              Convertir a Lista de Contactos
-                            </DropdownMenuItem>
-                          )}
-                          {!column.is_default && (
-                            <DropdownMenuItem
-                              onClick={() => onDeleteColumn(column.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2 px-3 pb-3">
-                    {/* Add Lead Button */}
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted/50 h-8"
-                      onClick={() => onCreateLead(column.id)}
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-2" />
-                      <span className="text-xs">Agregar Lead</span>
-                    </Button>
+                        )}
+                        {onConvertToContactList && (
+                          <DropdownMenuItem onClick={() => onConvertToContactList(column)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Convertir a Lista de Contactos
+                          </DropdownMenuItem>
+                        )}
+                        {!column.is_default && (
+                          <DropdownMenuItem 
+                            onClick={() => onDeleteColumn(column.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 pb-3">
+                  {/* Add Lead Button */}
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted/50 h-8"
+                    onClick={() => onCreateLead(column.id)}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-2" />
+                    <span className="text-xs">Agregar Lead</span>
+                  </Button>
 
-                    {/* Droppable Area for Leads */}
-                    <Droppable droppableId={column.id}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`min-h-[200px] space-y-2 ${snapshot.isDraggingOver ? 'bg-primary/5 rounded-lg p-2' : ''
-                            }`}
-                        >
-                          {columnLeads.map((lead, index) => (
-                            <LeadCard
-                              key={lead.id}
-                              lead={lead}
-                              index={index}
-                              onEdit={onEditLead}
-                              onDelete={onDeleteLead}
-                              onOpenConversation={onOpenConversation}
-                              allTags={tags}
-                              onUpdateTags={onUpdateLeadTags ? (newTags) => onUpdateLeadTags(lead.id, newTags) : undefined}
-                            />
-                          ))}
-                          {provided.placeholder}
-
-                          {columnLeads.length === 0 && (
-                            <div className="text-center text-muted-foreground text-sm py-8">
-                              No hay leads en esta columna
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </Droppable>
-                  </CardContent>
-                </Card>
-              </div>
-            );
-          })}
-        </div>
+                  {/* Droppable Area for Leads */}
+                  <Droppable droppableId={column.id}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`min-h-[200px] space-y-2 ${
+                          snapshot.isDraggingOver ? 'bg-primary/5 rounded-lg p-2' : ''
+                        }`}
+                      >
+                        {columnLeads.map((lead, index) => (
+                          <LeadCard
+                            key={lead.id}
+                            lead={lead}
+                            index={index}
+                            onEdit={onEditLead}
+                            onDelete={onDeleteLead}
+                            onOpenConversation={onOpenConversation}
+                          />
+                        ))}
+                        {provided.placeholder}
+                        
+                        {columnLeads.length === 0 && (
+                          <div className="text-center text-muted-foreground text-sm py-8">
+                            No hay leads en esta columna
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })}
+      </div>
       </TooltipProvider>
     </DragDropContext>
   );
