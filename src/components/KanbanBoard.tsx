@@ -215,11 +215,6 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                       <span className="truncate">{lead.email}</span>
                     </div>
                   )}
-                  {lead.notes && (
-                    <div className="text-xs bg-muted/30 px-2 py-1 rounded text-ellipsis overflow-hidden line-clamp-2">
-                      {lead.notes}
-                    </div>
-                  )}
                 </div>
               )}
               
