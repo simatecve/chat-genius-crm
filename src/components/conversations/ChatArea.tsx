@@ -59,6 +59,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [showQuickReplyDropdown, setShowQuickReplyDropdown] = useState(false);
+  const [quickReplyFilter, setQuickReplyFilter] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -148,7 +150,30 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const handleQuickReplySelect = (reply: any) => {
     setNewMessage(reply.message);
     setShowQuickReplies(false);
+    setShowQuickReplyDropdown(false);
+    setQuickReplyFilter('');
   };
+
+  // Manejar cambio de input con detección de "/"
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewMessage(value);
+    
+    if (value.startsWith('/')) {
+      const filter = value.substring(1).toLowerCase();
+      setQuickReplyFilter(filter);
+      setShowQuickReplyDropdown(true);
+    } else {
+      setShowQuickReplyDropdown(false);
+      setQuickReplyFilter('');
+    }
+  };
+
+  // Filtrar respuestas rápidas
+  const filteredQuickReplies = quickReplies.filter(reply => 
+    reply.title.toLowerCase().includes(quickReplyFilter) ||
+    reply.message.toLowerCase().includes(quickReplyFilter)
+  );
 
   // Remover archivo seleccionado
   const removeSelectedFile = () => {
@@ -472,10 +497,37 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           </Popover>
           
           <div className="flex-1 relative">
+            {/* Dropdown de respuestas rápidas al escribir "/" */}
+            {showQuickReplyDropdown && filteredQuickReplies.length > 0 && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto z-50">
+                <div className="p-2">
+                  <p className="text-xs text-muted-foreground px-2 mb-1">
+                    Respuestas Rápidas ({filteredQuickReplies.length})
+                  </p>
+                  {filteredQuickReplies.map((reply) => (
+                    <button
+                      key={reply.id}
+                      onClick={() => handleQuickReplySelect(reply)}
+                      className="w-full text-left px-3 py-2 hover:bg-muted rounded-md transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{reply.title}</span>
+                        {reply.hotkey && (
+                          <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{reply.hotkey}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                        {reply.message}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <Input
-              placeholder="Escribe un mensaje..."
+              placeholder="Escribe '/' para respuestas rápidas..."
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={handleInputChange}
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Trash2, Settings, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Trash2, Settings, BarChart3, Zap } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -16,6 +16,7 @@ import EmojiPicker from 'emoji-picker-react';
 import { FileUploadService } from '@/services/fileUploadService';
 import { Link } from 'react-router-dom';
 import { WebchatConversionStats } from '@/components/landing-chat/WebchatConversionStats';
+import { useQuickReplies } from '@/hooks/useQuickReplies';
 
 interface WebChatConversation {
   id: string;
@@ -54,6 +55,12 @@ const LandingChat = () => {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const webChatFileInputRef = useRef<HTMLInputElement>(null);
   const webChatMessagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Quick replies
+  const { quickReplies } = useQuickReplies();
+  const [showWebChatQuickReplies, setShowWebChatQuickReplies] = useState(false);
+  const [showWebChatQuickReplyDropdown, setShowWebChatQuickReplyDropdown] = useState(false);
+  const [webChatQuickReplyFilter, setWebChatQuickReplyFilter] = useState('');
 
 
   // Web Chat Functions
@@ -148,6 +155,34 @@ const LandingChat = () => {
   const handleWebChatEmojiSelect = (emojiData: any) => {
     setWebChatNewMessage(prev => prev + emojiData.emoji);
     setShowWebChatEmoji(false);
+  };
+
+  // Manejar cambio de input con detección de "/"
+  const handleWebChatInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setWebChatNewMessage(value);
+    
+    if (value.startsWith('/')) {
+      setWebChatQuickReplyFilter(value.substring(1).toLowerCase());
+      setShowWebChatQuickReplyDropdown(true);
+    } else {
+      setShowWebChatQuickReplyDropdown(false);
+      setWebChatQuickReplyFilter('');
+    }
+  };
+
+  // Filtrar respuestas rápidas
+  const filteredWebChatQuickReplies = quickReplies.filter(reply => 
+    reply.title.toLowerCase().includes(webChatQuickReplyFilter) ||
+    reply.message.toLowerCase().includes(webChatQuickReplyFilter)
+  );
+
+  // Seleccionar respuesta rápida
+  const handleWebChatQuickReplySelect = (reply: any) => {
+    setWebChatNewMessage(reply.message);
+    setShowWebChatQuickReplies(false);
+    setShowWebChatQuickReplyDropdown(false);
+    setWebChatQuickReplyFilter('');
   };
 
   useEffect(() => {
@@ -418,13 +453,74 @@ const LandingChat = () => {
                             <EmojiPicker onEmojiClick={handleWebChatEmojiSelect} />
                           </PopoverContent>
                         </Popover>
-                        <Input
-                          placeholder="Escribe un mensaje..."
-                          value={webChatNewMessage}
-                          onChange={(e) => setWebChatNewMessage(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendWebChatMessage()}
-                          className="flex-1 bg-input border-border"
-                        />
+                        
+                        {/* Botón de respuestas rápidas */}
+                        <Popover open={showWebChatQuickReplies} onOpenChange={setShowWebChatQuickReplies}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-foreground hover:bg-accent"
+                              title="Respuestas rápidas"
+                            >
+                              <Zap className="h-5 w-5" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 p-2" side="top" align="start">
+                            <p className="text-sm font-medium px-2 py-1">Respuestas Rápidas</p>
+                            {quickReplies.length === 0 ? (
+                              <p className="text-sm text-muted-foreground p-2">No hay respuestas rápidas configuradas</p>
+                            ) : (
+                              <ScrollArea className="max-h-60">
+                                {quickReplies.map((reply) => (
+                                  <button
+                                    key={reply.id}
+                                    onClick={() => handleWebChatQuickReplySelect(reply)}
+                                    className="w-full text-left px-2 py-2 hover:bg-muted rounded-md"
+                                  >
+                                    <p className="font-medium text-sm">{reply.title}</p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{reply.message}</p>
+                                  </button>
+                                ))}
+                              </ScrollArea>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                        
+                        <div className="flex-1 relative">
+                          {/* Dropdown al escribir "/" */}
+                          {showWebChatQuickReplyDropdown && filteredWebChatQuickReplies.length > 0 && (
+                            <div className="absolute bottom-full left-0 right-0 mb-2 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto z-50">
+                              <div className="p-2">
+                                <p className="text-xs text-muted-foreground px-2 mb-1">
+                                  Respuestas Rápidas ({filteredWebChatQuickReplies.length})
+                                </p>
+                                {filteredWebChatQuickReplies.map((reply) => (
+                                  <button
+                                    key={reply.id}
+                                    onClick={() => handleWebChatQuickReplySelect(reply)}
+                                    className="w-full text-left px-3 py-2 hover:bg-muted rounded-md"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-medium text-sm">{reply.title}</span>
+                                      {reply.hotkey && (
+                                        <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{reply.hotkey}</span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{reply.message}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <Input
+                            placeholder="Escribe '/' para respuestas rápidas..."
+                            value={webChatNewMessage}
+                            onChange={handleWebChatInputChange}
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendWebChatMessage()}
+                            className="bg-input border-border"
+                          />
+                        </div>
                         <Button 
                           onClick={() => sendWebChatMessage()} 
                           size="icon"
