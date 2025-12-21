@@ -1,29 +1,29 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useToast } from '@/hooks/use-toast';
 
 export const useBotAutoStop = () => {
-  const { user } = useAuth();
+  const { effectiveUserId, loading: effectiveUserIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
   const [autoStopEnabled, setAutoStopEnabled] = useState(true);
   const [botEnabled, setBotEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId && !effectiveUserIdLoading) {
       fetchSettings();
     }
-  }, [user]);
+  }, [effectiveUserId, effectiveUserIdLoading]);
 
   const fetchSettings = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('user_bot_settings')
         .select('auto_stop_on_human_reply, bot_enabled')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
@@ -31,7 +31,7 @@ export const useBotAutoStop = () => {
       }
 
       if (data) {
-        setAutoStopEnabled(data.auto_stop_on_human_reply);
+        setAutoStopEnabled(data.auto_stop_on_human_reply ?? true);
         setBotEnabled(data.bot_enabled);
       } else {
         // Si no existe, crear configuración por defecto
@@ -45,13 +45,13 @@ export const useBotAutoStop = () => {
   };
 
   const createDefaultSettings = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('user_bot_settings')
         .insert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           auto_stop_on_human_reply: true,
           bot_enabled: true,
         })
@@ -60,7 +60,7 @@ export const useBotAutoStop = () => {
 
       if (error) throw error;
 
-      setAutoStopEnabled(data.auto_stop_on_human_reply);
+      setAutoStopEnabled(data.auto_stop_on_human_reply ?? true);
       setBotEnabled(data.bot_enabled);
     } catch (error) {
       console.error('Error creating default bot settings:', error);
@@ -68,7 +68,7 @@ export const useBotAutoStop = () => {
   };
 
   const toggleAutoStop = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     const newValue = !autoStopEnabled;
     setIsLoading(true);
@@ -77,7 +77,7 @@ export const useBotAutoStop = () => {
       const { error } = await supabase
         .from('user_bot_settings')
         .upsert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           auto_stop_on_human_reply: newValue,
           updated_at: new Date().toISOString(),
         }, {
@@ -106,7 +106,7 @@ export const useBotAutoStop = () => {
   };
 
   const toggleBotEnabled = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     const newValue = !botEnabled;
     setIsLoading(true);
@@ -115,7 +115,7 @@ export const useBotAutoStop = () => {
       const { error } = await supabase
         .from('user_bot_settings')
         .upsert({
-          user_id: user.id,
+          user_id: effectiveUserId,
           bot_enabled: newValue,
           updated_at: new Date().toISOString(),
         }, {

@@ -1,27 +1,27 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useToast } from '@/hooks/use-toast';
 
 export const useBotBlock = (numero: string | null, pushname: string | null) => {
-  const { user } = useAuth();
+  const { effectiveUserId, loading: effectiveUserIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
   const [isBlocked, setIsBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (numero && user) {
+    if (numero && effectiveUserId && !effectiveUserIdLoading) {
       checkBlockStatus();
     }
-  }, [numero, user]);
+  }, [numero, effectiveUserId, effectiveUserIdLoading]);
 
   const checkBlockStatus = async () => {
-    if (!numero || !user) return;
+    if (!numero || !effectiveUserId) return;
 
     const { data, error } = await supabase
       .from('contacto_bloqueado_bot')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveUserId)
       .eq('numero', numero)
       .maybeSingle();
 
@@ -34,7 +34,7 @@ export const useBotBlock = (numero: string | null, pushname: string | null) => {
   };
 
   const toggleBotBlock = async () => {
-    if (!numero || !user) return;
+    if (!numero || !effectiveUserId) return;
 
     setIsLoading(true);
 
@@ -44,7 +44,7 @@ export const useBotBlock = (numero: string | null, pushname: string | null) => {
         const { error } = await supabase
           .from('contacto_bloqueado_bot')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId)
           .eq('numero', numero);
 
         if (error) throw error;
@@ -59,7 +59,7 @@ export const useBotBlock = (numero: string | null, pushname: string | null) => {
         const { error } = await supabase
           .from('contacto_bloqueado_bot')
           .insert({
-            user_id: user.id,
+            user_id: effectiveUserId,
             numero: numero,
             pushname: pushname,
           });
