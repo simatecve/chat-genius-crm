@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Trash2, Settings, BarChart3, Zap } from 'lucide-react';
+import { ArrowLeft, Send, ArrowDownLeft, ArrowUpRight, Globe, MessageCircle, Paperclip, Smile, File, Trash2, Settings, BarChart3, Zap, User } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,6 +17,8 @@ import { FileUploadService } from '@/services/fileUploadService';
 import { Link } from 'react-router-dom';
 import { WebchatConversionStats } from '@/components/landing-chat/WebchatConversionStats';
 import { useQuickReplies } from '@/hooks/useQuickReplies';
+import { ContactInfoPanel } from '@/components/conversations/ContactInfoPanel';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 interface WebChatConversation {
   id: string;
@@ -61,6 +63,9 @@ const LandingChat = () => {
   const [showWebChatQuickReplies, setShowWebChatQuickReplies] = useState(false);
   const [showWebChatQuickReplyDropdown, setShowWebChatQuickReplyDropdown] = useState(false);
   const [webChatQuickReplyFilter, setWebChatQuickReplyFilter] = useState('');
+  
+  // Contact info panel
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
 
 
   // Web Chat Functions
@@ -242,9 +247,10 @@ const LandingChat = () => {
 
         <TabsContent value="conversations" className="flex-1 min-h-0 mt-0">
           {/* Web Chat Content */}
-          <div className="h-full flex gap-4">
+          <ResizablePanelGroup direction="horizontal" className="h-full rounded-lg">
             {/* Web Chat Conversations List */}
-            <Card className="w-80 flex flex-col bg-card border-border">
+            <ResizablePanel defaultSize={25} minSize={15} maxSize={35}>
+              <Card className="h-full flex flex-col bg-card border-border rounded-r-none">
               <CardHeader className="py-3 border-b border-border">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <MessageCircle className="h-4 w-4" />
@@ -299,9 +305,13 @@ const LandingChat = () => {
                 </ScrollArea>
               </CardContent>
             </Card>
+            </ResizablePanel>
+
+            <ResizableHandle withHandle />
 
             {/* Web Chat Messages Area */}
-            <Card className="flex-1 flex flex-col bg-background border-border overflow-hidden">
+            <ResizablePanel defaultSize={showInfoPanel && selectedWebChat ? 50 : 75} minSize={35}>
+              <Card className="h-full flex flex-col bg-background border-border overflow-hidden rounded-none">
               {selectedWebChat ? (
                 <>
                   <CardHeader className="py-3 border-b border-border bg-muted">
@@ -327,29 +337,40 @@ const LandingChat = () => {
                           </p>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={async () => {
-                          if (!selectedWebChat) return;
-                          if (!confirm('¿Borrar memoria de IA para esta conversación?')) return;
-                          const { error } = await supabase
-                            .from('messages')
-                            .delete()
-                            .eq('conversation_id', selectedWebChat.id);
-                          if (error) {
-                            toast.error('Error al borrar memoria');
-                          } else {
-                            setWebChatMessages([]);
-                            toast.success('Memoria de IA borrada');
-                          }
-                        }}
-                        className="text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
-                        title="Borrar memoria de IA"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Borrar Memoria
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            if (!selectedWebChat) return;
+                            if (!confirm('¿Borrar memoria de IA para esta conversación?')) return;
+                            const { error } = await supabase
+                              .from('messages')
+                              .delete()
+                              .eq('conversation_id', selectedWebChat.id);
+                            if (error) {
+                              toast.error('Error al borrar memoria');
+                            } else {
+                              setWebChatMessages([]);
+                              toast.success('Memoria de IA borrada');
+                            }
+                          }}
+                          className="text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
+                          title="Borrar memoria de IA"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Borrar Memoria
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowInfoPanel(!showInfoPanel)}
+                          className={showInfoPanel ? 'text-primary' : 'text-muted-foreground'}
+                          title={showInfoPanel ? 'Ocultar información' : 'Mostrar información'}
+                        >
+                          <User className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   
@@ -543,7 +564,24 @@ const LandingChat = () => {
                 </CardContent>
               )}
             </Card>
-          </div>
+            </ResizablePanel>
+
+            {/* Contact Info Panel */}
+            {selectedWebChat && showInfoPanel && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+                  <ContactInfoPanel
+                    conversationId={selectedWebChat.id}
+                    contactName={selectedWebChat.contact_name || 'Visitante Web'}
+                    phoneNumber={selectedWebChat.phone_number}
+                    whatsappNumber={null}
+                    hideFunnel={true}
+                  />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
         </TabsContent>
 
         <TabsContent value="stats">
