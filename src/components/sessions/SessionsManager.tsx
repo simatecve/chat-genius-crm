@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil, Building2, GitBranch, MessageSquare } from 'lucide-react';
+import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil, Building2, GitBranch, MessageSquare, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useTwilioUsage } from '@/hooks/useTwilioUsage';
+import { useSessionStats } from '@/hooks/useSessionStats';
 import { supabase } from '@/integrations/supabase/client';
 import WhatsAppConnectionForm from './WhatsAppConnectionForm';
 import TelegramConnectionForm from './TelegramConnectionForm';
@@ -79,6 +80,7 @@ const SessionsManager = () => {
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
   const { getUsageByConnectionId, getUsagePercentage, getRemainingMessages, dailyLimit, isNearLimit } = useTwilioUsage();
+  const { getStatsBySessionId, loading: statsLoading } = useSessionStats(effectiveUserId);
 
   useEffect(() => {
     if (!userIdLoading && effectiveUserId) {
@@ -555,27 +557,57 @@ const SessionsManager = () => {
                   <span className="font-medium">ID:</span> {session.identifier}
                 </div>
                 
-                {/* Twilio Usage Stats */}
-                {session.type === 'twilio' && (
-                  <div className="space-y-1.5 p-2 rounded-lg bg-muted/50">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1 text-muted-foreground">
-                        <MessageSquare className="h-3 w-3" />
-                        Mensajes hoy
-                      </span>
-                      <span className={`font-medium ${isNearLimit(session.id) ? 'text-warning' : 'text-foreground'}`}>
-                        {getUsageByConnectionId(session.id)} / {dailyLimit}
-                      </span>
+                {/* Session Stats - Para todos los tipos de sesión */}
+                {(() => {
+                  const sessionStats = getStatsBySessionId(session.id);
+                  return (
+                    <div className="space-y-1.5 p-2 rounded-lg bg-muted/50">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <MessageSquare className="h-3 w-3" />
+                          Conversaciones
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {sessionStats?.total_conversations || 0}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <ArrowDownLeft className="h-3 w-3" />
+                          Recibidos
+                        </span>
+                        <span className="font-medium text-green-600 dark:text-green-400">
+                          {sessionStats?.received_messages || 0}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                          <ArrowUpRight className="h-3 w-3" />
+                          Enviados
+                        </span>
+                        <span className="font-medium text-blue-600 dark:text-blue-400">
+                          {sessionStats?.sent_messages || 0}
+                        </span>
+                      </div>
+                      {/* Twilio daily limit adicional */}
+                      {session.type === 'twilio' && (
+                        <>
+                          <div className="border-t border-border my-1.5" />
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Hoy</span>
+                            <span className={`font-medium ${isNearLimit(session.id) ? 'text-warning' : 'text-foreground'}`}>
+                              {getUsageByConnectionId(session.id)} / {dailyLimit}
+                            </span>
+                          </div>
+                          <Progress 
+                            value={getUsagePercentage(session.id)} 
+                            className={`h-1.5 ${isNearLimit(session.id) ? '[&>div]:bg-warning' : ''}`}
+                          />
+                        </>
+                      )}
                     </div>
-                    <Progress 
-                      value={getUsagePercentage(session.id)} 
-                      className={`h-1.5 ${isNearLimit(session.id) ? '[&>div]:bg-warning' : ''}`}
-                    />
-                    <div className="text-[10px] text-muted-foreground text-right">
-                      {getRemainingMessages(session.id)} restantes
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
