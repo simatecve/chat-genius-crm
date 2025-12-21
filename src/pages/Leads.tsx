@@ -20,9 +20,12 @@ import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 import ChatModal from '@/components/conversations/ChatModal';
 import { useMessages } from '@/hooks/useConversations';
+
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 type Workspace = Tables<'workspaces'>;
+type Tag = Tables<'etiquetas'>;
+
 interface ConversationSummary {
   id: string;
   phone_number: string;
@@ -31,23 +34,27 @@ interface ConversationSummary {
   last_message_time: string | null;
   unread_count: number | null;
 }
+
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
   conversations?: ConversationSummary[];
 }
+
 const Leads = () => {
   const { user } = useAuth();
   const { hasPermission, isAdmin } = useUserPermissions();
   const { effectiveUserId, loading: effectiveUserIdLoading } = useEffectiveUserId();
   const navigate = useNavigate();
-  
+
   // Permisos específicos de embudos
   const canCreateFunnels = isAdmin || hasPermission('puede_crear_embudos');
   const canEditFunnels = isAdmin || hasPermission('puede_editar_embudos');
   const canDeleteFunnels = isAdmin || hasPermission('puede_eliminar_embudos');
   const canMoveContacts = isAdmin || hasPermission('puede_mover_contactos_embudos');
+
   const [columns, setColumns] = useState<LeadColumn[]>([]);
   const [leads, setLeads] = useState<LeadWithColumn[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +97,7 @@ const Leads = () => {
   // Manejar envío de mensaje desde el modal (soporta múltiples canales)
   const handleSendMessage = async (messageText: string, attachment?: File) => {
     if (!messageText.trim() && !attachment || !selectedConversation || !effectiveUserId) return;
-    
+
     try {
       const channelType = selectedConversation.channel_type || 'whatsapp';
       const phoneNumber = selectedConversation.phone_number;
@@ -109,7 +116,7 @@ const Leads = () => {
       // Si es Twilio
       if (channelType === 'twilio') {
         let twilioConnectionId = selectedConversation.twilio_connection_id;
-        
+
         if (!twilioConnectionId) {
           const { data: twilioConnection } = await supabase
             .from('twilio_connections')
@@ -118,14 +125,14 @@ const Leads = () => {
             .eq('status', 'active')
             .limit(1)
             .single();
-            
+
           if (!twilioConnection) {
             toast({ title: "Error", description: "No se encontró una conexión activa de Twilio", variant: "destructive" });
             return;
           }
           twilioConnectionId = twilioConnection.id;
         }
-        
+
         await sendMessage({
           conversationId: selectedConversation.id,
           userId: effectiveUserId,
@@ -137,7 +144,7 @@ const Leads = () => {
         });
         return;
       }
-      
+
       // Si es Telegram
       if (channelType === 'telegram') {
         const telegramBotId = selectedConversation.telegram_bot_id;
@@ -145,7 +152,7 @@ const Leads = () => {
           toast({ title: "Error", description: "No se encontró el bot de Telegram para esta conversación", variant: "destructive" });
           return;
         }
-        
+
         await sendMessage({
           conversationId: selectedConversation.id,
           userId: effectiveUserId,
@@ -157,7 +164,7 @@ const Leads = () => {
         });
         return;
       }
-      
+
       // Si es WhatsApp (WAHA) - default
       const { data: whatsappConnection } = await supabase
         .from('whatsapp_connections')
@@ -166,12 +173,12 @@ const Leads = () => {
         .eq('status', 'WORKING')
         .limit(1)
         .single();
-        
+
       if (!whatsappConnection) {
         toast({ title: "Error", description: "No se encontró una conexión activa de WhatsApp", variant: "destructive" });
         return;
       }
-      
+
       await sendMessage({
         conversationId: selectedConversation.id,
         userId: effectiveUserId,
@@ -180,7 +187,7 @@ const Leads = () => {
         phoneNumber: phoneNumber,
         channelType: 'whatsapp'
       });
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -222,6 +229,7 @@ const Leads = () => {
       });
     }
   };
+
   useEffect(() => {
     if (effectiveUserId && !effectiveUserIdLoading) {
       loadData();
@@ -239,7 +247,7 @@ const Leads = () => {
   // Suscripción realtime para reordenar cuando lleguen nuevos mensajes
   useEffect(() => {
     if (!effectiveUserId) return;
-    
+
     const channel = supabase
       .channel(`leads-conversations-${effectiveUserId}-${Date.now()}`)
       .on(
@@ -256,7 +264,7 @@ const Leads = () => {
         }
       )
       .subscribe();
-    
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -276,10 +284,11 @@ const Leads = () => {
       setFilteredLeads(filtered);
     }
   }, [leads, searchFilter]);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadWorkspaces(), loadColumns(), loadLeads()]);
+      await Promise.all([loadWorkspaces(), loadColumns(), loadLeads(), loadTags()]);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -291,9 +300,10 @@ const Leads = () => {
       setLoading(false);
     }
   };
+
   const loadWorkspaces = async () => {
     if (!effectiveUserId) return;
-    
+
     const {
       data,
       error
@@ -337,9 +347,10 @@ const Leads = () => {
       setSelectedWorkspace(data[0].id);
     }
   };
+
   const loadColumns = async () => {
     if (!effectiveUserId) return;
-    
+
     let query = supabase.from('lead_columns').select('*').eq('user_id', effectiveUserId);
 
     // Filtrar por workspace si está seleccionado (incluir también columnas sin workspace)
@@ -361,9 +372,10 @@ const Leads = () => {
     }
     setColumns(data);
   };
+
   const createDefaultColumn = async () => {
     if (!effectiveUserId) return;
-    
+
     const {
       data,
       error
@@ -381,9 +393,10 @@ const Leads = () => {
     }
     setColumns([data]);
   };
+
   const loadLeads = async () => {
     if (!effectiveUserId) return;
-    
+
     // Si hay workspace seleccionado, primero obtener los IDs de las columnas
     let columnIds: string[] = [];
     if (selectedWorkspace) {
@@ -433,6 +446,37 @@ const Leads = () => {
     }
     setLeads(data || []);
   };
+
+  const loadTags = async () => {
+    if (!effectiveUserId) return;
+
+    const { data, error } = await supabase
+      .from('etiquetas')
+      .select('*')
+      .order('nombre');
+
+    if (error) {
+      console.error('Error loading tags:', error);
+      return;
+    }
+    setTags(data || []);
+  };
+
+  const handleUpdateLeadTags = async (leadId: string, newTags: string[]) => {
+    const { error } = await supabase.from('leads').update({
+      tags: newTags
+    }).eq('id', leadId);
+
+    if (error) {
+      console.error('Error updating tags:', error);
+      toast({ title: "Error", description: "Error al actualizar etiquetas", variant: "destructive" });
+      return;
+    }
+
+    setLeads(leads.map(l => l.id === leadId ? { ...l, tags: newTags } : l));
+    toast({ title: "Éxito", description: "Etiquetas actualizadas" });
+  };
+
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) {
       toast({
@@ -479,6 +523,7 @@ const Leads = () => {
       description: "Columna creada correctamente"
     });
   };
+
   const handleUpdateColumn = async () => {
     if (!editingColumn || !newColumnName.trim()) return;
     const {
@@ -510,6 +555,7 @@ const Leads = () => {
       description: "Columna actualizada correctamente"
     });
   };
+
   const handleDeleteColumn = async (columnId: string) => {
     const column = columns.find(col => col.id === columnId);
     if (column?.is_default) {
@@ -539,6 +585,7 @@ const Leads = () => {
       description: "Columna eliminada correctamente"
     });
   };
+
   const handleCreateLead = async () => {
     if (!newLead.name.trim()) return;
 
@@ -601,6 +648,7 @@ const Leads = () => {
       description: "Lead creado correctamente"
     });
   };
+
   const handleMoveLeadToColumn = async (leadId: string, targetColumnId: string) => {
     const {
       error
@@ -628,6 +676,7 @@ const Leads = () => {
       description: "Lead movido correctamente"
     });
   };
+
   const handleDeleteLead = async (leadId: string) => {
     const {
       error
@@ -647,12 +696,14 @@ const Leads = () => {
       description: "Lead eliminado correctamente"
     });
   };
+
   const openEditColumnDialog = (column: LeadColumn) => {
     setEditingColumn(column);
     setNewColumnName(column.name);
     setNewColumnColor(column.color);
     setShowColumnDialog(true);
   };
+
   const openCreateColumnDialog = () => {
     if (!selectedWorkspace) {
       toast({
@@ -667,6 +718,7 @@ const Leads = () => {
     setNewColumnColor('#22c55e');
     setShowColumnDialog(true);
   };
+
   const openCreateLeadDialog = (columnId: string) => {
     setNewLead({
       name: '',
@@ -679,19 +731,23 @@ const Leads = () => {
     });
     setShowLeadDialog(true);
   };
+
   const openConvertDialog = (column: LeadColumn) => {
     setConvertingColumn(column);
     setContactListName(`Lista de ${column.name}`);
     setShowConvertDialog(true);
   };
+
   const openMessageTriggersDialog = (column: LeadColumn) => {
     setSelectedColumnForTriggers(column);
     setShowMessageTriggersDialog(true);
   };
+
   const closeMessageTriggersDialog = () => {
     setShowMessageTriggersDialog(false);
     setSelectedColumnForTriggers(null);
   };
+
   const handleConvertToContactList = async () => {
     if (!convertingColumn || !contactListName.trim()) return;
     try {
@@ -726,8 +782,6 @@ const Leads = () => {
       }
 
       // Convertir leads a contactos
-      const contactsToInsert = [];
-      const contactListMembersToInsert = [];
       for (const lead of columnLeads) {
         if (lead.phone) {
           // Solo convertir leads que tengan teléfono
@@ -774,226 +828,432 @@ const Leads = () => {
       });
     }
   };
+
   if (loading) {
-    return <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Cargando...</div>
-      </div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        company: '',
+        value: '',
+        notes: '',
+        column_id: ''
+    });
+        setShowLeadDialog(false);
+        toast({
+          title: "Éxito",
+        description: "Lead creado correctamente"
+    });
+  };
+
+  const handleMoveLeadToColumn = async (leadId: string, targetColumnId: string) => {
+    const {
+          error
+        } = await supabase.from('leads').update({
+          column_id: targetColumnId,
+      position: leads.filter(l => l.column_id === targetColumnId).length
+    }).eq('id', leadId);
+        if (error) {
+          console.error('Error moving lead:', error);
+        toast({
+          title: "Error",
+        description: "Error al mover el lead",
+        variant: "destructive"
+      });
+        return;
+    }
+
+    // Update local state
+    setLeads(leads.map(lead => lead.id === leadId ? {
+          ...lead,
+          column_id: targetColumnId
+    } : lead));
+        toast({
+          title: "Éxito",
+        description: "Lead movido correctamente"
+    });
+  };
+
+  const handleDeleteLead = async (leadId: string) => {
+    const {
+          error
+        } = await supabase.from('leads').delete().eq('id', leadId);
+        if (error) {
+          console.error('Error deleting lead:', error);
+        toast({
+          title: "Error",
+        description: "Error al eliminar el lead",
+        variant: "destructive"
+      });
+        return;
+    }
+    setLeads(leads.filter(lead => lead.id !== leadId));
+        toast({
+          title: "Éxito",
+        description: "Lead eliminado correctamente"
+    });
+  };
+
+  const openEditColumnDialog = (column: LeadColumn) => {
+          setEditingColumn(column);
+        setNewColumnName(column.name);
+        setNewColumnColor(column.color);
+        setShowColumnDialog(true);
+  };
+
+  const openCreateColumnDialog = () => {
+    if (!selectedWorkspace) {
+          toast({
+            title: "Atención",
+            description: "Por favor selecciona un espacio de trabajo primero",
+            variant: "default"
+          });
+        return;
+    }
+        setEditingColumn(null);
+        setNewColumnName('');
+        setNewColumnColor('#22c55e');
+        setShowColumnDialog(true);
+  };
+
+  const openCreateLeadDialog = (columnId: string) => {
+          setNewLead({
+            name: '',
+            email: '',
+            phone: '',
+            company: '',
+            value: '',
+            notes: '',
+            column_id: columnId
+          });
+        setShowLeadDialog(true);
+  };
+
+  const openConvertDialog = (column: LeadColumn) => {
+          setConvertingColumn(column);
+        setContactListName(`Lista de ${column.name}`);
+        setShowConvertDialog(true);
+  };
+
+  const openMessageTriggersDialog = (column: LeadColumn) => {
+          setSelectedColumnForTriggers(column);
+        setShowMessageTriggersDialog(true);
+  };
+
+  const closeMessageTriggersDialog = () => {
+          setShowMessageTriggersDialog(false);
+        setSelectedColumnForTriggers(null);
+  };
+
+  const handleConvertToContactList = async () => {
+    if (!convertingColumn || !contactListName.trim()) return;
+        try {
+      // Obtener leads de la columna
+      const columnLeads = leads.filter(lead => lead.column_id === convertingColumn.id);
+        if (columnLeads.length === 0) {
+          toast({
+            title: "Error",
+            description: "No hay leads en esta columna para convertir",
+            variant: "destructive"
+          });
+        return;
+      }
+
+        // Crear la lista de contactos
+        const {
+          data: contactList,
+        error: listError
+      } = await supabase.from('contact_lists').insert({
+          name: contactListName,
+        description: `Lista creada desde la columna: ${convertingColumn.name}`,
+        user_id: effectiveUserId
+      }).select().single();
+        if (listError) {
+          console.error('Error creating contact list:', listError);
+        toast({
+          title: "Error",
+        description: "Error al crear la lista de contactos",
+        variant: "destructive"
+        });
+        return;
+      }
+
+        // Convertir leads a contactos
+        for (const lead of columnLeads) {
+        if (lead.phone) {
+          // Solo convertir leads que tengan teléfono
+          // Crear contacto
+          const {
+          data: contact,
+        error: contactError
+          } = await supabase.from('contacts').insert({
+          name: lead.name,
+        phone_number: lead.phone,
+        email: lead.email,
+        user_id: effectiveUserId
+          }).select().single();
+        if (contactError) {
+          console.error('Error creating contact:', contactError);
+        continue; // Continuar con el siguiente lead
+          }
+
+        // Agregar a la lista de contactos
+        const {
+          error: memberError
+          } = await supabase.from('contact_list_members').insert({
+          contact_id: contact.id,
+        contact_list_id: contactList.id
+          });
+        if (memberError) {
+          console.error('Error adding contact to list:', memberError);
+          }
+        }
+      }
+        setShowConvertDialog(false);
+        setConvertingColumn(null);
+        setContactListName('');
+        toast({
+          title: "Éxito",
+        description: `Lista de contactos "${contactListName}" creada correctamente`
+      });
+    } catch (error) {
+          console.error('Error converting to contact list:', error);
+        toast({
+          title: "Error",
+        description: "Error al convertir a lista de contactos",
+        variant: "destructive"
+      });
+    }
+  };
+
+        if (loading) {
+    return (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Cargando...</div>
+        </div>
+        );
   }
-  return <div className="space-y-6 bg-background min-h-screen p-6">
-      {/* Header with Workspace Selector */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
 
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Gestión de Embudos</h1>
-            <p className="text-muted-foreground mt-1">Organiza y gestiona tus leads en diferentes etapas</p>
-          </div>
-        </div>
+        return (
+        <div className="space-y-6 bg-background min-h-screen p-6">
+          {/* Header with Workspace Selector */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
 
-        <div className="flex items-center space-x-2">
-          <Select value={selectedWorkspace || ''} onValueChange={setSelectedWorkspace}>
-            <SelectTrigger className="w-[280px] bg-card border-border">
-              <SelectValue placeholder="Seleccionar espacio" />
-            </SelectTrigger>
-            <SelectContent>
-              {workspaces.map(workspace => <SelectItem key={workspace.id} value={workspace.id}>
-                  {workspace.name}
-                </SelectItem>)}
-            </SelectContent>
-          </Select>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Gestión de Embudos</h1>
+                <p className="text-muted-foreground mt-1">Organiza y gestiona tus leads en diferentes etapas</p>
+              </div>
+            </div>
 
-          {canCreateFunnels && (
-            <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Columna
-            </Button>
-          )}
-        </div>
-      </div>
+            <div className="flex items-center space-x-2">
+              <Select value={selectedWorkspace || ''} onValueChange={setSelectedWorkspace}>
+                <SelectTrigger className="w-[280px] bg-card border-border">
+                  <SelectValue placeholder="Seleccionar espacio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workspaces.map(workspace => (
+                    <SelectItem key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-      {/* Search Filter */}
-      
-
-      {/* Filter Results Info */}
-      {searchFilter && <div className="flex items-center justify-between bg-primary/10 p-3 rounded-lg border border-primary/20">
-          <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-primary" />
-            <span className="text-sm text-foreground">
-              Mostrando {filteredLeads.length} de {leads.length} embudos que coinciden con "{searchFilter}"
-            </span>
-          </div>
-          {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No se encontraron resultados</span>}
-        </div>}
-
-      <KanbanBoard columns={columns} leads={filteredLeads} onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} onConvertToContactList={openConvertDialog} onManageMessageTriggers={openMessageTriggersDialog} onOpenConversation={handleLeadClick} />
-
-      {/* Column Dialog */}
-      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-        <DialogContent className="bg-[#2a3942] border-[#3e4c59] text-white max-w-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-white">
-              {editingColumn ? 'Editar embudo' : 'Agregar embudo'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          {/* Icono de edición centrado */}
-          <div className="flex justify-center py-4">
-            <div className="w-16 h-16 rounded-lg bg-[#202c33] flex items-center justify-center">
-              <Edit className="h-8 w-8 text-gray-400" />
+              {canCreateFunnels && (
+                <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Columna
+                </Button>
+              )}
             </div>
           </div>
 
-          <div className="space-y-6">
-            {/* Campo de nombre con badge */}
-            <div className="space-y-2">
-              <div className="flex items-center space-x-3 bg-[#202c33] rounded-lg px-4 py-3">
-                <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded">
-                  {editingColumn ? columns.findIndex(c => c.id === editingColumn.id) + 1 : columns.length + 1}
+          {/* Filter Results Info */}
+          {searchFilter && (
+            <div className="flex items-center justify-between bg-primary/10 p-3 rounded-lg border border-primary/20">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-primary" />
+                <span className="text-sm text-foreground">
+                  Mostrando {filteredLeads.length} de {leads.length} embudos que coinciden con "{searchFilter}"
                 </span>
-                <Input id="column-name" value={newColumnName} onChange={e => setNewColumnName(e.target.value)} placeholder="Nombre del embudo" className="flex-1 border-0 bg-transparent text-white placeholder:text-gray-500 focus-visible:ring-0 px-0 uppercase" />
               </div>
+              {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No se encontraron resultados</span>}
             </div>
+          )}
 
-            {/* Sección de colores */}
-            <div className="space-y-3">
-              <Label className="text-white text-lg font-semibold">Color</Label>
-              <div className="grid grid-cols-9 gap-2">
-                {/* Fila 1: Verdes */}
-                {['#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0891b2', '#0284c7', '#3b82f6', '#2563eb', '#1d4ed8'].map(color => <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''}`} style={{
-                backgroundColor: color
-              }} />)}
-                
-                {/* Fila 2: Purples y Magentas */}
-                {['#8b5cf6', '#7c3aed', '#a855f7', '#d946ef', '#ec4899', '#db2777', '#ef4444', '#f87171', '#fb923c'].map(color => <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''}`} style={{
-                backgroundColor: color
-              }} />)}
-                
-                {/* Fila 3: Rojos y Naranjas */}
-                {['#dc2626', '#b91c1c', '#b45309', '#d97706', '#f59e0b', '#f97316', '#fb923c', '#fbbf24', '#facc15'].map(color => <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''}`} style={{
-                backgroundColor: color
-              }} />)}
-                
-                {/* Fila 4: Grises y Negro */}
-                {['#ffffff', '#d1d5db', '#9ca3af', '#6b7280', '#4b5563', '#374151', '#1f2937', '#000000'].map(color => <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''} ${color === '#ffffff' ? 'border border-gray-600' : ''}`} style={{
-                backgroundColor: color
-              }} />)}
+          <KanbanBoard
+            columns={columns}
+            leads={filteredLeads}
+            onEditColumn={canEditFunnels ? openEditColumnDialog : undefined}
+            onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined}
+            onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined}
+            onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined}
+            onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined}
+            onConvertToContactList={openConvertDialog}
+            onManageMessageTriggers={openMessageTriggersDialog}
+            onOpenConversation={handleLeadClick}
+            tags={tags}
+            onUpdateLeadTags={handleUpdateLeadTags}
+          />
+
+          {/* Column Dialog */}
+          <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+            <DialogContent className="bg-[#2a3942] border-[#3e4c59] text-white max-w-xl">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold text-white">
+                  {editingColumn ? 'Editar embudo' : 'Agregar embudo'}
+                </DialogTitle>
+              </DialogHeader>
+
+              {/* Icono de edición centrado */}
+              <div className="flex justify-center py-4">
+                <div className="w-16 h-16 rounded-lg bg-[#202c33] flex items-center justify-center">
+                  <Edit className="h-8 w-8 text-gray-400" />
+                </div>
               </div>
-            </div>
-          </div>
 
-          <DialogFooter className="mt-6">
-            <Button onClick={editingColumn ? handleUpdateColumn : handleCreateColumn} className="w-full bg-[#00a884] hover:bg-[#00a884]/90 text-white font-medium py-3 rounded-lg">
-              <Edit className="h-4 w-4 mr-2" />
-              {editingColumn ? 'Editar embudo' : 'Agregar embudo'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <div className="space-y-6">
+                {/* Campo de nombre con badge */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-3 bg-[#202c33] rounded-lg px-4 py-3">
+                    <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded">
+                      {editingColumn ? columns.findIndex(c => c.id === editingColumn.id) + 1 : columns.length + 1}
+                    </span>
+                    <Input id="column-name" value={newColumnName} onChange={e => setNewColumnName(e.target.value)} placeholder="Nombre del embudo" className="flex-1 border-0 bg-transparent text-white placeholder:text-gray-500 focus-visible:ring-0 px-0 uppercase" />
+                  </div>
+                </div>
 
-      {/* Lead Dialog */}
-      <Dialog open={showLeadDialog} onOpenChange={setShowLeadDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Nuevo Embudo</DialogTitle>
-            <DialogDescription>
-              Agrega un nuevo embudo a la columna
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="lead-name">Nombre *</Label>
-              <Input id="lead-name" value={newLead.name} onChange={e => setNewLead({
-              ...newLead,
-              name: e.target.value
-            })} placeholder="Nombre del lead" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-email">Email</Label>
-              <Input id="lead-email" type="email" value={newLead.email} onChange={e => setNewLead({
-              ...newLead,
-              email: e.target.value
-            })} placeholder="email@ejemplo.com" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-phone">Teléfono</Label>
-              <Input id="lead-phone" value={newLead.phone} onChange={e => setNewLead({
-              ...newLead,
-              phone: e.target.value
-            })} placeholder="+54 9 11 1234-5678" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-company">Empresa</Label>
-              <Input id="lead-company" value={newLead.company} onChange={e => setNewLead({
-              ...newLead,
-              company: e.target.value
-            })} placeholder="Nombre de la empresa" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-value">Valor Estimado</Label>
-              <Input id="lead-value" type="number" value={newLead.value} onChange={e => setNewLead({
-              ...newLead,
-              value: e.target.value
-            })} placeholder="1000" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-notes">Notas</Label>
-              <Textarea id="lead-notes" value={newLead.notes} onChange={e => setNewLead({
-              ...newLead,
-              notes: e.target.value
-            })} placeholder="Notas adicionales..." rows={3} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLeadDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCreateLead}>
-              Crear Lead
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                {/* Sección de colores */}
+                <div className="space-y-3">
+                  <Label className="text-white text-lg font-semibold">Color</Label>
+                  <div className="grid grid-cols-9 gap-2">
+                    {/* Fila 1: Verdes */}
+                    {['#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0891b2', '#0284c7', '#3b82f6', '#2563eb', '#1d4ed8'].map(color => (
+                      <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''}`} style={{ backgroundColor: color }} />
+                    ))}
 
-      {/* Modal de conversión a lista de contactos */}
-      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Convertir a Lista de Contactos</DialogTitle>
-            <DialogDescription>
-              Convertir todos los embudos de la columna "{convertingColumn?.name}" en una lista de contactos.
-              Solo se convertirán los embudos que tengan número de teléfono.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="contact-list-name" className="text-right">
-                Nombre de la lista
-              </Label>
-              <Input id="contact-list-name" value={contactListName} onChange={e => setContactListName(e.target.value)} className="col-span-3" placeholder="Nombre para la lista de contactos" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConvertDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleConvertToContactList}>
-              Convertir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                    {/* Fila 2: Purples y Magentas */}
+                    {['#8b5cf6', '#7c3aed', '#a855f7', '#d946ef', '#ec4899', '#db2777', '#ef4444', '#f87171', '#fb923c'].map(color => (
+                      <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''}`} style={{ backgroundColor: color }} />
+                    ))}
 
-      {/* Message Triggers Dialog */}
-      <MessageTriggersDialog isOpen={showMessageTriggersDialog} onClose={closeMessageTriggersDialog} column={selectedColumnForTriggers} />
-      {/* Modal de Chat */}
-      <ChatModal isOpen={isChatModalOpen} onClose={() => {
-      setIsChatModalOpen(false);
-      setSelectedConversation(null);
-      setSelectedConversationId(null);
-    }} conversation={selectedConversation} messages={messages} onSendMessage={handleSendMessage} isSending={isSending} />
-    </div>;
+                    {/* Fila 3: Rojos y Naranjas */}
+                    {['#dc2626', '#b91c1c', '#b45309', '#d97706', '#f59e0b', '#f97316', '#fb923c', '#fbbf24', '#facc15'].map(color => (
+                      <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''}`} style={{ backgroundColor: color }} />
+                    ))}
+
+                    {/* Fila 4: Grises y Negro */}
+                    {['#ffffff', '#d1d5db', '#9ca3af', '#6b7280', '#4b5563', '#374151', '#1f2937', '#000000'].map(color => (
+                      <button key={color} type="button" onClick={() => setNewColumnColor(color)} className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${newColumnColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2a3942]' : ''} ${color === '#ffffff' ? 'border border-gray-600' : ''}`} style={{ backgroundColor: color }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6">
+                <Button onClick={editingColumn ? handleUpdateColumn : handleCreateColumn} className="w-full bg-[#00a884] hover:bg-[#00a884]/90 text-white font-medium py-3 rounded-lg">
+                  <Edit className="h-4 w-4 mr-2" />
+                  {editingColumn ? 'Editar embudo' : 'Agregar embudo'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Lead Dialog */}
+          < Dialog open={showLeadDialog} onOpenChange={setShowLeadDialog} >
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nuevo Embudo</DialogTitle>
+                <DialogDescription>
+                  Agrega un nuevo embudo a la columna
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-name">Nombre *</Label>
+                  <Input id="lead-name" value={newLead.name} onChange={e => setNewLead({ ...newLead, name: e.target.value })} placeholder="Nombre del lead" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-email">Email</Label>
+                  <Input id="lead-email" type="email" value={newLead.email} onChange={e => setNewLead({ ...newLead, email: e.target.value })} placeholder="email@ejemplo.com" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-phone">Teléfono</Label>
+                  <Input id="lead-phone" value={newLead.phone} onChange={e => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+54 9 11 1234-5678" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-company">Empresa</Label>
+                  <Input id="lead-company" value={newLead.company} onChange={e => setNewLead({ ...newLead, company: e.target.value })} placeholder="Nombre de la empresa" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-value">Valor Estimado</Label>
+                  <Input id="lead-value" type="number" value={newLead.value} onChange={e => setNewLead({ ...newLead, value: e.target.value })} placeholder="1000" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-notes">Notas</Label>
+                  <Textarea id="lead-notes" value={newLead.notes} onChange={e => setNewLead({ ...newLead, notes: e.target.value })} placeholder="Notas adicionales..." rows={3} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowLeadDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreateLead}>
+                  Crear Lead
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog >
+
+          {/* Modal de conversión a lista de contactos */}
+          < Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog} >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Convertir a Lista de Contactos</DialogTitle>
+                <DialogDescription>
+                  Convertir todos los embudos de la columna "{convertingColumn?.name}" en una lista de contactos.
+                  Solo se convertirán los embudos que tengan número de teléfono.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="contact-list-name" className="text-right">
+                    Nombre de la lista
+                  </Label>
+                  <Input id="contact-list-name" value={contactListName} onChange={e => setContactListName(e.target.value)} className="col-span-3" placeholder="Nombre para la lista de contactos" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowConvertDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleConvertToContactList}>
+                  Convertir
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog >
+
+          {/* Message Triggers Dialog */}
+          < MessageTriggersDialog isOpen={showMessageTriggersDialog} onClose={closeMessageTriggersDialog} column={selectedColumnForTriggers} />
+
+          {/* Modal de Chat */}
+          < ChatModal
+            isOpen={isChatModalOpen}
+            onClose={() => {
+              setIsChatModalOpen(false);
+              setSelectedConversation(null);
+              setSelectedConversationId(null);
+            }}
+            conversation={selectedConversation}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isSending={isSending}
+          />
+        </div >
+        );
 };
-export default Leads;
+
+        export default Leads;
