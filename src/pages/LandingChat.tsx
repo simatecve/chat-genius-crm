@@ -216,8 +216,8 @@ const LandingChat = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between shrink-0 pb-4">
         <div className="flex items-center space-x-2">
           <Globe className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold">Web Chat</h1>
@@ -228,7 +228,7 @@ const LandingChat = () => {
         </Link>
       </div>
 
-      <Tabs defaultValue="conversations" className="w-full">
+      <Tabs defaultValue="conversations" className="w-full flex-1 flex flex-col min-h-0">
         <TabsList className="mb-4">
           <TabsTrigger value="conversations" className="flex items-center gap-2">
             <MessageCircle className="h-4 w-4" />
@@ -240,9 +240,9 @@ const LandingChat = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="conversations">
+        <TabsContent value="conversations" className="flex-1 min-h-0 mt-0">
           {/* Web Chat Content */}
-          <div className="h-[calc(100vh-320px)] flex gap-4">
+          <div className="h-full flex gap-4">
             {/* Web Chat Conversations List */}
             <Card className="w-80 flex flex-col bg-card border-border">
               <CardHeader className="py-3 border-b border-border">
