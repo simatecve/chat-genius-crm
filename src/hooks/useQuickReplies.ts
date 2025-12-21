@@ -18,7 +18,12 @@ export const useQuickReplies = () => {
   const quickRepliesQuery = useQuery({
     queryKey: ['quickReplies', effectiveUserId],
     queryFn: async () => {
-      if (!effectiveUserId) return [];
+      if (!effectiveUserId) {
+        console.warn('[useQuickReplies] No effectiveUserId, returning empty array');
+        return [];
+      }
+      
+      console.log('[useQuickReplies] Fetching for user:', effectiveUserId);
       
       const { data, error } = await supabase
         .from('quick_replies')
@@ -27,10 +32,11 @@ export const useQuickReplies = () => {
         .order('title', { ascending: true });
 
       if (error) {
-        console.error('Error fetching quick replies:', error);
+        console.error('[useQuickReplies] Error fetching:', error);
         throw error;
       }
 
+      console.log('[useQuickReplies] Found', data?.length, 'replies');
       return data as QuickReply[];
     },
     enabled: !!effectiveUserId,
