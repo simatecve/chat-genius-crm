@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
  * Hook para cargar archivos media con autenticación de WAHA o Twilio
  * Convierte URLs protegidas en blob URLs para mostrar en el navegador
  */
-export const useAuthenticatedMedia = (url: string | null) => {
+export const useAuthenticatedMedia = (url: string | null, twilioConnectionId?: string | null) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,11 +45,15 @@ export const useAuthenticatedMedia = (url: string | null) => {
           data = wahaData;
         } else if (isTwilioUrl) {
           // Usar edge function de Twilio
+          console.log('[useAuthenticatedMedia] Fetching Twilio media:', { url, twilioConnectionId });
           const { data: twilioData, error: invokeError } = await supabase.functions.invoke('twilio-get-file', {
-            body: { mediaUrl: url }
+            body: { mediaUrl: url, twilioConnectionId: twilioConnectionId }
           });
 
-          if (invokeError) throw invokeError;
+          if (invokeError) {
+            console.error('[useAuthenticatedMedia] Twilio invoke error:', invokeError);
+            throw invokeError;
+          }
           if (!twilioData?.file) throw new Error('No se recibió el archivo');
           data = twilioData;
         }
