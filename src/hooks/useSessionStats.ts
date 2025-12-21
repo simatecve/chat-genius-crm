@@ -51,13 +51,13 @@ export const useSessionStats = (userId: string | null) => {
               .from('messages')
               .select('*', { count: 'exact', head: true })
               .in('conversation_id', group.convIds)
-              .eq('direction', 'incoming');
+              .eq('direction', 'inbound');
 
             const { count: sentCount } = await supabase
               .from('messages')
               .select('*', { count: 'exact', head: true })
               .in('conversation_id', group.convIds)
-              .eq('direction', 'outgoing');
+              .eq('direction', 'outbound');
 
             statsMap[connId] = {
               session_id: connId,
@@ -100,13 +100,13 @@ export const useSessionStats = (userId: string | null) => {
                 .from('messages')
                 .select('*', { count: 'exact', head: true })
                 .in('conversation_id', convIds)
-                .eq('direction', 'incoming');
+                .eq('direction', 'inbound');
 
               const { count: sentCount } = await supabase
                 .from('messages')
                 .select('*', { count: 'exact', head: true })
                 .in('conversation_id', convIds)
-                .eq('direction', 'outgoing');
+                .eq('direction', 'outbound');
 
               const lastMessage = connConvs.reduce((latest, c) => {
                 if (!c.last_message_time) return latest;
@@ -162,13 +162,13 @@ export const useSessionStats = (userId: string | null) => {
               .from('messages')
               .select('*', { count: 'exact', head: true })
               .in('conversation_id', group.convIds)
-              .eq('direction', 'incoming');
+              .eq('direction', 'inbound');
 
             const { count: sentCount } = await supabase
               .from('messages')
               .select('*', { count: 'exact', head: true })
               .in('conversation_id', group.convIds)
-              .eq('direction', 'outgoing');
+              .eq('direction', 'outbound');
 
             statsMap[botId] = {
               session_id: botId,
@@ -222,13 +222,13 @@ export const useSessionStats = (userId: string | null) => {
               .from('landing_chat_messages')
               .select('*', { count: 'exact', head: true })
               .in('conversation_id', landingConvIds)
-              .eq('direction', 'incoming');
+              .eq('direction', 'inbound');
 
             const { count: sentCount } = await supabase
               .from('landing_chat_messages')
               .select('*', { count: 'exact', head: true })
               .in('conversation_id', landingConvIds)
-              .eq('direction', 'outgoing');
+              .eq('direction', 'outbound');
 
             const lastMessage = landingConversations.reduce((latest, c) => {
               if (!c.updated_at) return latest;
