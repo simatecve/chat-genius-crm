@@ -955,6 +955,7 @@ export type Database = {
           notes: string | null
           phone: string
           position: number
+          tags: string[] | null
           updated_at: string | null
           user_id: string
           value: number | null
@@ -970,6 +971,7 @@ export type Database = {
           notes?: string | null
           phone: string
           position: number
+          tags?: string[] | null
           updated_at?: string | null
           user_id: string
           value?: number | null
@@ -985,6 +987,7 @@ export type Database = {
           notes?: string | null
           phone?: string
           position?: number
+          tags?: string[] | null
           updated_at?: string | null
           user_id?: string
           value?: number | null
