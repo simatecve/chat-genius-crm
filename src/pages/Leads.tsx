@@ -87,30 +87,17 @@ const Leads = () => {
     isSending
   } = useMessages(selectedConversationId);
 
-  // Manejar envío de mensaje desde el modal
+  // Manejar envío de mensaje desde el modal (soporta múltiples canales)
   const handleSendMessage = async (messageText: string, attachment?: File) => {
     if (!messageText.trim() && !attachment || !selectedConversation || !effectiveUserId) return;
+    
     try {
-      // Obtener la sesión de WhatsApp asociada al usuario efectivo (admin para cajeros)
-      const {
-        data: whatsappConnection,
-        error: connectionError
-      } = await supabase.from('whatsapp_connections').select('name').eq('user_id', effectiveUserId).eq('status', 'WORKING').limit(1).single();
-      if (connectionError || !whatsappConnection) {
-        console.error('No active WhatsApp connection found');
-        toast({
-          title: "Error",
-          description: "No se encontró una conexión activa de WhatsApp",
-          variant: "destructive"
-        });
-        return;
-      }
-      const sessionName = whatsappConnection.name;
+      const channelType = selectedConversation.channel_type || 'whatsapp';
       const phoneNumber = selectedConversation.phone_number;
 
       // Por ahora solo soportamos mensajes de texto
       if (attachment) {
-        console.warn('Attachments not yet supported with WAHA');
+        console.warn('Attachments not yet supported');
         toast({
           title: "No soportado",
           description: "El envío de archivos aún no está disponible",
@@ -118,13 +105,82 @@ const Leads = () => {
         });
         return;
       }
+
+      // Si es Twilio
+      if (channelType === 'twilio') {
+        let twilioConnectionId = selectedConversation.twilio_connection_id;
+        
+        if (!twilioConnectionId) {
+          const { data: twilioConnection } = await supabase
+            .from('twilio_connections')
+            .select('id')
+            .eq('user_id', effectiveUserId)
+            .eq('status', 'active')
+            .limit(1)
+            .single();
+            
+          if (!twilioConnection) {
+            toast({ title: "Error", description: "No se encontró una conexión activa de Twilio", variant: "destructive" });
+            return;
+          }
+          twilioConnectionId = twilioConnection.id;
+        }
+        
+        await sendMessage({
+          conversationId: selectedConversation.id,
+          userId: effectiveUserId,
+          message: messageText.trim(),
+          sessionName: '',
+          phoneNumber: phoneNumber,
+          channelType: 'twilio',
+          twilioConnectionId: twilioConnectionId
+        });
+        return;
+      }
+      
+      // Si es Telegram
+      if (channelType === 'telegram') {
+        const telegramBotId = selectedConversation.telegram_bot_id;
+        if (!telegramBotId) {
+          toast({ title: "Error", description: "No se encontró el bot de Telegram para esta conversación", variant: "destructive" });
+          return;
+        }
+        
+        await sendMessage({
+          conversationId: selectedConversation.id,
+          userId: effectiveUserId,
+          message: messageText.trim(),
+          sessionName: '',
+          phoneNumber: phoneNumber,
+          channelType: 'telegram',
+          telegramBotId: telegramBotId
+        });
+        return;
+      }
+      
+      // Si es WhatsApp (WAHA) - default
+      const { data: whatsappConnection } = await supabase
+        .from('whatsapp_connections')
+        .select('name')
+        .eq('user_id', effectiveUserId)
+        .eq('status', 'WORKING')
+        .limit(1)
+        .single();
+        
+      if (!whatsappConnection) {
+        toast({ title: "Error", description: "No se encontró una conexión activa de WhatsApp", variant: "destructive" });
+        return;
+      }
+      
       await sendMessage({
         conversationId: selectedConversation.id,
         userId: effectiveUserId,
         message: messageText.trim(),
-        sessionName: sessionName,
-        phoneNumber: phoneNumber
+        sessionName: whatsappConnection.name,
+        phoneNumber: phoneNumber,
+        channelType: 'whatsapp'
       });
+      
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
