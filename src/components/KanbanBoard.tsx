@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBotBlock } from '@/hooks/useBotBlock';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useTags } from '@/hooks/useTags';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
@@ -50,9 +51,10 @@ interface LeadCardProps {
   onEdit?: (lead: Lead) => void;
   onDelete?: (leadId: string) => void;
   onOpenConversation?: (lead: LeadWithColumn) => void;
+  getTagColor: (tagName: string) => string;
 }
 
-const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOpenConversation }) => {
+const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOpenConversation, getTagColor }) => {
   const navigate = useNavigate();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
     lead.phone || null,
@@ -217,6 +219,30 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                   )}
                 </div>
               )}
+
+              {/* Etiquetas del lead */}
+              {lead.tags && lead.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {lead.tags.slice(0, 3).map((tag) => (
+                    <Badge 
+                      key={tag} 
+                      variant="outline" 
+                      className="text-[10px] px-1.5 py-0 h-4 border-0"
+                      style={{ 
+                        backgroundColor: `${getTagColor(tag)}20`,
+                        color: getTagColor(tag)
+                      }}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                  {lead.tags.length > 3 && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                      +{lead.tags.length - 3}
+                    </Badge>
+                  )}
+                </div>
+              )}
               
               {lead.value && (
                 <Badge variant="secondary" className="text-xs font-medium w-fit">
@@ -263,6 +289,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onOpenConversation
 }) => {
   const { user } = useAuth();
+  const { getTagColor } = useTags();
   
   const getLeadsByColumn = (columnId: string) => {
     return leads
@@ -445,6 +472,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             onEdit={onEditLead}
                             onDelete={onDeleteLead}
                             onOpenConversation={onOpenConversation}
+                            getTagColor={getTagColor}
                           />
                         ))}
                         {provided.placeholder}

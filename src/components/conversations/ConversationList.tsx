@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, MessageCircle, Phone, Send } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,8 +11,15 @@ import { EmbudoResponse } from '@/services/embudoServices';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProfile } from '@/hooks/useProfile';
 import { FilterMode, SessionOption } from '@/pages/Conversations';
+import { useTags } from '@/hooks/useTags';
+import { supabase } from '@/integrations/supabase/client';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
+
+interface ContactWithTags {
+  phone_number: string;
+  tags: string[] | null;
+}
 
 interface Workspace {
   id: string;
@@ -65,6 +72,35 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onSessionFilterChange = () => {}
 }) => {
   const { isCajero } = useProfile();
+  const { etiquetas, getTagColor } = useTags();
+  const [contactTags, setContactTags] = useState<Record<string, string[]>>({});
+
+  // Cargar etiquetas de contactos
+  useEffect(() => {
+    const loadContactTags = async () => {
+      if (conversations.length === 0) return;
+      
+      const phoneNumbers = conversations.map(c => c.phone_number).filter(Boolean);
+      if (phoneNumbers.length === 0) return;
+
+      const { data: contacts } = await supabase
+        .from('contacts')
+        .select('phone_number, tags')
+        .in('phone_number', phoneNumbers);
+
+      if (contacts) {
+        const tagsMap: Record<string, string[]> = {};
+        contacts.forEach(c => {
+          if (c.tags && c.tags.length > 0) {
+            tagsMap[c.phone_number] = c.tags;
+          }
+        });
+        setContactTags(tagsMap);
+      }
+    };
+
+    loadContactTags();
+  }, [conversations]);
 
   // Función para enmascarar números de teléfono
   const maskPhoneNumber = (phone: string | null) => {
@@ -193,7 +229,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
           </div> : conversations.length === 0 ? <div className="p-4 text-center text-muted-foreground">
             {searchTerm ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
           </div> : <div className="divide-y divide-border">
-            {conversations.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} isSelected={selectedConversation?.id === conversation.id} onSelect={() => onSelectConversation(conversation)} formatTime={formatTime} getInitials={getInitials} isCajero={isCajero} maskPhoneNumber={maskPhoneNumber} />)}
+            {conversations.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} isSelected={selectedConversation?.id === conversation.id} onSelect={() => onSelectConversation(conversation)} formatTime={formatTime} getInitials={getInitials} isCajero={isCajero} maskPhoneNumber={maskPhoneNumber} tags={contactTags[conversation.phone_number] || []} getTagColor={getTagColor} />)}
           </div>}
       </ScrollArea>
     </div>;
@@ -208,6 +244,8 @@ interface ConversationItemProps {
   getInitials: (name: string | null) => string;
   isCajero: boolean;
   maskPhoneNumber: (phone: string | null) => string;
+  tags: string[];
+  getTagColor: (tagName: string) => string;
 }
 const ConversationItem: React.FC<ConversationItemProps> = ({
   conversation,
@@ -216,7 +254,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   formatTime,
   getInitials,
   isCajero,
-  maskPhoneNumber
+  maskPhoneNumber,
+  tags,
+  getTagColor
 }) => {
   // Determinar el ícono según el tipo de canal
   const getChannelIcon = () => {
@@ -256,6 +296,30 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {conversation.last_message_time && formatTime(conversation.last_message_time)}
             </span>
           </div>
+
+          {/* Etiquetas del contacto */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {tags.slice(0, 3).map((tag) => (
+                <Badge 
+                  key={tag} 
+                  variant="outline" 
+                  className="text-[10px] px-1.5 py-0 h-4 border-0"
+                  style={{ 
+                    backgroundColor: `${getTagColor(tag)}20`,
+                    color: getTagColor(tag)
+                  }}
+                >
+                  {tag}
+                </Badge>
+              ))}
+              {tags.length > 3 && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                  +{tags.length - 3}
+                </Badge>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center justify-between mt-1">
             <p className="text-sm text-muted-foreground truncate">

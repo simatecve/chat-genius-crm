@@ -178,19 +178,40 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           .from('contacts')
           .update({ tags: newTags.length > 0 ? newTags : null })
           .eq('id', contact.id);
-        
-        setContactTags(newTags);
-        toast({
-          title: 'Etiquetas actualizadas',
-          description: `Se ${contactTags.includes(tagName) ? 'quitó' : 'agregó'} la etiqueta "${tagName}"`,
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: 'No se encontró el contacto para actualizar',
-          variant: 'destructive',
-        });
       }
+
+      // Sincronizar con leads - buscar lead por teléfono
+      let { data: lead } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('phone', cleanPhone)
+        .maybeSingle();
+      
+      if (!lead) {
+        const { data: lead2 } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('phone', phoneNumber)
+          .maybeSingle();
+        lead = lead2;
+      }
+      
+      if (lead) {
+        await supabase
+          .from('leads')
+          .update({ tags: newTags.length > 0 ? newTags : null })
+          .eq('id', lead.id);
+      }
+      
+      setContactTags(newTags);
+      toast({
+        title: 'Etiquetas actualizadas',
+        description: `Se ${contactTags.includes(tagName) ? 'quitó' : 'agregó'} la etiqueta "${tagName}"`,
+      });
+
+      // Invalidar queries para refrescar la UI
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
     } catch (error) {
       console.error('Error updating tags:', error);
       toast({
