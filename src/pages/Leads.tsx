@@ -89,13 +89,13 @@ const Leads = () => {
 
   // Manejar envío de mensaje desde el modal
   const handleSendMessage = async (messageText: string, attachment?: File) => {
-    if (!messageText.trim() && !attachment || !selectedConversation || !user) return;
+    if (!messageText.trim() && !attachment || !selectedConversation || !effectiveUserId) return;
     try {
-      // Obtener la sesión de WhatsApp asociada al usuario
+      // Obtener la sesión de WhatsApp asociada al usuario efectivo (admin para cajeros)
       const {
         data: whatsappConnection,
         error: connectionError
-      } = await supabase.from('whatsapp_connections').select('name').eq('user_id', user.id).eq('status', 'WORKING').limit(1).single();
+      } = await supabase.from('whatsapp_connections').select('name').eq('user_id', effectiveUserId).eq('status', 'WORKING').limit(1).single();
       if (connectionError || !whatsappConnection) {
         console.error('No active WhatsApp connection found');
         toast({
@@ -120,7 +120,7 @@ const Leads = () => {
       }
       await sendMessage({
         conversationId: selectedConversation.id,
-        userId: user.id,
+        userId: effectiveUserId,
         message: messageText.trim(),
         sessionName: sessionName,
         phoneNumber: phoneNumber
