@@ -613,6 +613,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             attachmentUrl={message.file_url || message.attachment_url}
             messageType={message.message_type}
             isOutgoing={isOutgoing}
+            twilioConnectionId={conversation.twilio_connection_id}
           />
         )}
         

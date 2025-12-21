@@ -203,6 +203,13 @@ const Conversations = () => {
     }
     // Si filterMode === 'all', no filtra por lead_id
     
+    // 4. Ordenar por fecha de último mensaje descendente (más recientes primero)
+    filtered = [...filtered].sort((a, b) => {
+      const dateA = new Date(a.last_message_time || a.created_at || 0).getTime();
+      const dateB = new Date(b.last_message_time || b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+    
     return filtered;
   }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds, filterMode, selectedSessionFilter, sessionOptions]);
 
@@ -221,8 +228,10 @@ const Conversations = () => {
 
   // Manejar selección de conversación
   const handleSelectConversation = (conversation: Conversation) => {
+    console.log('[Conversations] Selecting conversation:', conversation.id, 'unread:', conversation.unread_count);
     setSelectedConversation(conversation);
     if (conversation.unread_count && conversation.unread_count > 0) {
+      console.log('[Conversations] Marking as read:', conversation.id);
       markAsRead(conversation.id);
     }
     

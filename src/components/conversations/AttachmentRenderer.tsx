@@ -8,12 +8,14 @@ interface AttachmentRendererProps {
   attachmentUrl: string;
   messageType?: string;
   isOutgoing: boolean;
+  twilioConnectionId?: string | null;
 }
 
 const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   attachmentUrl,
   messageType,
-  isOutgoing
+  isOutgoing,
+  twilioConnectionId
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -22,7 +24,7 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   
   // Usar hook para cargar archivos con autenticación
-  const { blobUrl, isLoading: isLoadingMedia } = useAuthenticatedMedia(attachmentUrl);
+  const { blobUrl, isLoading: isLoadingMedia } = useAuthenticatedMedia(attachmentUrl, twilioConnectionId);
 
   // Detectar tipo de archivo por extensión, URL o messageType
   const getFileType = (url: string, type?: string) => {
