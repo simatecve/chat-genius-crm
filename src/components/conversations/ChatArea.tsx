@@ -424,21 +424,34 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             <Paperclip className="h-4 w-4" />
           </Button>
 
-          {/* Botón de respuestas rápidas */}
-          {quickReplies.length > 0 && (
-            <Popover open={showQuickReplies} onOpenChange={setShowQuickReplies}>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  disabled={isUploading || isSending}
-                >
-                  <Zap className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-2" align="start">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium px-2 py-1">Respuestas Rápidas</p>
+          {/* Botón de respuestas rápidas - siempre visible */}
+          <Popover open={showQuickReplies} onOpenChange={setShowQuickReplies}>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                disabled={isUploading || isSending}
+                title="Respuestas rápidas"
+              >
+                <Zap className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-2" align="start">
+              <div className="space-y-1">
+                <p className="text-sm font-medium px-2 py-1">Respuestas Rápidas</p>
+                {quickReplies.length === 0 ? (
+                  <div className="px-2 py-4 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No tienes respuestas rápidas configuradas.
+                    </p>
+                    <a 
+                      href="/configuracion" 
+                      className="text-sm text-primary hover:underline mt-2 inline-block"
+                    >
+                      Crear una respuesta rápida
+                    </a>
+                  </div>
+                ) : (
                   <ScrollArea className="max-h-[300px]">
                     {quickReplies.map((reply) => (
                       <button
@@ -453,10 +466,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                       </button>
                     ))}
                   </ScrollArea>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
           
           <div className="flex-1 relative">
             <Input

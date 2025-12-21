@@ -25,6 +25,17 @@ export const useEffectiveUserId = () => {
       try {
         setLoading(true);
         
+        // Verify we have a valid session before querying
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+          console.warn('[useEffectiveUserId] No valid session, using user.id as fallback');
+          setEffectiveUserId(user.id);
+          setIsImpersonating(false);
+          setLoading(false);
+          return;
+        }
+        
         // Check for impersonation parameter in URL
         const urlParams = new URLSearchParams(window.location.search);
         const impersonateUserId = urlParams.get('impersonate');
