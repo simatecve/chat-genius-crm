@@ -76,14 +76,14 @@ const Login = () => {
               className="w-full h-full object-contain"
             />
           </div>
-          <h1 className="text-white text-2xl font-bold">SUPERCRM</h1>
+          <h1 className="text-foreground text-2xl font-bold">SUPERCRM</h1>
         </div>
       </div>
 
       {/* Left side - Login Form */}
       <div className="flex-1 flex items-center justify-center px-4 py-6 lg:p-8 bg-background">
         <div className="w-full max-w-md">
-          <h1 className="text-white text-2xl lg:text-3xl font-semibold mb-6 lg:mb-8 text-center lg:text-left">
+          <h1 className="text-foreground text-2xl lg:text-3xl font-semibold mb-6 lg:mb-8 text-center lg:text-left">
             Iniciar sesión
           </h1>
 
@@ -98,7 +98,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
-                className="w-full pl-10 pr-4 py-4 bg-card border border-border rounded-lg text-white placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-base transition-all"
+                className="w-full pl-10 pr-4 py-4 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-base transition-all"
                 required
                 disabled={isLoading}
               />
@@ -114,7 +114,7 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Contraseña"
-                className="w-full pl-10 pr-12 py-4 bg-card border border-border rounded-lg text-white placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-base transition-all"
+                className="w-full pl-10 pr-12 py-4 bg-card border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-base transition-all"
                 required
                 disabled={isLoading}
               />
