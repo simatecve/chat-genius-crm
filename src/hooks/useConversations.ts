@@ -21,8 +21,8 @@ export const useConversations = () => {
     queryKey: ['conversations', effectiveUserId],
     queryFn: () => ConversationService.getConversations(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 30000, // 30 segundos
-    refetchInterval: 60000, // Refetch cada minuto
+    staleTime: 5000, // 5 segundos - más rápido para reflejar cambios
+    refetchInterval: 10000, // Refetch cada 10 segundos como fallback
   });
 
   // Query para obtener el conteo de no leídos
@@ -30,8 +30,8 @@ export const useConversations = () => {
     queryKey: ['unreadCount', effectiveUserId],
     queryFn: () => ConversationService.getUnreadCount(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 10000, // 10 segundos
-    refetchInterval: 30000, // Refetch cada 30 segundos
+    staleTime: 5000, // 5 segundos
+    refetchInterval: 10000, // Refetch cada 10 segundos
   });
 
   // Mutation para marcar como leído
@@ -112,7 +112,8 @@ export const useMessages = (conversationId: string | null) => {
     queryKey: ['messages', conversationId, effectiveUserId],
     queryFn: () => ConversationService.getMessages(conversationId || '', effectiveUserId || ''),
     enabled: !!conversationId && !!effectiveUserId,
-    staleTime: 10000,
+    staleTime: 5000, // 5 segundos - más rápido para reflejar cambios
+    refetchInterval: 15000, // Refetch cada 15 segundos como fallback
   });
 
   // Mutation para enviar mensaje a través de WAHA o Telegram
@@ -145,16 +146,53 @@ export const useMessages = (conversationId: string | null) => {
       telegramBotId,
       twilioConnectionId
     ),
-    onSuccess: () => {
-      toast({
-        title: 'Mensaje enviado',
-        description: 'El mensaje se envió correctamente',
-      });
-      // Invalidar mensajes para refrescar
-      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+    // Optimistic update - mostrar mensaje inmediatamente
+    onMutate: async (variables) => {
+      // Cancelar queries en curso
+      await queryClient.cancelQueries({ queryKey: ['messages', conversationId] });
+      
+      // Snapshot del estado anterior
+      const previousMessages = queryClient.getQueryData<Message[]>(['messages', conversationId, effectiveUserId]);
+      
+      // Crear mensaje temporal optimista
+      const tempMessage: Message = {
+        id: `temp-${Date.now()}`,
+        conversation_id: variables.conversationId,
+        user_id: variables.userId,
+        content: variables.message,
+        message: variables.message,
+        direction: 'outbound',
+        message_type: 'text',
+        is_bot: false,
+        status: 'sending',
+        created_at: new Date().toISOString(),
+        attachment_url: null,
+        file_url: null,
+        metadata: null
+      };
+      
+      // Agregar mensaje optimista a la cache
+      queryClient.setQueryData<Message[]>(
+        ['messages', conversationId, effectiveUserId],
+        (old = []) => [...old, tempMessage]
+      );
+      
+      console.log('[Optimistic] Added temp message:', tempMessage.id);
+      
+      return { previousMessages };
     },
-    onError: (error) => {
+    onSuccess: (savedMessage) => {
+      console.log('[Message] Sent successfully, refreshing...');
+      // Invalidar mensajes para obtener el mensaje real del servidor
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (error, variables, context) => {
       console.error('Error sending message:', error);
+      // Revertir al estado anterior en caso de error
+      if (context?.previousMessages) {
+        queryClient.setQueryData(['messages', conversationId, effectiveUserId], context.previousMessages);
+      }
       toast({
         title: 'Error',
         description: 'No se pudo enviar el mensaje',

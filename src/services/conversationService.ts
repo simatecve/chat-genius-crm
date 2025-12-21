@@ -434,8 +434,11 @@ export class ConversationService {
    * Suscribirse a cambios en tiempo real de conversaciones
    */
   static subscribeToConversations(userId: string, callback: (payload: any) => void) {
+    const channelName = `conversations-${userId}-${Date.now()}`;
+    console.log('[Realtime] Subscribing to conversations:', channelName);
+    
     return supabase
-      .channel('conversations')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -444,17 +447,25 @@ export class ConversationService {
           table: 'conversations',
           filter: `user_id=eq.${userId}`
         },
-        callback
+        (payload) => {
+          console.log('[Realtime] Conversation change received:', payload.eventType, payload);
+          callback(payload);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Realtime] Conversations subscription status:', status);
+      });
   }
 
   /**
    * Suscribirse a cambios en tiempo real de mensajes
    */
   static subscribeToMessages(conversationId: string, callback: (payload: any) => void) {
+    const channelName = `messages-${conversationId}-${Date.now()}`;
+    console.log('[Realtime] Subscribing to messages:', channelName);
+    
     return supabase
-      .channel('messages')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -463,9 +474,14 @@ export class ConversationService {
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`
         },
-        callback
+        (payload) => {
+          console.log('[Realtime] Message change received:', payload.eventType, payload);
+          callback(payload);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Realtime] Messages subscription status:', status);
+      });
   }
 
   /**
