@@ -26,6 +26,7 @@ interface ContactInfoPanelProps {
   contactName: string;
   phoneNumber: string;
   whatsappNumber?: string | null;
+  hideFunnel?: boolean;
 }
 
 export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
@@ -33,6 +34,7 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
   contactName,
   phoneNumber,
   whatsappNumber,
+  hideFunnel = false,
 }) => {
   const { effectiveUserId } = useEffectiveUserId();
   const { toast } = useToast();
@@ -1347,27 +1349,29 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           )}
         </Card>
 
-        {/* EMBUDO */}
-        <Card className="p-3 bg-card border-border">
-          <button
-            onClick={() => toggleSection('funnel')}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-success" />
-              <h3 className="font-medium text-sm text-foreground">EMBUDO</h3>
-            </div>
-            {expandedSections.funnel ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
+        {/* EMBUDO - Solo mostrar si hideFunnel es false */}
+        {!hideFunnel && (
+          <Card className="p-3 bg-card border-border">
+            <button
+              onClick={() => toggleSection('funnel')}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <div className="flex items-center space-x-2">
+                <Filter className="h-4 w-4 text-success" />
+                <h3 className="font-medium text-sm text-foreground">EMBUDO</h3>
+              </div>
+              {expandedSections.funnel ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
 
-          {expandedSections.funnel && (
-            <div className="mt-3">
-              <p className="text-sm text-foreground">
-                {currentEmbudo ? currentEmbudo.name : formData.funnel_stage || 'PRIMER CONTACTO'}
-              </p>
-            </div>
-          )}
-        </Card>
+            {expandedSections.funnel && (
+              <div className="mt-3">
+                <p className="text-sm text-foreground">
+                  {currentEmbudo ? currentEmbudo.name : formData.funnel_stage || 'PRIMER CONTACTO'}
+                </p>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* NOTAS */}
         <Card className="p-3 bg-card border-border">
