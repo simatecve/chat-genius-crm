@@ -236,6 +236,32 @@ const Leads = () => {
     }
   }, [selectedWorkspace, effectiveUserId, effectiveUserIdLoading]);
 
+  // Suscripción realtime para reordenar cuando lleguen nuevos mensajes
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    
+    const channel = supabase
+      .channel(`leads-conversations-${effectiveUserId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `user_id=eq.${effectiveUserId}`
+        },
+        (payload) => {
+          console.log('[Leads] Conversation updated, reloading leads...', payload);
+          loadLeads();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [effectiveUserId]);
+
   // Filtrar leads en tiempo real
   useEffect(() => {
     if (!searchFilter.trim()) {

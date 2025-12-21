@@ -270,7 +270,23 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const { user } = useAuth();
   
   const getLeadsByColumn = (columnId: string) => {
-    return leads.filter(lead => lead.column_id === columnId);
+    return leads
+      .filter(lead => lead.column_id === columnId)
+      .sort((a, b) => {
+        // Obtener el último mensaje de cada lead
+        const lastMessageA = a.conversations?.[0]?.last_message_time;
+        const lastMessageB = b.conversations?.[0]?.last_message_time;
+        
+        // Si ninguno tiene conversación, mantener orden por posición
+        if (!lastMessageA && !lastMessageB) return a.position - b.position;
+        
+        // Leads sin conversación van al final
+        if (!lastMessageA) return 1;
+        if (!lastMessageB) return -1;
+        
+        // Ordenar por fecha descendente (más reciente primero)
+        return new Date(lastMessageB).getTime() - new Date(lastMessageA).getTime();
+      });
   };
 
   const handleDragEnd = async (result: DropResult) => {
