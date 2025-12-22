@@ -146,10 +146,18 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`mb-3 ${snapshot.isDragging ? 'opacity-50' : ''}`}
+          className={`mb-3 transition-all duration-200 ${
+            snapshot.isDragging 
+              ? 'scale-105 rotate-1 z-50 opacity-95' 
+              : 'animate-kanban-drop'
+          }`}
         >
           <Card 
-            className="p-2.5 hover:bg-muted/30 transition-all cursor-pointer border-border/40 bg-card/80"
+            className={`p-2.5 transition-all cursor-grab border-border/40 bg-card/80 ${
+              snapshot.isDragging 
+                ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' 
+                : 'hover:bg-muted/30 hover:shadow-md'
+            }`}
             onClick={(e) => {
               // Solo navegar si no se hizo clic en un botón o menú
               const target = e.target as HTMLElement;
@@ -477,7 +485,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       });
   };
 
-  const handleDragEnd = async (result: DropResult) => {
+  const handleDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
 
     if (!destination) {
@@ -493,27 +501,25 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     // Move lead to different column
     if (destination.droppableId !== source.droppableId && onMoveLeadToColumn) {
+      // ✅ MOVER PRIMERO (actualización optimista inmediata)
+      onMoveLeadToColumn(draggableId, destination.droppableId);
+      
       // Encontrar el lead que se está moviendo
       const movedLead = leads.find(lead => lead.id === draggableId);
       
+      // ✅ TRIGGERS EN BACKGROUND (fire and forget - no bloquea UI)
       if (movedLead && user) {
-        try {
-          // Activar disparadores antes de mover el lead
-          await TriggerActivationService.activateTriggersOnLeadMove({
-            leadId: movedLead.id,
-            leadName: movedLead.name,
-            leadPhone: movedLead.phone || undefined,
-            fromColumnId: source.droppableId,
-            toColumnId: destination.droppableId,
-            userId: user.id
-          });
-        } catch (error) {
+        TriggerActivationService.activateTriggersOnLeadMove({
+          leadId: movedLead.id,
+          leadName: movedLead.name,
+          leadPhone: movedLead.phone || undefined,
+          fromColumnId: source.droppableId,
+          toColumnId: destination.droppableId,
+          userId: user.id
+        }).catch(error => {
           console.error('Error al activar disparadores:', error);
-          // Continuar con el movimiento aunque falle la activación de disparadores
-        }
+        });
       }
-      
-      onMoveLeadToColumn(draggableId, destination.droppableId);
     }
   };
 
@@ -626,8 +632,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`min-h-[200px] space-y-2 ${
-                          snapshot.isDraggingOver ? 'bg-primary/5 rounded-lg p-2' : ''
+                        className={`min-h-[200px] space-y-2 rounded-lg transition-all duration-200 ${
+                          snapshot.isDraggingOver 
+                            ? 'bg-primary/10 border-2 border-dashed border-primary/40 p-2 scale-[1.01]' 
+                            : 'border-2 border-transparent'
                         }`}
                       >
                         {columnLeads.map((lead, index) => (

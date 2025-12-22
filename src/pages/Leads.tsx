@@ -612,31 +612,34 @@ const Leads = () => {
     });
   };
   const handleMoveLeadToColumn = async (leadId: string, targetColumnId: string) => {
-    const {
-      error
-    } = await supabase.from('leads').update({
-      column_id: targetColumnId,
-      position: leads.filter(l => l.column_id === targetColumnId).length
-    }).eq('id', leadId);
-    if (error) {
-      console.error('Error moving lead:', error);
-      toast({
-        title: "Error",
-        description: "Error al mover el lead",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Update local state
+    // Guardar estado anterior para rollback
+    const previousLeads = [...leads];
+    
+    // ✅ ACTUALIZACIÓN OPTIMISTA INMEDIATA - UI responde al instante
     setLeads(leads.map(lead => lead.id === leadId ? {
       ...lead,
-      column_id: targetColumnId
+      column_id: targetColumnId,
+      position: leads.filter(l => l.column_id === targetColumnId).length
     } : lead));
-    toast({
-      title: "Éxito",
-      description: "Lead movido correctamente"
-    });
+
+    // Llamada a BD en background (no bloquea UI)
+    try {
+      const { error } = await supabase.from('leads').update({
+        column_id: targetColumnId,
+        position: leads.filter(l => l.column_id === targetColumnId).length
+      }).eq('id', leadId);
+      
+      if (error) throw error;
+    } catch (error) {
+      // Revertir si falla
+      console.error('Error moving lead:', error);
+      setLeads(previousLeads);
+      toast({
+        title: "Error",
+        description: "Error al mover el lead. Se revirtió el cambio.",
+        variant: "destructive"
+      });
+    }
   };
   const handleDeleteLead = async (leadId: string) => {
     const {
