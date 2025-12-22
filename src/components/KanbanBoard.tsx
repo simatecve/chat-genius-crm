@@ -553,6 +553,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             <CardTitle className="text-sm font-semibold uppercase tracking-wide truncate">
                               {column.name}
                             </CardTitle>
+                            <Badge variant="secondary" className="text-xs font-bold shrink-0">
+                              {columnLeads.length}
+                            </Badge>
                             {column.is_default && (
                               <Badge variant="outline" className="text-xs shrink-0">
                                 Por defecto
@@ -575,10 +578,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       </Tooltip>
                     </div>
                   <div className="flex items-center gap-2 mt-3">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground font-medium">
-                      {columnLeads.length}
-                    </span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0">

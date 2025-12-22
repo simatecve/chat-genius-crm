@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Tables } from '@/integrations/supabase/types';
@@ -242,12 +242,12 @@ const Leads = () => {
     }
   }, [selectedWorkspace, effectiveUserId, effectiveUserIdLoading]);
 
-  // Suscripción realtime para reordenar cuando lleguen nuevos mensajes
+  // Suscripción realtime para reordenar cuando lleguen nuevos mensajes y detectar nuevos leads
   useEffect(() => {
     if (!effectiveUserId) return;
     
     // Canal fijo sin Date.now() para reutilizar conexiones
-    const channelName = `leads-conversations-${effectiveUserId}`;
+    const channelName = `leads-realtime-${effectiveUserId}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -259,7 +259,20 @@ const Leads = () => {
           filter: `user_id=eq.${effectiveUserId}`
         },
         () => {
-          // Recargar leads sin log excesivo
+          // Recargar leads cuando se actualiza una conversación
+          loadLeads();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'leads',
+          filter: `user_id=eq.${effectiveUserId}`
+        },
+        () => {
+          // Recargar leads cuando se crea uno nuevo
           loadLeads();
         }
       )
@@ -441,7 +454,23 @@ const Leads = () => {
       console.error('Error loading leads:', error);
       return;
     }
-    setLeads(data || []);
+    
+    // Ordenar leads por último mensaje (más reciente arriba) dentro de cada columna
+    const sortedData = (data || []).sort((a, b) => {
+      // Primero agrupar por columna
+      if (a.column_id !== b.column_id) {
+        return 0; // Mantener orden de columnas
+      }
+      
+      // Dentro de la misma columna, ordenar por last_message_time
+      const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
+      const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+      
+      // Más reciente primero (descendente)
+      return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
+    });
+    
+    setLeads(sortedData);
   };
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) {
@@ -817,6 +846,16 @@ const Leads = () => {
                 </SelectItem>)}
             </SelectContent>
           </Select>
+
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => loadLeads()}
+            disabled={loading}
+            title="Recargar leads"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
 
           {canCreateFunnels && (
             <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
