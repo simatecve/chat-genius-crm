@@ -48,6 +48,8 @@ interface KanbanBoardProps {
   onConvertToContactList?: (column: LeadColumn) => void;
   onManageMessageTriggers?: (column: LeadColumn) => void;
   onOpenConversation?: (lead: LeadWithColumn) => void;
+  allWorkspaces?: { id: string; name: string; channel_type?: string }[];
+  onMoveLeadToWorkspace?: (leadId: string, targetWorkspaceId: string) => void;
 }
 
 interface LeadCardProps {
@@ -57,15 +59,20 @@ interface LeadCardProps {
   onDelete?: (leadId: string) => void;
   onOpenConversation?: (lead: LeadWithColumn) => void;
   getTagColor: (tagName: string) => string;
+  allWorkspaces?: { id: string; name: string; channel_type?: string }[];
+  onMoveToWorkspace?: (leadId: string, workspaceId: string) => void;
 }
 
-const LeadCard: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () => void }> = ({ lead, index, onEdit, onDelete, onOpenConversation, getTagColor, etiquetas, onTagsUpdated }) => {
+const LeadCard: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () => void }> = ({ 
+  lead, index, onEdit, onDelete, onOpenConversation, getTagColor, etiquetas, onTagsUpdated, allWorkspaces, onMoveToWorkspace 
+}) => {
   const navigate = useNavigate();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
     lead.phone || null,
     lead.name || null
   );
   const [showTagDialog, setShowTagDialog] = useState(false);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [leadTags, setLeadTags] = useState<string[]>(lead.tags || []);
   const [savingTags, setSavingTags] = useState(false);
   
@@ -238,6 +245,12 @@ const LeadCard: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () 
                           <Tag className="h-3 w-3 mr-2" />
                           Etiquetas
                         </DropdownMenuItem>
+                        {allWorkspaces && allWorkspaces.length > 1 && onMoveToWorkspace && (
+                          <DropdownMenuItem onClick={() => setShowMoveDialog(true)}>
+                            <Users className="h-3 w-3 mr-2" />
+                            Mover a otro espacio
+                          </DropdownMenuItem>
+                        )}
                         {onDelete && (
                           <DropdownMenuItem 
                             onClick={() => onDelete(lead.id)}
@@ -365,6 +378,46 @@ const LeadCard: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () 
         </div>
       </DialogContent>
     </Dialog>
+    
+    {/* Dialog para mover a otro workspace */}
+    <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Mover a otro espacio</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-60">
+          <div className="space-y-2 p-1">
+            {allWorkspaces && allWorkspaces.length > 0 ? (
+              allWorkspaces.map((ws) => (
+                <Button
+                  key={ws.id}
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    if (onMoveToWorkspace) {
+                      onMoveToWorkspace(lead.id, ws.id);
+                      setShowMoveDialog(false);
+                    }
+                  }}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  {ws.name}
+                  {ws.channel_type && (
+                    <Badge variant="secondary" className="ml-auto text-xs">
+                      {ws.channel_type}
+                    </Badge>
+                  )}
+                </Button>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay otros espacios disponibles
+              </p>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
     </>
   );
 };
@@ -380,7 +433,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onMoveLeadToColumn,
   onConvertToContactList,
   onManageMessageTriggers,
-  onOpenConversation
+  onOpenConversation,
+  allWorkspaces,
+  onMoveLeadToWorkspace
 }) => {
   const { user } = useAuth();
   const { getTagColor, etiquetas, refresh: refreshTags } = useTags();
@@ -569,6 +624,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             onOpenConversation={onOpenConversation}
                             getTagColor={getTagColor}
                             etiquetas={etiquetas}
+                            allWorkspaces={allWorkspaces}
+                            onMoveToWorkspace={onMoveLeadToWorkspace}
                             onTagsUpdated={() => {
                               refreshTags();
                               queryClient.invalidateQueries({ queryKey: ['leads'] });
