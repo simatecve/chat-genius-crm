@@ -2332,6 +2332,7 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          channel_type: string | null
           created_at: string | null
           id: string
           name: string
@@ -2340,6 +2341,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          channel_type?: string | null
           created_at?: string | null
           id?: string
           name: string
@@ -2348,6 +2350,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          channel_type?: string | null
           created_at?: string | null
           id?: string
           name?: string
