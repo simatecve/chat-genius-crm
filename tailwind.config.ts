@@ -112,11 +112,45 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'kanban-drag': {
+					'0%': { 
+						transform: 'scale(1) rotate(0deg)', 
+						boxShadow: '0 0 0 rgba(0,0,0,0)' 
+					},
+					'100%': { 
+						transform: 'scale(1.03) rotate(1deg)', 
+						boxShadow: '0 12px 28px rgba(0,0,0,0.25)' 
+					}
+				},
+				'kanban-drop': {
+					'0%': { 
+						transform: 'scale(1.03)', 
+						opacity: '0.9' 
+					},
+					'50%': { 
+						transform: 'scale(0.98)' 
+					},
+					'100%': { 
+						transform: 'scale(1)', 
+						opacity: '1' 
+					}
+				},
+				'kanban-highlight': {
+					'0%, 100%': { 
+						borderColor: 'hsl(var(--primary) / 0.3)' 
+					},
+					'50%': { 
+						borderColor: 'hsl(var(--primary) / 0.6)' 
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'kanban-drag': 'kanban-drag 0.2s ease-out forwards',
+				'kanban-drop': 'kanban-drop 0.3s ease-out',
+				'kanban-highlight': 'kanban-highlight 1s ease-in-out infinite'
 			}
 		}
 	},
