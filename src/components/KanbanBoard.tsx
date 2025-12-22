@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { TriggerActivationService } from '@/services/triggerActivationService';
@@ -12,7 +15,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useBotBlock } from '@/hooks/useBotBlock';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useTags } from '@/hooks/useTags';
+import { useTags, syncTagsBetweenContactAndLead } from '@/hooks/useTags';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/hooks/use-toast';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
@@ -54,12 +59,15 @@ interface LeadCardProps {
   getTagColor: (tagName: string) => string;
 }
 
-const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOpenConversation, getTagColor }) => {
+const LeadCard: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () => void }> = ({ lead, index, onEdit, onDelete, onOpenConversation, getTagColor, etiquetas, onTagsUpdated }) => {
   const navigate = useNavigate();
   const { isBlocked, isLoading: isBotToggling, toggleBotBlock } = useBotBlock(
     lead.phone || null,
     lead.name || null
   );
+  const [showTagDialog, setShowTagDialog] = useState(false);
+  const [leadTags, setLeadTags] = useState<string[]>(lead.tags || []);
+  const [savingTags, setSavingTags] = useState(false);
   
   const hasConversation = lead.conversations && lead.conversations.length > 0;
   const conversation = hasConversation ? lead.conversations[0] : null;
@@ -86,7 +94,45 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
     }
   };
 
+  // Manejar toggle de etiqueta
+  const handleTagToggle = (tagName: string) => {
+    setLeadTags(prev => 
+      prev.includes(tagName) 
+        ? prev.filter(t => t !== tagName)
+        : [...prev, tagName]
+    );
+  };
+
+  // Guardar etiquetas
+  const handleSaveTags = async () => {
+    setSavingTags(true);
+    try {
+      // Actualizar lead
+      const { error } = await supabase
+        .from('leads')
+        .update({ tags: leadTags })
+        .eq('id', lead.id);
+      
+      if (error) throw error;
+
+      // Sincronizar con contacto si tiene teléfono
+      if (lead.phone) {
+        await syncTagsBetweenContactAndLead(lead.phone, leadTags);
+      }
+
+      toast({ title: 'Etiquetas actualizadas' });
+      setShowTagDialog(false);
+      onTagsUpdated?.();
+    } catch (error) {
+      console.error('Error saving tags:', error);
+      toast({ title: 'Error al guardar etiquetas', variant: 'destructive' });
+    } finally {
+      setSavingTags(false);
+    }
+  };
+
   return (
+    <>
     <Draggable draggableId={lead.id} index={index}>
       {(provided, snapshot) => (
         <div
@@ -188,6 +234,10 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
                             Editar
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuItem onClick={() => setShowTagDialog(true)}>
+                          <Tag className="h-3 w-3 mr-2" />
+                          Etiquetas
+                        </DropdownMenuItem>
                         {onDelete && (
                           <DropdownMenuItem 
                             onClick={() => onDelete(lead.id)}
@@ -272,6 +322,50 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, index, onEdit, onDelete, onOp
         </div>
       )}
     </Draggable>
+    {/* Dialog de etiquetas - fuera del Draggable */}
+    <Dialog open={showTagDialog} onOpenChange={setShowTagDialog}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Gestionar Etiquetas</DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-60">
+          <div className="space-y-2 p-1">
+            {etiquetas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay etiquetas disponibles
+              </p>
+            ) : (
+              etiquetas.map((etiqueta) => (
+                <div 
+                  key={etiqueta.id} 
+                  className="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                  onClick={() => handleTagToggle(etiqueta.nombre)}
+                >
+                  <Checkbox 
+                    checked={leadTags.includes(etiqueta.nombre)}
+                    onCheckedChange={() => handleTagToggle(etiqueta.nombre)}
+                  />
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: etiqueta.color }}
+                  />
+                  <span className="text-sm">{etiqueta.nombre}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setShowTagDialog(false)}>
+            Cancelar
+          </Button>
+          <Button size="sm" onClick={handleSaveTags} disabled={savingTags}>
+            {savingTags ? 'Guardando...' : 'Guardar'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
 
@@ -289,7 +383,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onOpenConversation
 }) => {
   const { user } = useAuth();
-  const { getTagColor } = useTags();
+  const { getTagColor, etiquetas, refresh: refreshTags } = useTags();
+  const queryClient = useQueryClient();
   
   const getLeadsByColumn = (columnId: string) => {
     return leads
@@ -473,6 +568,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             onDelete={onDeleteLead}
                             onOpenConversation={onOpenConversation}
                             getTagColor={getTagColor}
+                            etiquetas={etiquetas}
+                            onTagsUpdated={() => {
+                              refreshTags();
+                              queryClient.invalidateQueries({ queryKey: ['leads'] });
+                            }}
                           />
                         ))}
                         {provided.placeholder}

@@ -19,6 +19,8 @@ import { WebchatConversionStats } from '@/components/landing-chat/WebchatConvers
 import { useQuickReplies } from '@/hooks/useQuickReplies';
 import { ContactInfoPanel } from '@/components/conversations/ContactInfoPanel';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
+import { useTags } from '@/hooks/useTags';
+import { Badge } from '@/components/ui/badge';
 
 interface WebChatConversation {
   id: string;
@@ -27,6 +29,7 @@ interface WebChatConversation {
   last_message: string | null;
   last_message_time: string | null;
   unread_count: number | null;
+  tags?: string[];
 }
 
 interface WebChatMessage {
@@ -43,6 +46,8 @@ interface WebChatMessage {
 const LandingChat = () => {
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
+  const { getTagColor } = useTags();
+  const [contactTags, setContactTags] = useState<Record<string, string[]>>({});
   
   
   // Web Chat state
@@ -85,6 +90,25 @@ const LandingChat = () => {
         return;
       }
       setWebChatConversations(data || []);
+      
+      // Cargar etiquetas de contactos
+      if (data && data.length > 0) {
+        const phoneNumbers = data.map(c => c.phone_number).filter(Boolean);
+        const { data: contacts } = await supabase
+          .from('contacts')
+          .select('phone_number, tags')
+          .in('phone_number', phoneNumbers);
+        
+        if (contacts) {
+          const tagsMap: Record<string, string[]> = {};
+          contacts.forEach(c => {
+            if (c.tags && c.tags.length > 0) {
+              tagsMap[c.phone_number] = c.tags;
+            }
+          });
+          setContactTags(tagsMap);
+        }
+      }
     } catch (err) {
       console.error('Error:', err);
     } finally {
@@ -182,12 +206,22 @@ const LandingChat = () => {
     reply.message.toLowerCase().includes(webChatQuickReplyFilter)
   );
 
-  // Seleccionar respuesta rápida
-  const handleWebChatQuickReplySelect = (reply: any) => {
-    setWebChatNewMessage(reply.message);
-    setShowWebChatQuickReplies(false);
-    setShowWebChatQuickReplyDropdown(false);
-    setWebChatQuickReplyFilter('');
+  // Seleccionar respuesta rápida (y enviar automáticamente)
+  const handleWebChatQuickReplySelect = (reply: any, autoSend: boolean = false) => {
+    if (autoSend) {
+      // Enviar directamente
+      setWebChatNewMessage(reply.message);
+      setShowWebChatQuickReplies(false);
+      setShowWebChatQuickReplyDropdown(false);
+      setWebChatQuickReplyFilter('');
+      // Enviar inmediatamente
+      setTimeout(() => sendWebChatMessage(), 0);
+    } else {
+      setWebChatNewMessage(reply.message);
+      setShowWebChatQuickReplies(false);
+      setShowWebChatQuickReplyDropdown(false);
+      setWebChatQuickReplyFilter('');
+    }
   };
 
   useEffect(() => {
@@ -292,8 +326,26 @@ const LandingChat = () => {
                             <p className="text-xs text-muted-foreground truncate mt-0.5">
                               {conv.last_message || 'Sin mensaje'}
                             </p>
+                            {/* Etiquetas */}
+                            {contactTags[conv.phone_number] && contactTags[conv.phone_number].length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {contactTags[conv.phone_number].slice(0, 2).map((tag) => (
+                                  <Badge 
+                                    key={tag}
+                                    variant="outline" 
+                                    className="text-[9px] px-1 py-0 h-3.5 border-0"
+                                    style={{ 
+                                      backgroundColor: `${getTagColor(tag)}20`,
+                                      color: getTagColor(tag)
+                                    }}
+                                  >
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                             {(conv.unread_count || 0) > 0 && (
-                              <span className="inline-flex items-center justify-center w-5 h-5 text-xs bg-primary text-primary-foreground rounded-full">
+                              <span className="inline-flex items-center justify-center w-5 h-5 text-xs bg-primary text-primary-foreground rounded-full mt-1">
                                 {conv.unread_count}
                               </span>
                             )}
@@ -538,7 +590,17 @@ const LandingChat = () => {
                             placeholder="Escribe '/' para respuestas rápidas..."
                             value={webChatNewMessage}
                             onChange={handleWebChatInputChange}
-                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendWebChatMessage()}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                // Si hay dropdown abierto con respuestas filtradas, seleccionar y enviar la primera
+                                if (showWebChatQuickReplyDropdown && filteredWebChatQuickReplies.length > 0) {
+                                  handleWebChatQuickReplySelect(filteredWebChatQuickReplies[0], true);
+                                } else {
+                                  sendWebChatMessage();
+                                }
+                              }
+                            }}
                             className="bg-input border-border"
                           />
                         </div>

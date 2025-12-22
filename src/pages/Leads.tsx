@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 import ChatModal from '@/components/conversations/ChatModal';
-import { useMessages } from '@/hooks/useConversations';
+import { useMessages, useConversations } from '@/hooks/useConversations';
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 type Workspace = Tables<'workspaces'>;
@@ -86,6 +86,9 @@ const Leads = () => {
     sendMessage,
     isSending
   } = useMessages(selectedConversationId);
+
+  // Hook para marcar como leído
+  const { markAsRead } = useConversations();
 
   // Manejar envío de mensaje desde el modal (soporta múltiples canales)
   const handleSendMessage = async (messageText: string, attachment?: File) => {
@@ -206,6 +209,9 @@ const Leads = () => {
         setSelectedConversation(fullConversation);
         setSelectedConversationId(fullConversation.id);
         setIsChatModalOpen(true);
+        
+        // Marcar como leído al abrir
+        markAsRead(fullConversation.id);
       } else {
         toast({
           title: "Error",
