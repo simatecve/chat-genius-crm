@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCallback, useMemo } from 'react';
 
 export interface Etiqueta {
   id: string;
@@ -8,48 +9,50 @@ export interface Etiqueta {
   descripcion: string | null;
 }
 
+// Función de fetch separada para React Query
+const fetchEtiquetas = async (): Promise<Etiqueta[]> => {
+  const { data, error } = await supabase
+    .from('etiquetas')
+    .select('id, nombre, color, descripcion')
+    .order('nombre');
+
+  if (error) throw error;
+  return data || [];
+};
+
 export const useTags = () => {
-  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadEtiquetas();
-  }, []);
+  const { data: etiquetas = [], isLoading } = useQuery({
+    queryKey: ['etiquetas'],
+    queryFn: fetchEtiquetas,
+    staleTime: 5 * 60 * 1000, // 5 minutos - evitar recargas innecesarias
+    gcTime: 10 * 60 * 1000, // 10 minutos en cache
+    refetchOnWindowFocus: false,
+    retry: 2,
+  });
 
-  const loadEtiquetas = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('etiquetas')
-        .select('id, nombre, color, descripcion')
-        .order('nombre');
-
-      if (error) throw error;
-      setEtiquetas(data || []);
-    } catch (error) {
-      console.error('Error loading etiquetas:', error);
-      setEtiquetas([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getTagColor = (tagName: string): string => {
+  // Memoizar funciones de búsqueda
+  const getTagColor = useCallback((tagName: string): string => {
     const tag = etiquetas.find(e => e.nombre === tagName);
-    return tag?.color || '#6b7280'; // Default gray
-  };
+    return tag?.color || '#6b7280';
+  }, [etiquetas]);
 
-  const getTagByName = (tagName: string): Etiqueta | undefined => {
+  const getTagByName = useCallback((tagName: string): Etiqueta | undefined => {
     return etiquetas.find(e => e.nombre === tagName);
-  };
+  }, [etiquetas]);
 
-  return {
+  const refresh = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['etiquetas'] });
+  }, [queryClient]);
+
+  return useMemo(() => ({
     etiquetas,
     isLoading,
     getTagColor,
     getTagByName,
-    refresh: loadEtiquetas,
-  };
+    refresh,
+  }), [etiquetas, isLoading, getTagColor, getTagByName, refresh]);
 };
 
 // Servicio para sincronizar tags entre contacts y leads
