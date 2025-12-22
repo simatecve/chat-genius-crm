@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import { 
   Users, 
   MessageSquare, 
@@ -36,19 +36,19 @@ export const Dashboard = () => {
     'Año': 'year'
   };
 
-  // Transformar datos para los gráficos
-  const chartData = conversationsByHour.map(item => ({
+  // Memoize chart data transformations
+  const chartData = useMemo(() => conversationsByHour.map(item => ({
     time: item.hour,
     nuevos: item.new,
     recurrentes: item.recurring,
     totales: item.total
-  }));
+  })), [conversationsByHour]);
 
-  const barData = messagesByHour.map(item => ({
+  const barData = useMemo(() => messagesByHour.map(item => ({
     time: item.hour,
     recibidos: item.incoming,
     enviados: item.outgoing
-  }));
+  })), [messagesByHour]);
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -459,3 +459,5 @@ export const Dashboard = () => {
     </div>
   );
 };
+
+export default memo(Dashboard);

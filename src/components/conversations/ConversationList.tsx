@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
 import { Search, MessageCircle, Phone, Send } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -235,7 +235,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
     </div>;
 };
 
-// Componente separado para cada item de conversación
+// Componente separado y memoizado para cada item de conversación
 interface ConversationItemProps {
   conversation: Conversation;
   isSelected: boolean;
@@ -247,7 +247,8 @@ interface ConversationItemProps {
   tags: string[];
   getTagColor: (tagName: string) => string;
 }
-const ConversationItem: React.FC<ConversationItemProps> = ({
+
+const ConversationItem = memo<ConversationItemProps>(({
   conversation,
   isSelected,
   onSelect,
@@ -259,7 +260,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   getTagColor
 }) => {
   // Determinar el ícono según el tipo de canal
-  const getChannelIcon = () => {
+  const channelIcon = useMemo(() => {
     if (conversation.channel_type === 'telegram') {
       return <MessageCircle className="h-4 w-4 text-telegram-blue" />;
     }
@@ -267,9 +268,16 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
       return <MessageCircle className="h-4 w-4 text-[hsl(var(--twilio-red))]" />;
     }
     return null;
-  };
+  }, [conversation.channel_type]);
 
-  return <div onClick={onSelect} className={cn("p-4 cursor-pointer hover:bg-muted/50 transition-colors", isSelected && "bg-muted")}>
+  return (
+    <div 
+      onClick={onSelect} 
+      className={cn(
+        "p-4 cursor-pointer hover:bg-muted/50 transition-colors", 
+        isSelected && "bg-muted"
+      )}
+    >
       <div className="flex items-center gap-3">
         <div className="relative">
           <Avatar className="h-12 w-12">
@@ -277,10 +285,9 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               {getInitials(conversation.pushname)}
             </AvatarFallback>
           </Avatar>
-          {/* Ícono del canal en la esquina del avatar */}
-          {getChannelIcon() && (
+          {channelIcon && (
             <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-1 border border-border">
-              {getChannelIcon()}
+              {channelIcon}
             </div>
           )}
         </div>
@@ -297,7 +304,6 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             </span>
           </div>
 
-          {/* Etiquetas del contacto */}
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {tags.slice(0, 3).map((tag) => (
@@ -325,12 +331,18 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
             <p className="text-sm text-muted-foreground truncate">
               {conversation.last_message || 'Sin mensajes'}
             </p>
-            {conversation.unread_count && conversation.unread_count > 0 && <Badge variant="destructive" className="text-xs ml-2">
+            {conversation.unread_count && conversation.unread_count > 0 && (
+              <Badge variant="destructive" className="text-xs ml-2">
                 {conversation.unread_count}
-              </Badge>}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
-    </div>;
-};
-export default ConversationList;
+    </div>
+  );
+});
+
+ConversationItem.displayName = 'ConversationItem';
+
+export default memo(ConversationList);
