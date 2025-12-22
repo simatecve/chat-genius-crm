@@ -246,8 +246,10 @@ const Leads = () => {
   useEffect(() => {
     if (!effectiveUserId) return;
     
+    // Canal fijo sin Date.now() para reutilizar conexiones
+    const channelName = `leads-conversations-${effectiveUserId}`;
     const channel = supabase
-      .channel(`leads-conversations-${effectiveUserId}-${Date.now()}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -256,8 +258,8 @@ const Leads = () => {
           table: 'conversations',
           filter: `user_id=eq.${effectiveUserId}`
         },
-        (payload) => {
-          console.log('[Leads] Conversation updated, reloading leads...', payload);
+        () => {
+          // Recargar leads sin log excesivo
           loadLeads();
         }
       )
@@ -411,7 +413,7 @@ const Leads = () => {
       }
     }
 
-    // Construir query de leads
+    // Construir query de leads con límite para performance
     let query = supabase.from('leads').select(`
         *,
         lead_columns(*),
@@ -429,10 +431,12 @@ const Leads = () => {
     if (selectedWorkspace && columnIds.length > 0) {
       query = query.in('column_id', columnIds);
     }
+    
+    // Limitar a 200 leads por workspace para evitar timeouts
     const {
       data,
       error
-    } = await query.order('position');
+    } = await query.order('position').limit(200);
     if (error) {
       console.error('Error loading leads:', error);
       return;
