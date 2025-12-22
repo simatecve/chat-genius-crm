@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +63,7 @@ interface LeadCardProps {
   onMoveToWorkspace?: (leadId: string, workspaceId: string) => void;
 }
 
-const LeadCard: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () => void }> = ({ 
+const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () => void }> = ({ 
   lead, index, onEdit, onDelete, onOpenConversation, getTagColor, etiquetas, onTagsUpdated, allWorkspaces, onMoveToWorkspace 
 }) => {
   const navigate = useNavigate();
@@ -421,6 +421,22 @@ const LeadCard: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpdated?: () 
     </>
   );
 };
+
+// Memoized LeadCard component
+const LeadCard = memo(LeadCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.lead.id === nextProps.lead.id &&
+    prevProps.lead.name === nextProps.lead.name &&
+    prevProps.lead.phone === nextProps.lead.phone &&
+    prevProps.lead.column_id === nextProps.lead.column_id &&
+    prevProps.lead.value === nextProps.lead.value &&
+    prevProps.index === nextProps.index &&
+    JSON.stringify(prevProps.lead.tags) === JSON.stringify(nextProps.lead.tags) &&
+    JSON.stringify(prevProps.lead.conversations) === JSON.stringify(nextProps.lead.conversations)
+  );
+});
+
+LeadCard.displayName = 'LeadCard';
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   columns,

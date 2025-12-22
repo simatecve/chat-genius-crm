@@ -41,7 +41,20 @@ const AdminStatistics = lazy(() => import("./pages/admin/AdminStatistics"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
 const AdminConversations = lazy(() => import("./pages/admin/AdminConversations"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 2, // 2 minutes - data considered fresh
+      gcTime: 1000 * 60 * 10, // 10 minutes - keep in cache (formerly cacheTime)
+      refetchOnWindowFocus: false, // Prevent refetch on tab switch
+      retry: 1, // Only retry once on failure
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

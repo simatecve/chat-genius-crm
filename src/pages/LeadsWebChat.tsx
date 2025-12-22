@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,7 +19,6 @@ import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 import ChatModal from '@/components/conversations/ChatModal';
 import { useMessages, useConversations } from '@/hooks/useConversations';
-import AppLayout from '@/components/layout/AppLayout';
 
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
@@ -501,214 +500,210 @@ const LeadsWebChat = () => {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Cargando embudos WebChat...</p>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando embudos WebChat...</p>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="flex flex-col h-full">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <Globe className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Embudos WebChat</h1>
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              {leads.length} leads
-            </Badge>
+    <div className="flex flex-col h-full">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Globe className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Embudos WebChat</h1>
+          <Badge variant="secondary" className="bg-primary/10 text-primary">
+            {leads.length} leads
+          </Badge>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Selector de Workspace */}
+          <Select value={selectedWorkspace || ''} onValueChange={setSelectedWorkspace}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Seleccionar espacio" />
+            </SelectTrigger>
+            <SelectContent>
+              {workspaces.map((workspace) => (
+                <SelectItem key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Búsqueda */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar leads..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="pl-9 w-[200px]"
+            />
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Selector de Workspace */}
-            <Select value={selectedWorkspace || ''} onValueChange={setSelectedWorkspace}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Seleccionar espacio" />
-              </SelectTrigger>
-              <SelectContent>
-                {workspaces.map((workspace) => (
-                  <SelectItem key={workspace.id} value={workspace.id}>
-                    {workspace.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            {/* Búsqueda */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar leads..."
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                className="pl-9 w-[200px]"
-              />
-            </div>
-            
-            {canCreateFunnels && (
-              <Button onClick={openCreateColumnDialog} className="bg-primary hover:bg-primary/90">
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Columna
-              </Button>
-            )}
-          </div>
+          {canCreateFunnels && (
+            <Button onClick={openCreateColumnDialog} className="bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Columna
+            </Button>
+          )}
         </div>
+      </div>
 
-        {/* Kanban Board */}
-        <div className="flex-1 overflow-hidden">
-          <KanbanBoard
-            columns={columns}
-            leads={searchFilter ? filteredLeads : leads}
-            onEditColumn={openEditColumnDialog}
-            onDeleteColumn={handleDeleteColumn}
-            onCreateLead={openCreateLeadDialog}
-            onEditLead={openEditLeadDialog}
-            onDeleteLead={handleDeleteLead}
-            onMoveLeadToColumn={handleMoveLeadToColumn}
-            onManageMessageTriggers={(column) => {
-              setSelectedColumnForTriggers(column);
-              setShowMessageTriggersDialog(true);
-            }}
-            onOpenConversation={handleLeadClick}
-          />
-        </div>
-
-        {/* Column Dialog */}
-        <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingColumn ? 'Editar Columna' : 'Nueva Columna'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nombre</Label>
-                <Input
-                  value={newColumnName}
-                  onChange={(e) => setNewColumnName(e.target.value)}
-                  placeholder="Nombre de la columna"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <div className="flex gap-2 flex-wrap">
-                  {['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setNewColumnColor(color)}
-                      className={`w-8 h-8 rounded-full ${newColumnColor === color ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowColumnDialog(false)}>Cancelar</Button>
-              <Button onClick={editingColumn ? handleUpdateColumn : handleCreateColumn}>
-                {editingColumn ? 'Actualizar' : 'Crear'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Lead Dialog */}
-        <Dialog open={showLeadDialog} onOpenChange={setShowLeadDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingLead ? 'Editar Lead' : 'Nuevo Lead'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nombre *</Label>
-                <Input
-                  value={newLead.name}
-                  onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
-                  placeholder="Nombre del lead"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    value={newLead.email}
-                    onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                    placeholder="email@ejemplo.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <Input
-                    value={newLead.phone}
-                    onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                    placeholder="+1234567890"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Empresa</Label>
-                  <Input
-                    value={newLead.company}
-                    onChange={(e) => setNewLead({ ...newLead, company: e.target.value })}
-                    placeholder="Empresa"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor</Label>
-                  <Input
-                    type="number"
-                    value={newLead.value}
-                    onChange={(e) => setNewLead({ ...newLead, value: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Notas</Label>
-                <Textarea
-                  value={newLead.notes}
-                  onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
-                  placeholder="Notas adicionales"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowLeadDialog(false)}>Cancelar</Button>
-              <Button onClick={editingLead ? handleUpdateLead : handleCreateLead}>
-                {editingLead ? 'Actualizar' : 'Crear'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Message Triggers Dialog */}
-        <MessageTriggersDialog
-          isOpen={showMessageTriggersDialog}
-          onClose={() => setShowMessageTriggersDialog(false)}
-          column={selectedColumnForTriggers}
-        />
-
-        {/* Chat Modal */}
-        <ChatModal
-          isOpen={isChatModalOpen}
-          onClose={() => {
-            setIsChatModalOpen(false);
-            setSelectedConversation(null);
-            setSelectedConversationId(null);
+      {/* Kanban Board */}
+      <div className="flex-1 overflow-hidden">
+        <KanbanBoard
+          columns={columns}
+          leads={searchFilter ? filteredLeads : leads}
+          onEditColumn={openEditColumnDialog}
+          onDeleteColumn={handleDeleteColumn}
+          onCreateLead={openCreateLeadDialog}
+          onEditLead={openEditLeadDialog}
+          onDeleteLead={handleDeleteLead}
+          onMoveLeadToColumn={handleMoveLeadToColumn}
+          onManageMessageTriggers={(column) => {
+            setSelectedColumnForTriggers(column);
+            setShowMessageTriggersDialog(true);
           }}
-          conversation={selectedConversation}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          isSending={isSending}
+          onOpenConversation={handleLeadClick}
         />
       </div>
-    </AppLayout>
+
+      {/* Column Dialog */}
+      <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingColumn ? 'Editar Columna' : 'Nueva Columna'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre</Label>
+              <Input
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+                placeholder="Nombre de la columna"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <div className="flex gap-2 flex-wrap">
+                {['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewColumnColor(color)}
+                    className={`w-8 h-8 rounded-full ${newColumnColor === color ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowColumnDialog(false)}>Cancelar</Button>
+            <Button onClick={editingColumn ? handleUpdateColumn : handleCreateColumn}>
+              {editingColumn ? 'Actualizar' : 'Crear'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lead Dialog */}
+      <Dialog open={showLeadDialog} onOpenChange={setShowLeadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingLead ? 'Editar Lead' : 'Nuevo Lead'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                value={newLead.name}
+                onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
+                placeholder="Nombre del lead"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={newLead.email}
+                  onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                  placeholder="email@ejemplo.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Teléfono</Label>
+                <Input
+                  value={newLead.phone}
+                  onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
+                  placeholder="+1234567890"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Empresa</Label>
+                <Input
+                  value={newLead.company}
+                  onChange={(e) => setNewLead({ ...newLead, company: e.target.value })}
+                  placeholder="Empresa"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Valor</Label>
+                <Input
+                  type="number"
+                  value={newLead.value}
+                  onChange={(e) => setNewLead({ ...newLead, value: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notas</Label>
+              <Textarea
+                value={newLead.notes}
+                onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
+                placeholder="Notas adicionales"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeadDialog(false)}>Cancelar</Button>
+            <Button onClick={editingLead ? handleUpdateLead : handleCreateLead}>
+              {editingLead ? 'Actualizar' : 'Crear'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Message Triggers Dialog */}
+      <MessageTriggersDialog
+        isOpen={showMessageTriggersDialog}
+        onClose={() => setShowMessageTriggersDialog(false)}
+        column={selectedColumnForTriggers}
+      />
+
+      {/* Chat Modal */}
+      <ChatModal
+        isOpen={isChatModalOpen}
+        onClose={() => {
+          setIsChatModalOpen(false);
+          setSelectedConversation(null);
+          setSelectedConversationId(null);
+        }}
+        conversation={selectedConversation}
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        isSending={isSending}
+      />
+    </div>
   );
 };
 

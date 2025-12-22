@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -585,7 +585,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   );
 };
 
-// Componente para cada burbuja de mensaje
+// Memoized message bubble component
 interface MessageBubbleProps {
   message: Message;
   showAvatar: boolean;
@@ -594,7 +594,7 @@ interface MessageBubbleProps {
   conversation: Conversation;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({
+const MessageBubble = memo<MessageBubbleProps>(({
   message,
   showAvatar,
   formatTime,
@@ -659,6 +659,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.showAvatar === nextProps.showAvatar
+  );
+});
 
-export default ChatArea;
+MessageBubble.displayName = 'MessageBubble';
+
+export default memo(ChatArea);
