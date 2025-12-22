@@ -10,8 +10,15 @@ import { Plus, Edit, Trash2, Briefcase } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Workspace = Tables<'workspaces'>;
+type Workspace = Tables<'workspaces'> & { channel_type?: string };
 type LeadColumn = Tables<'lead_columns'>;
+
+const CHANNEL_TYPES = [
+  { value: 'whatsapp', label: 'WhatsApp', color: 'bg-green-500' },
+  { value: 'webchat', label: 'WebChat', color: 'bg-blue-500' },
+  { value: 'telegram', label: 'Telegram', color: 'bg-sky-500' },
+  { value: 'all', label: 'Todos', color: 'bg-purple-500' }
+];
 
 const WorkspaceManagement = () => {
   const { user } = useAuth();
@@ -22,6 +29,7 @@ const WorkspaceManagement = () => {
   const [showColumnDialog, setShowColumnDialog] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [editingColumn, setEditingColumn] = useState<LeadColumn | null>(null);
+  const [workspaceChannelType, setWorkspaceChannelType] = useState('whatsapp');
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState('');
   const [columnName, setColumnName] = useState('');
@@ -87,7 +95,8 @@ const WorkspaceManagement = () => {
       .insert({
         name: workspaceName,
         position: workspaces.length,
-        user_id: user?.id
+        user_id: user?.id,
+        channel_type: workspaceChannelType
       })
       .select()
       .single();
@@ -104,11 +113,13 @@ const WorkspaceManagement = () => {
 
     setWorkspaces([...workspaces, data]);
     setWorkspaceName('');
+    setWorkspaceChannelType('whatsapp');
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
       description: "Espacio de trabajo creado correctamente"
     });
+  };
   };
 
   const handleUpdateWorkspace = async () => {
@@ -263,12 +274,14 @@ const WorkspaceManagement = () => {
   const openCreateWorkspaceDialog = () => {
     setEditingWorkspace(null);
     setWorkspaceName('');
+    setWorkspaceChannelType('whatsapp');
     setShowWorkspaceDialog(true);
   };
 
   const openEditWorkspaceDialog = (workspace: Workspace) => {
     setEditingWorkspace(workspace);
     setWorkspaceName(workspace.name);
+    setWorkspaceChannelType(workspace.channel_type || 'whatsapp');
     setShowWorkspaceDialog(true);
   };
 
@@ -338,9 +351,14 @@ const WorkspaceManagement = () => {
             <Card key={workspace.id} className="border-border/50">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <Briefcase className="h-5 w-5" />
                     <h3 className="text-lg font-semibold uppercase">{workspace.name}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full text-white ${
+                      CHANNEL_TYPES.find(c => c.value === workspace.channel_type)?.color || 'bg-gray-500'
+                    }`}>
+                      {CHANNEL_TYPES.find(c => c.value === workspace.channel_type)?.label || 'WhatsApp'}
+                    </span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
@@ -443,6 +461,26 @@ const WorkspaceManagement = () => {
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 placeholder="Ej: Ventas, Marketing, Soporte"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Canal</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {CHANNEL_TYPES.map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => setWorkspaceChannelType(type.value)}
+                    className={`p-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                      workspaceChannelType === type.value 
+                        ? 'border-primary bg-primary/10' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <span className={`w-3 h-3 rounded-full ${type.color}`}></span>
+                    <span className="text-sm font-medium">{type.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

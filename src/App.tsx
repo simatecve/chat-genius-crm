@@ -1,3 +1,4 @@
+import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,35 +7,39 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "next-themes";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import WhatsAppConnections from "./pages/WhatsAppConnections";
-import AIAgents from "./pages/AIAgents";
-import CreateAIAgent from "./pages/CreateAIAgent";
-import ContactLists from "./pages/ContactLists";
-import Contacts from "./pages/Contacts";
-import ContactsNew from "./pages/ContactsNew";
-import MassCampaigns from "./pages/MassCampaigns";
-import CreateMassCampaign from "./pages/CreateMassCampaign";
-import Settings from "./pages/Settings";
-import Leads from "./pages/Leads";
-import Conversations from "./pages/Conversations";
-import InternalChat from "./pages/InternalChat";
-import LandingChat from "./pages/LandingChat";
-import Sales from "./pages/Sales";
-import Calendar from "./pages/Calendar";
-import PaymentPlans from "./pages/PaymentPlans";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentFailure from "./pages/PaymentFailure";
-import PaymentPending from "./pages/PaymentPending";
-import UsagePlan from "./pages/UsagePlan";
-import NotFound from "./pages/NotFound";
+import LoadingSpinner from "@/components/LoadingSpinner";
+
+// Lazy loaded pages for better performance
+const Index = lazy(() => import("./pages/Index"));
+const Login = lazy(() => import("./pages/Login"));
+const WhatsAppConnections = lazy(() => import("./pages/WhatsAppConnections"));
+const AIAgents = lazy(() => import("./pages/AIAgents"));
+const CreateAIAgent = lazy(() => import("./pages/CreateAIAgent"));
+const ContactLists = lazy(() => import("./pages/ContactLists"));
+const Contacts = lazy(() => import("./pages/Contacts"));
+const ContactsNew = lazy(() => import("./pages/ContactsNew"));
+const MassCampaigns = lazy(() => import("./pages/MassCampaigns"));
+const CreateMassCampaign = lazy(() => import("./pages/CreateMassCampaign"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Leads = lazy(() => import("./pages/Leads"));
+const LeadsWebChat = lazy(() => import("./pages/LeadsWebChat"));
+const Conversations = lazy(() => import("./pages/Conversations"));
+const InternalChat = lazy(() => import("./pages/InternalChat"));
+const LandingChat = lazy(() => import("./pages/LandingChat"));
+const Sales = lazy(() => import("./pages/Sales"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const PaymentPlans = lazy(() => import("./pages/PaymentPlans"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentFailure = lazy(() => import("./pages/PaymentFailure"));
+const PaymentPending = lazy(() => import("./pages/PaymentPending"));
+const UsagePlan = lazy(() => import("./pages/UsagePlan"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 // Admin pages
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminStatistics from "./pages/admin/AdminStatistics";
-import AdminMessages from "./pages/admin/AdminMessages";
-import AdminConversations from "./pages/admin/AdminConversations";
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminStatistics = lazy(() => import("./pages/admin/AdminStatistics"));
+const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
+const AdminConversations = lazy(() => import("./pages/admin/AdminConversations"));
 
 const queryClient = new QueryClient();
 
@@ -46,7 +51,8 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
+            <Suspense fallback={<LoadingSpinner message="Cargando..." />}>
+              <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={
                 <ProtectedRoute>
