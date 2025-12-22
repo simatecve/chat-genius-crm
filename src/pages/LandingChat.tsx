@@ -83,7 +83,8 @@ const LandingChat = () => {
         .select('*')
         .eq('user_id', effectiveUserId)
         .eq('channel_type', 'webchat')
-        .order('last_message_time', { ascending: false });
+        .order('last_message_time', { ascending: false })
+        .limit(100);
 
       if (error) {
         console.error('Error fetching webchat conversations:', error);
