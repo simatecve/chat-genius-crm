@@ -51,6 +51,7 @@ export const Sidebar = () => {
     '/chat-interno': 'puede_ver_chats',
     '/campanas-masivas': 'puede_enviar_mensajes',
     '/leads': 'puede_ver_embudos',
+    '/leads-webchat': 'puede_ver_embudos',
     '/contactos': 'puede_ver_contactos',
     '/listas-contactos': 'puede_ver_contactos',
     '/asistente-ia': 'puede_ver_configuracion',
@@ -97,6 +98,11 @@ export const Sidebar = () => {
       label: 'Embudos',
       icon: UserPlus,
       href: '/leads',
+      permission: 'puede_ver_embudos'
+    }, {
+      label: 'Embudos WebChat',
+      icon: Globe,
+      href: '/leads-webchat',
       permission: 'puede_ver_embudos'
     }, {
       label: 'Contactos',

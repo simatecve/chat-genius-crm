@@ -273,6 +273,10 @@ const LandingChat = () => {
             <MessageCircle className="h-4 w-4" />
             Conversaciones
           </TabsTrigger>
+          <TabsTrigger value="funnels" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Embudos
+          </TabsTrigger>
           <TabsTrigger value="stats" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Estadísticas
@@ -644,6 +648,24 @@ const LandingChat = () => {
               </>
             )}
           </ResizablePanelGroup>
+        </TabsContent>
+
+        <TabsContent value="funnels" className="flex-1 min-h-0 mt-0">
+          <div className="h-full flex flex-col items-center justify-center gap-4 bg-muted/20 rounded-lg p-8">
+            <Globe className="h-12 w-12 text-primary/50" />
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold">Embudos WebChat</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Gestiona tus leads de webchat en embudos visuales con la vista Kanban completa.
+              </p>
+            </div>
+            <Link to="/leads-webchat">
+              <Button className="mt-2">
+                <Zap className="h-4 w-4 mr-2" />
+                Ir a Embudos WebChat
+              </Button>
+            </Link>
+          </div>
         </TabsContent>
 
         <TabsContent value="stats">

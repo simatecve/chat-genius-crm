@@ -114,6 +114,11 @@ const App = () => (
                   <Leads />
                 </ProtectedRoute>
               } />
+              <Route path="/leads-webchat" element={
+                <ProtectedRoute>
+                  <LeadsWebChat />
+                </ProtectedRoute>
+              } />
               <Route path="/conversaciones" element={
                 <ProtectedRoute>
                   <Conversations />
@@ -193,6 +198,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

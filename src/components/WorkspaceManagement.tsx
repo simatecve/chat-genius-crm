@@ -120,7 +120,6 @@ const WorkspaceManagement = () => {
       description: "Espacio de trabajo creado correctamente"
     });
   };
-  };
 
   const handleUpdateWorkspace = async () => {
     if (!editingWorkspace || !workspaceName.trim()) return;
