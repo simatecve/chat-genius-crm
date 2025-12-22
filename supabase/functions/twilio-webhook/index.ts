@@ -41,9 +41,27 @@ function normalizePhoneNumber(phone: string): string {
     .trim();
 }
 
-// Obtener user_id desde el número de Twilio
-async function getUserIdFromTwilioNumber(supabase: any, fromNumber: string): Promise<{ userId: string | null; connectionId: string | null }> {
-  const normalized = normalizePhoneNumber(fromNumber);
+// Obtener user_id desde el número de Twilio o connectionId
+async function getUserIdFromTwilioNumber(supabase: any, toNumber: string, connectionIdFromUrl: string | null): Promise<{ userId: string | null; connectionId: string | null }> {
+  // Primero intentar con connectionId de la URL (más preciso)
+  if (connectionIdFromUrl) {
+    console.log(`[twilio-webhook] Looking up connection by ID: ${connectionIdFromUrl}`);
+    const { data, error } = await supabase
+      .from('twilio_connections')
+      .select('user_id, id')
+      .eq('id', connectionIdFromUrl)
+      .single();
+
+    if (!error && data) {
+      console.log(`[twilio-webhook] Found connection by ID: user_id=${data.user_id}`);
+      return { userId: data.user_id, connectionId: data.id };
+    }
+    console.warn(`[twilio-webhook] Connection ID ${connectionIdFromUrl} not found, falling back to phone number`);
+  }
+
+  // Fallback: buscar por número de teléfono
+  const normalized = normalizePhoneNumber(toNumber);
+  console.log(`[twilio-webhook] Looking up connection by phone: ${normalized}`);
   
   const { data, error } = await supabase
     .from('twilio_connections')
@@ -52,10 +70,11 @@ async function getUserIdFromTwilioNumber(supabase: any, fromNumber: string): Pro
     .single();
 
   if (error) {
-    console.error('Error getting user_id from Twilio number:', error);
+    console.error('[twilio-webhook] Error getting user_id from Twilio number:', error);
     return { userId: null, connectionId: null };
   }
 
+  console.log(`[twilio-webhook] Found connection by phone: user_id=${data?.user_id}, id=${data?.id}`);
   return { userId: data?.user_id || null, connectionId: data?.id || null };
 }
 
@@ -370,6 +389,12 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
+    // Extraer connectionId de la URL si existe
+    const url = new URL(req.url);
+    const connectionIdFromUrl = url.searchParams.get('connectionId');
+    console.log(`[twilio-webhook] Request URL: ${req.url}`);
+    console.log(`[twilio-webhook] connectionId from URL: ${connectionIdFromUrl || 'not provided'}`);
+
     // Parsear datos de Twilio (application/x-www-form-urlencoded)
     const formData = await req.formData();
     const twilioData: any = {};
@@ -377,7 +402,7 @@ serve(async (req) => {
       twilioData[key] = value;
     }
 
-    console.log('Received Twilio webhook:', twilioData);
+    console.log('[twilio-webhook] Received Twilio data:', JSON.stringify(twilioData));
 
     const fromNumber = twilioData.From || ''; // whatsapp:+1234567890
     const toNumber = twilioData.To || '';
@@ -419,8 +444,8 @@ serve(async (req) => {
     console.log(`Message from: ${phoneNumber}, to: ${twilioPhoneNumber}`);
     console.log(`Content: ${messageBody.substring(0, 50)}... | Media: ${mediaType} (${numMedia} files)`);
 
-    // Obtener user_id y connection_id desde el número de Twilio
-    const { userId, connectionId } = await getUserIdFromTwilioNumber(supabase, toNumber);
+    // Obtener user_id y connection_id desde el número de Twilio o connectionId de URL
+    const { userId, connectionId } = await getUserIdFromTwilioNumber(supabase, toNumber, connectionIdFromUrl);
     if (!userId || !connectionId) {
       console.error('Could not get user_id or connection_id from Twilio number');
       return new Response('OK', { status: 200, headers: corsHeaders });
