@@ -16,25 +16,19 @@ export class ConversationService {
    */
   static async getConversations(userId: string): Promise<ConversationWithLastMessage[]> {
     try {
-      console.log('[ConversationService] Fetching conversations for userId:', userId);
-      
+      // NO cargar mensajes aquí - solo metadatos de conversación para mejor rendimiento
       const { data, error } = await supabase
         .from('conversations')
-        .select(`
-          *,
-          messages(
-            *
-          )
-        `)
+        .select('*')
         .eq('user_id', userId)
-        .order('last_message_time', { ascending: false });
+        .order('last_message_time', { ascending: false })
+        .limit(100); // Limitar a 100 conversaciones para velocidad
 
       if (error) {
         console.error('Error fetching conversations:', error);
         throw error;
       }
 
-      console.log('[ConversationService] Found conversations:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('Error in getConversations:', error);
@@ -70,17 +64,14 @@ export class ConversationService {
    */
   static async searchConversations(userId: string, searchTerm: string): Promise<ConversationWithLastMessage[]> {
     try {
+      // NO cargar mensajes - solo metadatos
       const { data, error } = await supabase
         .from('conversations')
-        .select(`
-          *,
-          messages(
-            *
-          )
-        `)
+        .select('*')
         .eq('user_id', userId)
         .or(`pushname.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`)
-        .order('last_message_time', { ascending: false });
+        .order('last_message_time', { ascending: false })
+        .limit(50);
 
       if (error) {
         console.error('Error searching conversations:', error);
@@ -434,8 +425,8 @@ export class ConversationService {
    * Suscribirse a cambios en tiempo real de conversaciones
    */
   static subscribeToConversations(userId: string, callback: (payload: any) => void) {
-    const channelName = `conversations-${userId}-${Date.now()}`;
-    console.log('[Realtime] Subscribing to conversations:', channelName);
+    // Usar nombre de canal fijo para reusar conexiones (sin Date.now())
+    const channelName = `conversations-${userId}`;
     
     return supabase
       .channel(channelName)
@@ -461,8 +452,8 @@ export class ConversationService {
    * Suscribirse a cambios en tiempo real de mensajes
    */
   static subscribeToMessages(conversationId: string, callback: (payload: any) => void) {
-    const channelName = `messages-${conversationId}-${Date.now()}`;
-    console.log('[Realtime] Subscribing to messages:', channelName);
+    // Usar nombre de canal fijo para reusar conexiones (sin Date.now())
+    const channelName = `messages-${conversationId}`;
     
     return supabase
       .channel(channelName)

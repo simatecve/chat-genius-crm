@@ -16,22 +16,22 @@ export const useConversations = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Query para obtener todas las conversaciones
+  // Query para obtener todas las conversaciones - optimizado
   const conversationsQuery = useQuery({
     queryKey: ['conversations', effectiveUserId],
     queryFn: () => ConversationService.getConversations(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 5000, // 5 segundos - más rápido para reflejar cambios
-    refetchInterval: 10000, // Refetch cada 10 segundos como fallback
+    staleTime: 30000, // 30 segundos - reduce queries innecesarias
+    refetchInterval: 60000, // Refetch cada 60 segundos - el realtime maneja actualizaciones
   });
 
-  // Query para obtener el conteo de no leídos
+  // Query para obtener el conteo de no leídos - optimizado
   const unreadCountQuery = useQuery({
     queryKey: ['unreadCount', effectiveUserId],
     queryFn: () => ConversationService.getUnreadCount(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 5000, // 5 segundos
-    refetchInterval: 10000, // Refetch cada 10 segundos
+    staleTime: 30000, // 30 segundos
+    refetchInterval: 60000, // 60 segundos
   });
 
   // Mutation para marcar como leído
@@ -107,13 +107,13 @@ export const useMessages = (conversationId: string | null) => {
 
   console.log('[useMessages] conversationId:', conversationId, 'effectiveUserId:', effectiveUserId);
 
-  // Query para obtener mensajes
+  // Query para obtener mensajes - optimizado
   const messagesQuery = useQuery({
     queryKey: ['messages', conversationId, effectiveUserId],
     queryFn: () => ConversationService.getMessages(conversationId || '', effectiveUserId || ''),
     enabled: !!conversationId && !!effectiveUserId,
-    staleTime: 5000, // 5 segundos - más rápido para reflejar cambios
-    refetchInterval: 15000, // Refetch cada 15 segundos como fallback
+    staleTime: 30000, // 30 segundos - el realtime maneja nuevos mensajes
+    refetchInterval: false, // Desactivar polling - realtime es suficiente
   });
 
   // Mutation para enviar mensaje a través de WAHA o Telegram
