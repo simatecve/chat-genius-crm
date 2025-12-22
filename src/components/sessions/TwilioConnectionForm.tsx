@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
-import { Loader2, CheckCircle, Copy } from 'lucide-react';
+import { Loader2, CheckCircle, Copy, TestTube2, XCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface TwilioConnectionFormProps {
@@ -28,6 +28,8 @@ interface LeadColumn {
 const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
   const [open, setOpen] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ valid: boolean; message: string } | null>(null);
   const [connectionCreated, setConnectionCreated] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -58,6 +60,11 @@ const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
       fetchLeadColumns();
     }
   }, [formData.workspace_id, effectiveUserId]);
+
+  // Reset test result when credentials change
+  useEffect(() => {
+    setTestResult(null);
+  }, [formData.account_sid, formData.auth_token]);
 
   const fetchWorkspaces = async () => {
     if (!effectiveUserId) return;
@@ -97,6 +104,56 @@ const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
     });
   };
 
+  const testCredentials = async () => {
+    if (!formData.account_sid || !formData.auth_token) {
+      toast({
+        title: "Error",
+        description: "Ingresa Account SID y Auth Token para probar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTesting(true);
+    setTestResult(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('twilio-verify-credentials', {
+        body: {
+          account_sid: formData.account_sid,
+          auth_token: formData.auth_token
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.valid) {
+        setTestResult({ valid: true, message: `✓ ${data.message} - ${data.account_name}` });
+        toast({
+          title: "Conexión exitosa",
+          description: `Cuenta válida: ${data.account_name}`,
+        });
+      } else {
+        setTestResult({ valid: false, message: data.error });
+        toast({
+          title: "Credenciales inválidas",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error testing credentials:', error);
+      setTestResult({ valid: false, message: 'Error al verificar' });
+      toast({
+        title: "Error",
+        description: "No se pudo verificar las credenciales",
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -123,15 +180,15 @@ const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
       const cleanPhoneNumber = formData.phone_number.replace(/\D/g, '');
       
       // Validar credenciales de Twilio
-      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${formData.account_sid}.json`;
-      const twilioResponse = await fetch(twilioUrl, {
-        headers: {
-          'Authorization': `Basic ${btoa(`${formData.account_sid}:${formData.auth_token}`)}`,
-        },
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('twilio-verify-credentials', {
+        body: {
+          account_sid: formData.account_sid,
+          auth_token: formData.auth_token
+        }
       });
 
-      if (!twilioResponse.ok) {
-        throw new Error('Credenciales de Twilio inválidas');
+      if (verifyError || !verifyData?.valid) {
+        throw new Error(verifyData?.error || 'Credenciales de Twilio inválidas');
       }
 
       // Crear conexión en la base de datos
@@ -146,6 +203,7 @@ const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
           status: 'active',
           workspace_id: formData.workspace_id || null,
           default_column_id: formData.default_column_id || null,
+          webhook_url: null, // Se actualizará después
         })
         .select()
         .single();
@@ -153,6 +211,13 @@ const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
       if (insertError) throw insertError;
 
       const generatedWebhookUrl = `https://pxvembsxhwvpotydtiqa.supabase.co/functions/v1/twilio-webhook?connectionId=${connection.id}`;
+      
+      // Guardar webhook_url en la conexión
+      await supabase
+        .from('twilio_connections')
+        .update({ webhook_url: generatedWebhookUrl })
+        .eq('id', connection.id);
+
       setWebhookUrl(generatedWebhookUrl);
       setConnectionCreated(true);
 
@@ -217,6 +282,39 @@ const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
                 placeholder="••••••••••••••••••••••••••••••••"
                 required
               />
+            </div>
+
+            {/* Botón Probar Conexión */}
+            <div className="flex items-center gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={testCredentials}
+                disabled={testing || !formData.account_sid || !formData.auth_token}
+                className="flex-shrink-0"
+              >
+                {testing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Probando...
+                  </>
+                ) : (
+                  <>
+                    <TestTube2 className="mr-2 h-4 w-4" />
+                    Probar Conexión
+                  </>
+                )}
+              </Button>
+              {testResult && (
+                <div className={`flex items-center gap-1 text-sm ${testResult.valid ? 'text-green-600' : 'text-red-600'}`}>
+                  {testResult.valid ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  <span>{testResult.message}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -292,37 +390,41 @@ const TwilioConnectionForm = ({ onClose }: TwilioConnectionFormProps) => {
           </form>
         ) : (
           <div className="space-y-4 py-4">
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-700 dark:text-green-300">
                 ¡Conexión creada exitosamente! Ahora configura el webhook en Twilio.
               </AlertDescription>
             </Alert>
 
             <div className="space-y-2">
-              <Label>URL del Webhook</Label>
+              <Label className="font-semibold">URL del Webhook (copiar y pegar en Twilio)</Label>
               <div className="flex gap-2">
-                <Input value={webhookUrl} readOnly className="font-mono text-sm" />
+                <Input value={webhookUrl} readOnly className="font-mono text-sm bg-muted" />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
                   onClick={() => copyToClipboard(webhookUrl)}
+                  className="flex-shrink-0"
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Método: <strong>HTTP POST</strong>
+              </p>
             </div>
 
-            <div className="space-y-2 text-sm">
-              <p className="font-semibold">Instrucciones:</p>
-              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                <li>Ve a la consola de Twilio</li>
-                <li>Navega a Messaging → Try it out → Send a WhatsApp message</li>
-                <li>Selecciona tu WhatsApp Sender</li>
-                <li>En "Sandbox Settings" o "WhatsApp Sender Configuration"</li>
-                <li>Configura "When a message comes in" con la URL del webhook</li>
-                <li>Método: HTTP POST</li>
+            <div className="space-y-2 text-sm bg-muted p-4 rounded-lg">
+              <p className="font-semibold">📋 Instrucciones para configurar en Twilio:</p>
+              <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                <li>Ve a <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">console.twilio.com</a></li>
+                <li>Navega a <strong>Messaging → Try it out → Send a WhatsApp message</strong></li>
+                <li>O ve a <strong>Messaging → Senders → WhatsApp senders</strong></li>
+                <li>Selecciona tu número de WhatsApp</li>
+                <li>En <strong>"When a message comes in"</strong>, pega la URL del webhook</li>
+                <li>Asegúrate de que el método sea <strong>HTTP POST</strong></li>
                 <li>Guarda los cambios</li>
               </ol>
             </div>
