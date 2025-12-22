@@ -146,12 +146,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     setShowEmojiPicker(false);
   };
 
-  // Manejar selección de respuesta rápida
-  const handleQuickReplySelect = (reply: any) => {
-    setNewMessage(reply.message);
-    setShowQuickReplies(false);
-    setShowQuickReplyDropdown(false);
-    setQuickReplyFilter('');
+  // Manejar selección de respuesta rápida (y enviar automáticamente)
+  const handleQuickReplySelect = (reply: any, autoSend: boolean = false) => {
+    if (autoSend) {
+      // Enviar directamente sin poner en el input
+      onSendMessage(reply.message, undefined);
+      setShowQuickReplies(false);
+      setShowQuickReplyDropdown(false);
+      setQuickReplyFilter('');
+      setNewMessage('');
+    } else {
+      setNewMessage(reply.message);
+      setShowQuickReplies(false);
+      setShowQuickReplyDropdown(false);
+      setQuickReplyFilter('');
+    }
   };
 
   // Manejar cambio de input con detección de "/"
@@ -528,10 +537,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               placeholder="Escribe '/' para respuestas rápidas..."
               value={newMessage}
               onChange={handleInputChange}
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSendMessage();
+                  // Si hay dropdown abierto con respuestas filtradas, seleccionar y enviar la primera
+                  if (showQuickReplyDropdown && filteredQuickReplies.length > 0) {
+                    handleQuickReplySelect(filteredQuickReplies[0], true);
+                  } else {
+                    handleSendMessage();
+                  }
                 }
               }}
               className="pr-10 bg-muted border border-input text-foreground placeholder:text-muted-foreground"
