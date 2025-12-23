@@ -17,11 +17,12 @@ import WorkspaceManagement from '@/components/WorkspaceManagement';
 import SessionsManager from '@/components/sessions/SessionsManager';
 import QuickReplies from '@/components/QuickReplies';
 import UserManagement from '@/components/UserManagement';
-import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon, Tag, Brain } from 'lucide-react';
+import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon, Tag, Brain, Calculator } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 import TagsTab from '@/components/settings/TagsTab';
 import IADefaultTab from '@/components/settings/IADefaultTab';
+import CostEstimatorTab from '@/components/settings/CostEstimatorTab';
 
 interface UserProfile {
   first_name: string | null;
@@ -260,6 +261,12 @@ const Settings = () => {
             <TabsTrigger value="tags" className="flex items-center space-x-2 flex-shrink-0">
               <Tag className="h-4 w-4" />
               <span>Etiquetas</span>
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="cost-estimator" className="flex items-center space-x-2 flex-shrink-0">
+              <Calculator className="h-4 w-4" />
+              <span>Costos</span>
             </TabsTrigger>
           )}
         </TabsList>
@@ -552,6 +559,12 @@ const Settings = () => {
         {canManageTags && (
           <TabsContent value="tags" className="mt-6">
             <TagsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="cost-estimator" className="mt-6">
+            <CostEstimatorTab userId={effectiveUserId} />
           </TabsContent>
         )}
       </Tabs>
