@@ -342,16 +342,23 @@ const Leads = () => {
   const loadWorkspaces = async () => {
     if (!effectiveUserId) return;
     
+    // IMPORTANTE: Excluir workspaces de webchat - estos se manejan en LeadsWebChat.tsx
     const {
       data,
       error
-    } = await supabase.from('workspaces').select('*').eq('user_id', effectiveUserId).order('position');
+    } = await supabase
+      .from('workspaces')
+      .select('*')
+      .eq('user_id', effectiveUserId)
+      .or('channel_type.is.null,channel_type.neq.webchat')
+      .order('position');
+      
     if (error) {
       console.error('Error loading workspaces:', error);
       return;
     }
 
-    // Si no hay workspaces, crear uno por defecto
+    // Si no hay workspaces normales, crear uno por defecto
     if (!data || data.length === 0) {
       const {
         data: newWorkspace,
@@ -360,6 +367,7 @@ const Leads = () => {
         user_id: effectiveUserId,
         name: 'Mi Espacio de Trabajo',
         position: 0
+        // channel_type queda NULL = workspace normal
       }).select().single();
       if (createError) {
         console.error('Error creating default workspace:', createError);
@@ -379,9 +387,17 @@ const Leads = () => {
       setSelectedWorkspace(newWorkspace.id);
       return;
     }
+    
     setWorkspaces(data || []);
-    // Seleccionar el primer workspace por defecto
-    if (data && data.length > 0 && !selectedWorkspace) {
+    
+    // Verificar que el workspace seleccionado sea válido (no webchat)
+    const validWorkspaceIds = data.map(w => w.id);
+    if (selectedWorkspace && !validWorkspaceIds.includes(selectedWorkspace)) {
+      // El workspace seleccionado no es válido (es webchat), resetear al primero
+      console.log('[Leads] Resetting selectedWorkspace - current is webchat or invalid');
+      setSelectedWorkspace(data[0].id);
+    } else if (!selectedWorkspace && data.length > 0) {
+      // Seleccionar el primer workspace por defecto
       setSelectedWorkspace(data[0].id);
     }
   };
