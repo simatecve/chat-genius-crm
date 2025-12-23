@@ -512,18 +512,21 @@ const Leads = () => {
     }
 
     // Cargar conversaciones huérfanas (sin lead_id) - EXCLUYENDO webchat
+    // Incluir channel_type NULL (conversaciones antiguas) y todos los canales excepto webchat
     const { data: orphanConversations, error: orphanError } = await supabase
       .from('conversations')
       .select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at')
       .eq('user_id', effectiveUserId)
       .is('lead_id', null)
-      .neq('channel_type', 'webchat')
+      .or('channel_type.neq.webchat,channel_type.is.null')
       .order('last_message_time', { ascending: false, nullsFirst: false })
       .limit(200);
 
     if (orphanError) {
       console.error('Error loading orphan conversations:', orphanError);
     }
+    
+    console.log('[Leads] Orphan conversations loaded:', orphanConversations?.length || 0, 'defaultColumnId:', defaultColumnId);
     
     // Filtrar conversaciones webchat de los leads reales
     const filteredRealLeads = (realLeads || []).map(lead => ({
