@@ -111,21 +111,8 @@ async function processBuffer(supabase: any, buffer: any) {
       return;
     }
 
-    // Verificar si el bot está habilitado globalmente
-    const { data: botSettings } = await supabase
-      .from('user_bot_settings')
-      .select('bot_enabled')
-      .eq('user_id', userId)
-      .single();
-
-    if (botSettings?.bot_enabled === false) {
-      console.log('[process-ai-buffer] Bot disabled globally, skipping');
-      await supabase
-        .from('ai_response_buffer')
-        .update({ processed: true })
-        .eq('id', buffer.id);
-      return;
-    }
+     // Nota: La IA predeterminada se controla por sesión/canal (ai_enabled). 
+     // No bloqueamos globalmente por user_bot_settings.bot_enabled acá porque impide respuestas aun con la sesión habilitada.
 
     // Verificar si el contacto bloqueó el bot
     const { data: blockedContact } = await supabase
