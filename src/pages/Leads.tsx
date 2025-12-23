@@ -291,6 +291,18 @@ const Leads = () => {
           loadLeads();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          // Recargar cuando llega un nuevo mensaje para reordenar leads
+          loadLeads();
+        }
+      )
       .subscribe();
     
     return () => {
@@ -440,10 +452,31 @@ const Leads = () => {
       const defaultCol = columnsData?.find(col => col.is_default);
       defaultColumnId = defaultCol?.id || columnsData?.[0]?.id || null;
 
-      // Si no hay columnas en el workspace, no hay leads que mostrar
+      // Si no hay columnas en el workspace, crear una por defecto
       if (columnIds.length === 0) {
-        setLeads([]);
-        return;
+        console.log('[Leads] No columns found, creating default column');
+        const { data: newColumn, error: createError } = await supabase
+          .from('lead_columns')
+          .insert({
+            user_id: effectiveUserId,
+            workspace_id: selectedWorkspace,
+            name: 'Nuevos Contactos',
+            color: '#22c55e',
+            position: 0,
+            is_default: true
+          })
+          .select()
+          .single();
+          
+        if (createError) {
+          console.error('Error creating default column:', createError);
+          setLeads([]);
+          return;
+        }
+        
+        columnIds = [newColumn.id];
+        defaultColumnId = newColumn.id;
+        setColumns([newColumn]);
       }
     }
 
