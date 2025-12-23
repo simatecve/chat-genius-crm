@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Calculator, DollarSign, TrendingDown, Loader2, Database } from 'lucide-react';
+import { Calculator, DollarSign, TrendingDown, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,10 +24,10 @@ const COSTS = {
 
 const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
   const [messageCount, setMessageCount] = useState<number>(0);
-  const [isLoadingReal, setIsLoadingReal] = useState(false);
+  const [isLoadingReal, setIsLoadingReal] = useState(true);
   const { toast } = useToast();
 
-  const loadRealMessageCount = async () => {
+  const loadRealMessageCount = async (showToast = false) => {
     setIsLoadingReal(true);
     try {
       const { count, error } = await supabase
@@ -38,21 +38,32 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
       if (error) throw error;
 
       setMessageCount(count || 0);
-      toast({
-        title: "Datos cargados",
-        description: `Se encontraron ${count || 0} mensajes en tu cuenta`,
-      });
+      if (showToast) {
+        toast({
+          title: "Datos actualizados",
+          description: `Se encontraron ${count || 0} mensajes en tu cuenta`,
+        });
+      }
     } catch (error) {
       console.error('Error loading message count:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los datos reales",
-        variant: "destructive",
-      });
+      if (showToast) {
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos reales",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoadingReal(false);
     }
   };
+
+  // Cargar datos automáticamente al montar el componente
+  useEffect(() => {
+    if (userId) {
+      loadRealMessageCount(false);
+    }
+  }, [userId]);
 
   // Calcular costos
   const internalCost = messageCount * COSTS.internal;
@@ -111,16 +122,16 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
             </div>
             <Button
               variant="outline"
-              onClick={loadRealMessageCount}
+              onClick={() => loadRealMessageCount(true)}
               disabled={isLoadingReal}
               className="flex items-center gap-2"
             >
               {isLoadingReal ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Database className="h-4 w-4" />
+                <RefreshCw className="h-4 w-4" />
               )}
-              Usar mis datos reales
+              Actualizar datos
             </Button>
           </div>
         </CardContent>
