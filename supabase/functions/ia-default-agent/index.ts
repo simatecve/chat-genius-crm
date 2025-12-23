@@ -197,24 +197,10 @@ serve(async (req) => {
       throw settingsError;
     }
 
-    const isEnabled = !!settings?.is_enabled;
+    // La IA predeterminada siempre está disponible - la activación se controla a nivel de sesión/canal
     const cashierNumbersText: string = settings?.cashier_numbers || '';
     const cbu: string = settings?.cbu || '';
     const casinoLink: string = settings?.casino_link || 'https://bet32.fun/';
-
-    // Si la IA global está desactivada, no responde
-    if (!isEnabled) {
-      const payload: DefaultAgentResponse = {
-        isActivated: false,
-        intencionCargaFichas: false,
-        comprobanteDetectado: false,
-        respuesta: ''
-      };
-      return new Response(JSON.stringify(payload), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
-    }
 
     // ANÁLISIS DE IMÁGENES: Si hay imágenes, verificar si alguna es comprobante de pago
     if (imageUrls && imageUrls.length > 0 && GOOGLE_GEMINI_API_KEY) {

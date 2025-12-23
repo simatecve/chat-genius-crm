@@ -514,14 +514,14 @@ serve(async (req) => {
       );
     }
 
-    // Agregar al buffer de respuestas IA
-    const { data: botSettings } = await supabase
-      .from('user_bot_settings')
-      .select('bot_enabled')
-      .eq('user_id', userId)
+    // Agregar al buffer de respuestas IA - verificar ai_enabled de la conexión Twilio
+    const { data: twilioConnectionSettings } = await supabase
+      .from('twilio_connections')
+      .select('ai_enabled')
+      .eq('id', connectionId)
       .single();
 
-    if (botSettings?.bot_enabled !== false) {
+    if (twilioConnectionSettings?.ai_enabled === true) {
       console.log('[twilio-webhook] Bot enabled, adding to buffer...');
       
       // Estructura del mensaje para el buffer (compatible con WAHA)
