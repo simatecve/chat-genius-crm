@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Tables } from '@/integrations/supabase/types';
@@ -76,6 +76,11 @@ const Leads = () => {
   const [searchFilter, setSearchFilter] = useState('');
   const [filteredLeads, setFilteredLeads] = useState<LeadWithColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Ref para debounce de recargas realtime
+  const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadLeadsRef = useRef<() => Promise<void>>();
 
   // Estado para el modal de chat
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -244,6 +249,29 @@ const Leads = () => {
     }
   }, [selectedWorkspace, effectiveUserId, effectiveUserIdLoading]);
 
+  // Función debounced para recargar leads (evita múltiples recargas seguidas)
+  const debouncedLoadLeads = useCallback(() => {
+    if (reloadTimeoutRef.current) {
+      clearTimeout(reloadTimeoutRef.current);
+    }
+    setIsRefreshing(true);
+    reloadTimeoutRef.current = setTimeout(async () => {
+      if (loadLeadsRef.current) {
+        await loadLeadsRef.current();
+      }
+      setIsRefreshing(false);
+    }, 500);
+  }, []);
+
+  // Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Suscripción realtime para reordenar cuando lleguen nuevos mensajes y detectar nuevos leads/conversaciones
   useEffect(() => {
     if (!effectiveUserId) return;
@@ -252,6 +280,7 @@ const Leads = () => {
     const channelName = `leads-realtime-${effectiveUserId}`;
     const channel = supabase
       .channel(channelName)
+      // Conversations: INSERT y UPDATE
       .on(
         'postgres_changes',
         {
@@ -260,23 +289,7 @@ const Leads = () => {
           table: 'conversations',
           filter: `user_id=eq.${effectiveUserId}`
         },
-        () => {
-          // Recargar leads cuando se actualiza una conversación
-          loadLeads();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'leads',
-          filter: `user_id=eq.${effectiveUserId}`
-        },
-        () => {
-          // Recargar leads cuando se crea uno nuevo
-          loadLeads();
-        }
+        () => debouncedLoadLeads()
       )
       .on(
         'postgres_changes',
@@ -286,11 +299,40 @@ const Leads = () => {
           table: 'conversations',
           filter: `user_id=eq.${effectiveUserId}`
         },
-        () => {
-          // Recargar cuando llega una nueva conversación (aparecerá como lead virtual)
-          loadLeads();
-        }
+        () => debouncedLoadLeads()
       )
+      // Leads: INSERT, UPDATE y DELETE
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'leads',
+          filter: `user_id=eq.${effectiveUserId}`
+        },
+        () => debouncedLoadLeads()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'leads',
+          filter: `user_id=eq.${effectiveUserId}`
+        },
+        () => debouncedLoadLeads()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'leads',
+          filter: `user_id=eq.${effectiveUserId}`
+        },
+        () => debouncedLoadLeads()
+      )
+      // Messages: INSERT (sin filtro porque no tiene user_id directo)
       .on(
         'postgres_changes',
         {
@@ -298,17 +340,14 @@ const Leads = () => {
           schema: 'public',
           table: 'messages'
         },
-        () => {
-          // Recargar cuando llega un nuevo mensaje para reordenar leads
-          loadLeads();
-        }
+        () => debouncedLoadLeads()
       )
       .subscribe();
     
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [effectiveUserId]);
+  }, [effectiveUserId, debouncedLoadLeads]);
 
   // Filtrar leads en tiempo real
   useEffect(() => {
@@ -592,6 +631,9 @@ const Leads = () => {
     
     setLeads(sortedData);
   };
+
+  // Actualizar ref de loadLeads para uso en debounce
+  loadLeadsRef.current = loadLeads;
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) {
       toast({
@@ -1032,14 +1074,22 @@ const Leads = () => {
             </SelectContent>
           </Select>
 
+          {/* Indicador de actualización realtime */}
+          {isRefreshing && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 rounded-md border border-primary/20">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <span className="text-xs text-primary">Actualizando...</span>
+            </div>
+          )}
+
           <Button 
             variant="outline" 
             size="icon"
             onClick={() => loadLeads()}
-            disabled={loading}
+            disabled={loading || isRefreshing}
             title="Recargar leads"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
 
           {canCreateFunnels && (
