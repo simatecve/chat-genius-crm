@@ -155,7 +155,8 @@ async function getOrCreateConversation(
     .eq('user_id', userId)
     .eq('phone_number', phoneNumber)
     .eq('channel_type', 'twilio')
-    .single();
+    .eq('twilio_connection_id', twilioConnectionId)
+    .maybeSingle();
 
   if (error && error.code !== 'PGRST116') {
     console.error('Error searching conversation:', error);
