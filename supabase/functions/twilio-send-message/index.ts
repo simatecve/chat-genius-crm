@@ -18,14 +18,46 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
+    const requestBody = await req.json();
+    
+    // Accept both 'phoneNumber' and 'toNumber' for backwards compatibility
     const { 
       twilioConnectionId, 
-      phoneNumber, 
+      phoneNumber: phoneNumberField,
+      toNumber,  // Legacy field name
       message, 
       userId,
       conversationId,
       isBot
-    } = await req.json();
+    } = requestBody;
+    
+    // Use phoneNumber if provided, fallback to toNumber
+    const phoneNumber = phoneNumberField || toNumber;
+    
+    // Validate required fields
+    if (!twilioConnectionId) {
+      console.error('Missing twilioConnectionId');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing twilioConnectionId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!phoneNumber) {
+      console.error('Missing phoneNumber/toNumber');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing phoneNumber' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!message) {
+      console.error('Missing message');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing message' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log('Sending message via Twilio:', {
       twilioConnectionId,

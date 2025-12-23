@@ -31,6 +31,10 @@ const IADefaultTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Global AI enabled state
+  const [globalAIEnabled, setGlobalAIEnabled] = useState(true);
+  const [togglingGlobal, setTogglingGlobal] = useState(false);
+
   // Settings state
   const [systemPrompt, setSystemPrompt] = useState('');
   const [cashierNumbers, setCashierNumbers] = useState('');
@@ -51,6 +55,7 @@ const IADefaultTab: React.FC = () => {
         // Load unified AI settings
         const settings = await unifiedAIService.getSettings(effectiveUserId);
         if (settings) {
+          setGlobalAIEnabled(settings.is_enabled ?? true);
           setSystemPrompt(settings.system_prompt || unifiedAIService.getDefaultPrompt());
           setCashierNumbers(settings.cashier_numbers || '');
           setCbu(settings.cbu || '');
@@ -58,6 +63,7 @@ const IADefaultTab: React.FC = () => {
           setModel(settings.model || 'google/gemini-2.5-flash');
           setMaxTokens(settings.max_tokens || 500);
         } else {
+          setGlobalAIEnabled(true);
           setSystemPrompt(unifiedAIService.getDefaultPrompt());
         }
 
@@ -78,6 +84,37 @@ const IADefaultTab: React.FC = () => {
     load();
   }, [effectiveUserId, userIdLoading, toast]);
 
+  const handleToggleGlobalAI = async () => {
+    if (!effectiveUserId) return;
+    
+    setTogglingGlobal(true);
+    try {
+      const newValue = !globalAIEnabled;
+      await unifiedAIService.saveSettings({
+        user_id: effectiveUserId,
+        is_enabled: newValue,
+        system_prompt: systemPrompt,
+        cashier_numbers: cashierNumbers,
+        cbu,
+        casino_link: casinoLink,
+        model,
+        max_tokens: maxTokens,
+      });
+      setGlobalAIEnabled(newValue);
+      toast({
+        title: newValue ? 'IA Activada' : 'IA Desactivada',
+        description: newValue 
+          ? 'La IA predeterminada responderá en los canales habilitados.' 
+          : 'La IA predeterminada está pausada globalmente.',
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: 'Error', description: error.message || 'No se pudo cambiar el estado.', variant: 'destructive' });
+    } finally {
+      setTogglingGlobal(false);
+    }
+  };
+
   const saveSettings = async () => {
     if (!effectiveUserId) return;
 
@@ -85,7 +122,7 @@ const IADefaultTab: React.FC = () => {
     try {
       await unifiedAIService.saveSettings({
         user_id: effectiveUserId,
-        is_enabled: true,
+        is_enabled: globalAIEnabled,
         system_prompt: systemPrompt,
         cashier_numbers: cashierNumbers,
         cbu,
@@ -143,10 +180,45 @@ const IADefaultTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-2">
-        <span className="h-6 w-6 text-primary">🧠</span>
-        <h2 className="text-2xl font-bold">Inteligencia Artificial Unificada</h2>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <span className="h-6 w-6 text-primary">🧠</span>
+          <h2 className="text-2xl font-bold">Inteligencia Artificial Unificada</h2>
+        </div>
       </div>
+
+      {/* Global AI Switch */}
+      <Card className={`border-2 ${globalAIEnabled ? 'border-green-500/50 bg-green-500/5' : 'border-muted'}`}>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full ${globalAIEnabled ? 'bg-green-500/20' : 'bg-muted'}`}>
+                <Bot className={`h-6 w-6 ${globalAIEnabled ? 'text-green-500' : 'text-muted-foreground'}`} />
+              </div>
+              <div>
+                <h3 className="font-semibold">IA Predeterminada</h3>
+                <p className="text-sm text-muted-foreground">
+                  {globalAIEnabled 
+                    ? 'La IA está activa y responderá en los canales habilitados' 
+                    : 'La IA está pausada globalmente (no responderá en ningún canal)'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {togglingGlobal && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Switch
+                checked={globalAIEnabled}
+                onCheckedChange={handleToggleGlobalAI}
+                disabled={togglingGlobal}
+                className="data-[state=checked]:bg-green-500"
+              />
+              <span className={`text-sm font-medium ${globalAIEnabled ? 'text-green-500' : 'text-muted-foreground'}`}>
+                {globalAIEnabled ? 'ON' : 'OFF'}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* AI Usage Statistics */}
       <AIUsageStats userId={effectiveUserId} />

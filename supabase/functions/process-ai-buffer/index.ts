@@ -86,6 +86,22 @@ async function processBuffer(supabase: any, buffer: any) {
         .eq('id', buffer.id);
       return;
     }
+
+    // Check global AI enabled flag from unified settings
+    const { data: globalSettings } = await supabase
+      .from('webchat_ai_settings')
+      .select('is_enabled')
+      .eq('user_id', buffer.user_id)
+      .single();
+
+    if (globalSettings && globalSettings.is_enabled === false) {
+      console.log(`[process-ai-buffer] Global AI disabled for user ${buffer.user_id}, skipping buffer ${buffer.id}`);
+      await supabase
+        .from('ai_response_buffer')
+        .update({ processed: true })
+        .eq('id', buffer.id);
+      return;
+    }
     
     // accumulated_messages puede venir como string JSON o ya parseado
     let messages: any[];
@@ -292,16 +308,22 @@ async function processBuffer(supabase: any, buffer: any) {
                 });
               }
             } else if (channelType === 'twilio') {
-              await supabase.functions.invoke('twilio-send-message', {
+              console.log(`[process-ai-buffer] Sending Twilio message to ${conversation.phone_number} via connection ${buffer.twilio_connection_id}`);
+              const { data: sendResult, error: sendError } = await supabase.functions.invoke('twilio-send-message', {
                 body: {
                   twilioConnectionId: buffer.twilio_connection_id,
-                  toNumber: conversation.phone_number,
+                  phoneNumber: conversation.phone_number, // Fixed: was 'toNumber'
                   message: mensaje,
                   userId,
                   conversationId,
                   isBot: true
                 }
               });
+              if (sendError) {
+                console.error('[process-ai-buffer] Error sending Twilio message:', sendError);
+              } else {
+                console.log('[process-ai-buffer] Twilio message sent successfully:', sendResult?.success);
+              }
             } else {
               // WhatsApp
               await supabase.functions.invoke('waha-send-message', {
