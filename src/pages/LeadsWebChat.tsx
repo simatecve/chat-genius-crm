@@ -304,13 +304,20 @@ const LeadsWebChat = () => {
       return;
     }
     
-    // Filtrar solo leads con conversaciones webchat o sin conversaciones
+    // Filtrar solo leads con conversaciones webchat
     const filteredData = (data || []).map(lead => ({
       ...lead,
       conversations: lead.conversations?.filter((c: any) => c.channel_type === 'webchat') || []
     }));
     
-    setLeads(filteredData);
+    // Ordenar por último mensaje (más reciente arriba)
+    const sortedData = filteredData.sort((a, b) => {
+      const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
+      const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+      return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
+    });
+    
+    setLeads(sortedData);
   };
 
   const handleCreateColumn = async () => {
