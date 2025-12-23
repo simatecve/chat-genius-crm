@@ -4,7 +4,7 @@ import { useEffectiveUserId } from './useEffectiveUserId';
 import { Database } from '@/integrations/supabase/types';
 import { useEffect } from 'react';
 import { useToast } from './use-toast';
-
+import { supabase } from '@/integrations/supabase/client';
 type Message = Database['public']['Tables']['messages']['Row'];
 type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 
@@ -21,8 +21,8 @@ export const useConversations = () => {
     queryKey: ['conversations', effectiveUserId],
     queryFn: () => ConversationService.getConversations(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 30000, // 30 segundos - reduce queries innecesarias
-    refetchInterval: 60000, // Refetch cada 60 segundos - el realtime maneja actualizaciones
+    staleTime: 5000, // 5 segundos - respuesta más rápida a cambios
+    refetchInterval: 30000, // Refetch cada 30 segundos - el realtime maneja actualizaciones
   });
 
   // Query para obtener el conteo de no leídos - optimizado
@@ -30,8 +30,8 @@ export const useConversations = () => {
     queryKey: ['unreadCount', effectiveUserId],
     queryFn: () => ConversationService.getUnreadCount(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 30000, // 30 segundos
-    refetchInterval: 60000, // 60 segundos
+    staleTime: 5000, // 5 segundos
+    refetchInterval: 30000, // 30 segundos
   });
 
   // Mutation para marcar como leído
@@ -53,22 +53,67 @@ export const useConversations = () => {
     },
   });
 
-  // Suscripción a cambios en tiempo real
+  // Suscripción a cambios en tiempo real - también escuchar mensajes nuevos
   useEffect(() => {
     if (!effectiveUserId) return;
 
-    const subscription = ConversationService.subscribeToConversations(
+    // Suscribirse a cambios en conversaciones
+    const conversationsSubscription = ConversationService.subscribeToConversations(
       effectiveUserId,
       (payload) => {
         console.log('Conversation change:', payload);
-        // Invalidar queries para refrescar datos
-        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        
+        // Si es UPDATE, actualizar el cache directamente y reordenar
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          queryClient.setQueryData<ConversationWithLastMessage[]>(
+            ['conversations', effectiveUserId],
+            (old) => {
+              if (!old) return old;
+              
+              // Actualizar la conversación modificada
+              const updated = old.map(conv => 
+                conv.id === payload.new.id ? { ...conv, ...payload.new } : conv
+              );
+              
+              // Reordenar por last_message_time (más reciente primero)
+              return updated.sort((a, b) => {
+                const aTime = a.last_message_time || a.updated_at || '';
+                const bTime = b.last_message_time || b.updated_at || '';
+                return new Date(bTime).getTime() - new Date(aTime).getTime();
+              });
+            }
+          );
+        } else {
+          // Para INSERT o DELETE, invalidar para refetch completo
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        }
+        
         queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
       }
     );
 
+    // Suscribirse a nuevos mensajes para reordenar conversaciones
+    const messagesChannel = supabase
+      .channel(`messages-global-${effectiveUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          console.log('New message received globally:', payload);
+          // Cuando llega un mensaje nuevo, invalidar para reordenar
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
+        }
+      )
+      .subscribe();
+
     return () => {
-      subscription.unsubscribe();
+      conversationsSubscription.unsubscribe();
+      supabase.removeChannel(messagesChannel);
     };
   }, [effectiveUserId, queryClient]);
 
