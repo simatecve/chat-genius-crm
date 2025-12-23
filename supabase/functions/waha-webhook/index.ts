@@ -703,24 +703,24 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
         );
       }
 
-      // Llamar al agente de IA si hay uno activo y el bot está habilitado
-      console.log('Checking bot settings and active AI agent...');
+      // Llamar al agente de IA si está habilitado en la conexión WhatsApp
+      console.log('Checking WhatsApp connection AI settings...');
       try {
-        // Verificar si el bot está habilitado para el usuario
-        const { data: botSettings, error: settingsError } = await supabase
-          .from('user_bot_settings')
-          .select('bot_enabled')
-          .eq('user_id', userId)
+        // Verificar si la IA está habilitada para esta conexión WhatsApp específica
+        const { data: whatsappConnection, error: connError } = await supabase
+          .from('whatsapp_connections')
+          .select('ai_enabled')
+          .eq('name', session)
           .maybeSingle();
 
-        if (settingsError) {
-          console.error('Error fetching bot settings:', settingsError);
+        if (connError) {
+          console.error('Error fetching WhatsApp connection settings:', connError);
         }
 
-        const isBotEnabled = botSettings?.bot_enabled !== false; // Default a true si no existe
+        const isAIEnabled = whatsappConnection?.ai_enabled === true;
 
-        if (!isBotEnabled) {
-          console.log('Bot is disabled for this user, skipping AI response');
+        if (!isAIEnabled) {
+          console.log('AI is disabled for this WhatsApp connection, skipping AI response');
           return;
         }
 

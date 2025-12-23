@@ -578,14 +578,14 @@ async function processTelegramMessage(supabase: any, update: any, botDbId: strin
       );
     }
 
-    // Verificar si hay bot habilitado y agregar al buffer
-    const { data: botSettings } = await supabase
-      .from('user_bot_settings')
-      .select('bot_enabled')
-      .eq('user_id', userId)
+    // Verificar si la IA está habilitada para este bot de Telegram
+    const { data: telegramBotSettings } = await supabase
+      .from('telegram_bots')
+      .select('ai_enabled')
+      .eq('id', telegramBotId)
       .single();
 
-    if (botSettings?.bot_enabled !== false) {
+    if (telegramBotSettings?.ai_enabled === true) {
       console.log('[telegram-bot-webhook] Bot enabled, adding to buffer...');
       
       // Buscar o crear buffer
