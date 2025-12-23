@@ -478,18 +478,25 @@ const Leads = () => {
       return;
     }
 
-    // Cargar conversaciones huérfanas (sin lead_id)
+    // Cargar conversaciones huérfanas (sin lead_id) - EXCLUYENDO webchat
     const { data: orphanConversations, error: orphanError } = await supabase
       .from('conversations')
       .select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at')
       .eq('user_id', effectiveUserId)
       .is('lead_id', null)
+      .neq('channel_type', 'webchat')
       .order('last_message_time', { ascending: false, nullsFirst: false })
       .limit(200);
 
     if (orphanError) {
       console.error('Error loading orphan conversations:', orphanError);
     }
+    
+    // Filtrar conversaciones webchat de los leads reales
+    const filteredRealLeads = (realLeads || []).map(lead => ({
+      ...lead,
+      conversations: lead.conversations?.filter((c: any) => c.channel_type !== 'webchat') || []
+    }));
 
     // Crear leads virtuales desde conversaciones huérfanas
     const virtualLeads: LeadWithColumn[] = (orphanConversations || []).map((conv, index) => ({
@@ -519,17 +526,11 @@ const Leads = () => {
       }]
     }));
 
-    // Combinar leads reales + virtuales
-    const allLeads = [...(realLeads || []), ...virtualLeads];
+    // Combinar leads reales (sin webchat) + virtuales
+    const allLeads = [...filteredRealLeads, ...virtualLeads];
     
-    // Ordenar leads por último mensaje (más reciente arriba) dentro de cada columna
+    // Ordenar leads por último mensaje (más reciente arriba) - ordenamiento global
     const sortedData = allLeads.sort((a, b) => {
-      // Primero agrupar por columna
-      if (a.column_id !== b.column_id) {
-        return 0; // Mantener orden de columnas
-      }
-      
-      // Dentro de la misma columna, ordenar por last_message_time
       const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
       const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
       
