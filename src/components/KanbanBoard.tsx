@@ -7,7 +7,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { TriggerActivationService } from '@/services/triggerActivationService';
@@ -331,19 +333,32 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
               )}
               
               {hasConversation && conversation && (
-                <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-xs text-muted-foreground">
-                      {conversation.last_message && conversation.last_message.length > 25 
-                        ? `${conversation.last_message.substring(0, 25)}...` 
-                        : conversation.last_message || "Activo"}
-                    </span>
+                <div className="flex flex-col gap-1 pt-2 border-t border-border/40">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                      <span className="text-xs text-muted-foreground truncate">
+                        {conversation.last_message && conversation.last_message.length > 25 
+                          ? `${conversation.last_message.substring(0, 25)}...` 
+                          : conversation.last_message || "Activo"}
+                      </span>
+                    </div>
+                    {conversation.unread_count > 0 && (
+                      <Badge variant="destructive" className="h-4 px-1.5 text-[10px] shrink-0">
+                        {conversation.unread_count}
+                      </Badge>
+                    )}
                   </div>
-                  {conversation.unread_count > 0 && (
-                    <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
-                      {conversation.unread_count}
-                    </Badge>
+                  {conversation.last_message_time && (
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                      <Clock className="h-2.5 w-2.5" />
+                      <span>
+                        {formatDistanceToNow(new Date(conversation.last_message_time), { 
+                          addSuffix: true, 
+                          locale: es 
+                        })}
+                      </span>
+                    </div>
                   )}
                 </div>
               )}

@@ -516,11 +516,11 @@ const Leads = () => {
       query = query.in('column_id', columnIds);
     }
     
-    // Cargar leads reales (límite 200)
+    // Cargar leads reales - sin límite para no perder conversaciones
     const {
       data: realLeads,
       error
-    } = await query.order('position').limit(200);
+    } = await query.order('updated_at', { ascending: false });
     
     if (error) {
       console.error('Error loading leads:', error);
