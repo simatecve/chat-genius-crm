@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
-import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare } from 'lucide-react';
+import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -372,6 +372,36 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   ))}
                 </SelectContent>
               </Select>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Indicador de contacto bloqueado */}
+      {isBlocked && (
+        <div className="mx-3 mt-3">
+          <Alert className="border-orange-500/50 bg-orange-500/10">
+            <BotOff className="h-4 w-4 text-orange-500" />
+            <AlertDescription className="flex items-center justify-between">
+              <span className="text-orange-700 dark:text-orange-400">
+                Este contacto tiene el bot desactivado. La IA no responderá automáticamente.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleBotBlock}
+                disabled={isBotToggling}
+                className="ml-2 text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0"
+              >
+                {isBotToggling ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Bot className="h-4 w-4 mr-1" />
+                    Activar Bot
+                  </>
+                )}
+              </Button>
             </AlertDescription>
           </Alert>
         </div>

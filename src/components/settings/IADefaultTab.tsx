@@ -10,6 +10,7 @@ import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { unifiedAIService, UnifiedAISettings, SessionAIStatus } from '@/services/unifiedAIService';
 import { MessageSquare, Phone, Bot, Globe, Loader2 } from 'lucide-react';
 import AIUsageStats from './AIUsageStats';
+import BlockedContactsPanel from './BlockedContactsPanel';
 
 const channelIcons: Record<string, React.ReactNode> = {
   whatsapp: <Phone className="h-4 w-4 text-green-500" />,
@@ -222,6 +223,9 @@ const IADefaultTab: React.FC = () => {
 
       {/* AI Usage Statistics */}
       <AIUsageStats userId={effectiveUserId} />
+
+      {/* Blocked Contacts Panel */}
+      <BlockedContactsPanel />
 
       {/* Activación por Sesión */}
       <Card>

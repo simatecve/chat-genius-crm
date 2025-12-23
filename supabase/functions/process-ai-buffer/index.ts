@@ -139,7 +139,7 @@ async function processBuffer(supabase: any, buffer: any) {
       .single();
 
     if (blockedContact) {
-      console.log('[process-ai-buffer] Contact blocked bot, skipping');
+      console.log(`[process-ai-buffer] Contact blocked bot - phone: ${conversation.phone_number}, buffer: ${buffer.id}, skipping`);
       await supabase
         .from('ai_response_buffer')
         .update({ processed: true })
