@@ -34,6 +34,8 @@ interface ConversationSummary {
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
   conversations?: ConversationSummary[];
+  isVirtual?: boolean; // Flag para identificar leads creados desde conversaciones huérfanas
+  originalConversationId?: string; // ID de la conversación original para leads virtuales
 }
 const Leads = () => {
   const { user } = useAuth();
@@ -242,7 +244,7 @@ const Leads = () => {
     }
   }, [selectedWorkspace, effectiveUserId, effectiveUserIdLoading]);
 
-  // Suscripción realtime para reordenar cuando lleguen nuevos mensajes y detectar nuevos leads
+  // Suscripción realtime para reordenar cuando lleguen nuevos mensajes y detectar nuevos leads/conversaciones
   useEffect(() => {
     if (!effectiveUserId) return;
     
@@ -273,6 +275,19 @@ const Leads = () => {
         },
         () => {
           // Recargar leads cuando se crea uno nuevo
+          loadLeads();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: `user_id=eq.${effectiveUserId}`
+        },
+        () => {
+          // Recargar cuando llega una nueva conversación (aparecerá como lead virtual)
           loadLeads();
         }
       )
@@ -407,17 +422,23 @@ const Leads = () => {
     
     // Si hay workspace seleccionado, primero obtener los IDs de las columnas
     let columnIds: string[] = [];
+    let defaultColumnId: string | null = null;
+    
     if (selectedWorkspace) {
       // Incluir columnas con workspace_id igual al seleccionado O sin workspace (null)
       const {
         data: columnsData,
         error: columnsError
-      } = await supabase.from('lead_columns').select('id').eq('user_id', effectiveUserId).or(`workspace_id.eq.${selectedWorkspace},workspace_id.is.null`);
+      } = await supabase.from('lead_columns').select('id, is_default').eq('user_id', effectiveUserId).or(`workspace_id.eq.${selectedWorkspace},workspace_id.is.null`);
       if (columnsError) {
         console.error('Error loading columns for leads:', columnsError);
         return;
       }
       columnIds = columnsData?.map(col => col.id) || [];
+      
+      // Encontrar columna por defecto para asignar leads virtuales
+      const defaultCol = columnsData?.find(col => col.is_default);
+      defaultColumnId = defaultCol?.id || columnsData?.[0]?.id || null;
 
       // Si no hay columnas en el workspace, no hay leads que mostrar
       if (columnIds.length === 0) {
@@ -436,7 +457,8 @@ const Leads = () => {
           pushname,
           last_message,
           last_message_time,
-          unread_count
+          unread_count,
+          channel_type
         )
       `);
 
@@ -445,18 +467,63 @@ const Leads = () => {
       query = query.in('column_id', columnIds);
     }
     
-    // Limitar a 200 leads por workspace para evitar timeouts
+    // Cargar leads reales (límite 200)
     const {
-      data,
+      data: realLeads,
       error
     } = await query.order('position').limit(200);
+    
     if (error) {
       console.error('Error loading leads:', error);
       return;
     }
+
+    // Cargar conversaciones huérfanas (sin lead_id)
+    const { data: orphanConversations, error: orphanError } = await supabase
+      .from('conversations')
+      .select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at')
+      .eq('user_id', effectiveUserId)
+      .is('lead_id', null)
+      .order('last_message_time', { ascending: false, nullsFirst: false })
+      .limit(200);
+
+    if (orphanError) {
+      console.error('Error loading orphan conversations:', orphanError);
+    }
+
+    // Crear leads virtuales desde conversaciones huérfanas
+    const virtualLeads: LeadWithColumn[] = (orphanConversations || []).map((conv, index) => ({
+      id: `virtual-${conv.id}`,
+      name: conv.pushname || conv.phone_number || 'Sin nombre',
+      phone: conv.phone_number,
+      email: null,
+      company: null,
+      notes: null,
+      value: null,
+      tags: null,
+      column_id: defaultColumnId || '',
+      position: index,
+      user_id: effectiveUserId,
+      created_at: conv.created_at,
+      updated_at: conv.updated_at,
+      bot_active: true,
+      isVirtual: true,
+      originalConversationId: conv.id,
+      conversations: [{
+        id: conv.id,
+        phone_number: conv.phone_number,
+        pushname: conv.pushname,
+        last_message: conv.last_message,
+        last_message_time: conv.last_message_time,
+        unread_count: conv.unread_count
+      }]
+    }));
+
+    // Combinar leads reales + virtuales
+    const allLeads = [...(realLeads || []), ...virtualLeads];
     
     // Ordenar leads por último mensaje (más reciente arriba) dentro de cada columna
-    const sortedData = (data || []).sort((a, b) => {
+    const sortedData = allLeads.sort((a, b) => {
       // Primero agrupar por columna
       if (a.column_id !== b.column_id) {
         return 0; // Mantener orden de columnas
@@ -641,7 +708,72 @@ const Leads = () => {
     });
   };
   const handleMoveLeadToColumn = async (leadId: string, targetColumnId: string) => {
-    // Guardar estado anterior para rollback
+    // Verificar si es un lead virtual (conversación huérfana)
+    const isVirtualLead = leadId.startsWith('virtual-');
+    
+    if (isVirtualLead) {
+      // Convertir lead virtual a lead real
+      const virtualLead = leads.find(l => l.id === leadId);
+      if (!virtualLead || !virtualLead.originalConversationId) return;
+      
+      const previousLeads = [...leads];
+      
+      // Remover el lead virtual de la UI inmediatamente
+      setLeads(leads.filter(l => l.id !== leadId));
+      
+      try {
+        // Crear lead real en la base de datos
+        const { data: newLead, error: createError } = await supabase
+          .from('leads')
+          .insert({
+            name: virtualLead.name,
+            phone: virtualLead.phone,
+            column_id: targetColumnId,
+            position: leads.filter(l => l.column_id === targetColumnId).length,
+            user_id: effectiveUserId
+          })
+          .select(`
+            *,
+            lead_columns(*)
+          `)
+          .single();
+        
+        if (createError) throw createError;
+        
+        // Vincular la conversación al nuevo lead
+        const { error: linkError } = await supabase
+          .from('conversations')
+          .update({ lead_id: newLead.id })
+          .eq('id', virtualLead.originalConversationId);
+        
+        if (linkError) {
+          console.error('Error linking conversation:', linkError);
+        }
+        
+        // Agregar el lead real a la lista
+        setLeads(prev => [...prev.filter(l => l.id !== leadId), {
+          ...newLead,
+          conversations: virtualLead.conversations
+        }]);
+        
+        toast({
+          title: "Lead creado",
+          description: `${virtualLead.name} fue agregado al embudo`
+        });
+        
+      } catch (error) {
+        console.error('Error converting virtual lead:', error);
+        setLeads(previousLeads);
+        toast({
+          title: "Error",
+          description: "Error al crear el lead",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+    
+    // Lead real - comportamiento normal
     const previousLeads = [...leads];
     
     // ✅ ACTUALIZACIÓN OPTIMISTA INMEDIATA - UI responde al instante

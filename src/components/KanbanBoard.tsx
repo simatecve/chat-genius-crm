@@ -34,6 +34,8 @@ interface ConversationSummary {
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
   conversations?: ConversationSummary[];
+  isVirtual?: boolean;
+  originalConversationId?: string;
 }
 
 interface KanbanBoardProps {
@@ -157,7 +159,7 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
               snapshot.isDragging 
                 ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' 
                 : 'hover:bg-muted/30 hover:shadow-md'
-            }`}
+            } ${lead.isVirtual ? 'border-l-4 border-l-amber-500/70' : ''}`}
             onClick={(e) => {
               // Solo navegar si no se hizo clic en un botón o menú
               const target = e.target as HTMLElement;
@@ -169,12 +171,19 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
             <div className="space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0 text-xs font-medium">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-medium ${
+                    lead.isVirtual ? 'bg-amber-500/20 text-amber-600' : 'bg-muted'
+                  }`}>
                     {lead.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">
+                    <div className="font-medium text-sm truncate flex items-center gap-1.5">
                       {lead.name}
+                      {lead.isVirtual && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-amber-500/10 text-amber-600 border-amber-500/30">
+                          Nuevo
+                        </Badge>
+                      )}
                     </div>
                     {lead.phone && (
                       <div className="text-xs text-muted-foreground truncate">
