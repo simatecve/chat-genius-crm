@@ -680,12 +680,6 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
                   <CardTitle className="text-sm font-semibold uppercase tracking-wide truncate">
                     {column.name}
                   </CardTitle>
-                  <Badge variant="secondary" className="text-xs font-bold shrink-0">
-                    {columnState?.totalCount !== undefined 
-                      ? `${columnLeads.length}/${columnState.totalCount}`
-                      : columnLeads.length
-                    }
-                  </Badge>
                   {column.is_default && (
                     <Badge variant="outline" className="text-xs shrink-0">
                       Por defecto
@@ -707,10 +701,16 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
               </TooltipContent>
             </Tooltip>
           </div>
-          <div className="flex items-center gap-2 mt-3">
+          <div className="flex items-center gap-2 mt-3 justify-end">
+            <Badge variant="secondary" className="text-xs font-bold shrink-0">
+              {columnState?.totalCount !== undefined 
+                ? `${columnLeads.length}/${columnState.totalCount}`
+                : columnLeads.length
+              }
+            </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
