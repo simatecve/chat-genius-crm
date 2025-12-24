@@ -296,12 +296,10 @@ serve(async (req) => {
         });
       }
       
-      const cajas = cashierNumbersText?.trim() || 'Contacta a soporte para obtener el número del cajero';
       const mensajesMultiples = [
         'Para transferir te dejo el CBU a continuación ↓',
         cbu,
-        'Una vez realizada la transferencia, enviá el comprobante al cajero para acreditar tu saldo ↓',
-        cajas
+        'Una vez que hagas la transferencia, enviame el comprobante ACÁ para acreditar tu saldo 💸'
       ];
 
       const payload: DefaultAgentResponse = {
@@ -500,9 +498,11 @@ ${existingUserInfo}
 - ¿A nombre de quién está el CBU? → Edgardo Barrientos
 
 **CUÁNDO MENCIONAR AL CAJERO (SOLO en estos casos):**
-- Cuando el usuario EXPLÍCITAMENTE pida: cargar saldo, depositar, retirar dinero, enviar comprobante
-- Cuando pida hablar con un humano o asesor
-- Cuando tenga problemas técnicos que no puedas resolver
+- ÚNICAMENTE después de que el usuario envíe una imagen de comprobante de transferencia y sea verificada
+- Cuando pidan específicamente RETIRO de dinero
+- Cuando pidan hablar con un humano o asesor
+- Cuando tengan problemas técnicos que no puedas resolver
+- NUNCA menciones al cajero cuando pidan cargar saldo (primero deben enviar comprobante acá)
 - Formato: "Para eso contactá con nuestro cajero: ${cashierNumbersText || '[número]'}"
 
 **CUÁNDO NO MENCIONAR AL CAJERO:**
@@ -531,7 +531,11 @@ ${existingUserInfo}
 - NUNCA expliques por qué el usuario tiene ese formato (no menciones fechas, sufijos, ni cómo se generó). Solo comunicá el usuario creado tal cual.
 
 **REGLAS IMPORTANTES:**
-- Si te piden cargar fichas, depositar o retirar saldo, primero dales el CBU: ${cbu || '[CBU]'}, y luego indicá que deben enviar el comprobante al cajero: ${cashierNumbersText || '[número del cajero]'}
+- Si te piden CARGAR fichas o DEPOSITAR:
+  1. Primero dales el CBU: ${cbu || '[CBU]'}
+  2. Deciles que envíen el comprobante ACÁ (al chat, NO al cajero aún)
+  3. SOLO cuando envíen el comprobante y lo verifiques como válido, ahí sí dales el link del cajero: ${cashierNumbersText || '[número del cajero]'}
+- Si te piden RETIRO de dinero, ahí sí podés dar directamente el cajero
 - NUNCA inventes información. Si no sabés algo, decilo claramente y recomendá contactar al cajero
 - Si preguntan el link o cómo entrar al casino, respondé: ${casinoLink}
 
