@@ -198,20 +198,8 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
                       )}
                     </div>
                     {lead.phone && (
-                      <div className="text-xs text-muted-foreground truncate flex items-center gap-2">
-                        <span>{lead.phone}</span>
-                        {((hasConversation && conversation?.last_message_time) || lead.updated_at) && (
-                          <span className="text-muted-foreground/70">
-                            · {formatDistanceToNow(
-                              new Date(
-                                (hasConversation && conversation?.last_message_time) 
-                                  ? conversation.last_message_time 
-                                  : lead.updated_at!
-                              ), 
-                              { addSuffix: false, locale: es }
-                            )}
-                          </span>
-                        )}
+                      <div className="text-xs text-muted-foreground truncate">
+                        {lead.phone}
                       </div>
                     )}
                   </div>
@@ -354,13 +342,26 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
                 </Badge>
               )}
               
-              {hasConversation && conversation && conversation.unread_count > 0 && (
-                <div className="flex items-center justify-end pt-2 border-t border-border/40">
+              {/* Footer con fecha y mensajes no leídos */}
+              <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  {((hasConversation && conversation?.last_message_time) || lead.updated_at) && 
+                    formatDistanceToNow(
+                      new Date(
+                        (hasConversation && conversation?.last_message_time) 
+                          ? conversation.last_message_time 
+                          : lead.updated_at!
+                      ), 
+                      { addSuffix: true, locale: es }
+                    )
+                  }
+                </span>
+                {hasConversation && conversation && conversation.unread_count > 0 && (
                   <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
                     {conversation.unread_count}
                   </Badge>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </Card>
         </div>
