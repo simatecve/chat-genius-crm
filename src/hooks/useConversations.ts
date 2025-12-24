@@ -213,7 +213,8 @@ export const useMessages = (conversationId: string | null) => {
         created_at: new Date().toISOString(),
         attachment_url: null,
         file_url: null,
-        metadata: null
+        metadata: null,
+        responded_by: null
       };
       
       // Agregar mensaje optimista a la cache

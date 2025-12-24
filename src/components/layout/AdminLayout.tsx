@@ -10,7 +10,8 @@ import {
   BarChart3,
   DollarSign,
   Shield,
-  Calendar
+  Calendar,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,6 +84,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       label: 'Suscripciones',
       href: '/admin/gestion-suscripciones',
       active: location.pathname === '/admin/gestion-suscripciones'
+    },
+    {
+      icon: FileText,
+      label: 'Auditoría',
+      href: '/admin/auditoria',
+      active: location.pathname === '/admin/auditoria'
     }
   ];
 
