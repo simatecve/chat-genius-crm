@@ -7,6 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Función para esperar un tiempo determinado
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Función para obtener delay aleatorio
+function getRandomDelay(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,39 +40,116 @@ serve(async (req) => {
       message, 
       userId,
       conversationId,
-      isBot
+      isBot,
+      // Nuevos parámetros de humanización
+      humanizationDelay,
+      enableTypingIndicator
     } = await req.json();
 
     console.log('Sending message via WAHA:', {
       sessionName,
       phoneNumber,
-      messagePreview: message.substring(0, 50)
+      messagePreview: message.substring(0, 50),
+      humanizationDelay,
+      enableTypingIndicator
     });
 
     // Formatear número de teléfono para WAHA
-    // Los números pueden tener dos formatos:
-    // - @c.us para números regulares
-    // - @lid para números de canales/listas de difusión
     const formattedPhone = phoneNumber.replace(/[^0-9]/g, '');
     
-    // Determinar el sufijo correcto según el número
-    // Los números que empiezan con ciertos patrones usan @lid
     let chatId: string;
     if (phoneNumber.includes('@lid') || phoneNumber.includes('@newsletter')) {
-      // Ya viene con el formato correcto
       chatId = phoneNumber;
     } else if (phoneNumber.includes('@c.us')) {
-      // Ya viene con el formato correcto
       chatId = phoneNumber;
     } else {
-      // Formatear el número
-      // Los números de grupos/canales pueden tener formato especial
       chatId = `${formattedPhone}@c.us`;
     }
 
     console.log('Formatted chatId:', chatId);
 
-    // Enviar mensaje a WAHA según documentación oficial
+    // ============= HUMANIZACIÓN: DELAY ANTES DE ENVIAR =============
+    
+    // Obtener configuración de humanización si no viene en el request
+    let delayMs = humanizationDelay;
+    let showTyping = enableTypingIndicator;
+    
+    if (isBot && (delayMs === undefined || showTyping === undefined)) {
+      try {
+        const { data: humanSettings } = await supabase
+          .from('ia_humanization_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+        
+        if (humanSettings) {
+          if (delayMs === undefined) {
+            delayMs = getRandomDelay(
+              humanSettings.min_response_delay_ms || 2000,
+              humanSettings.max_response_delay_ms || 6000
+            );
+          }
+          if (showTyping === undefined) {
+            showTyping = humanSettings.enable_typing_indicator ?? true;
+          }
+        }
+      } catch (e) {
+        console.log('[waha-send-message] Could not fetch humanization settings, using defaults');
+        delayMs = delayMs ?? getRandomDelay(2000, 5000);
+        showTyping = showTyping ?? true;
+      }
+    }
+
+    // Solo aplicar delay y typing para mensajes del bot
+    if (isBot && delayMs && delayMs > 0) {
+      console.log(`[waha-send-message] Applying humanization delay: ${delayMs}ms, typing: ${showTyping}`);
+      
+      // Mostrar indicador de "escribiendo..." si está habilitado
+      if (showTyping) {
+        try {
+          const typingUrl = `${WAHA_BASE_URL}/api/startTyping`;
+          await fetch(typingUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Api-Key': WAHA_API_KEY,
+            },
+            body: JSON.stringify({
+              chatId: chatId,
+              session: sessionName
+            }),
+          });
+          console.log('[waha-send-message] Started typing indicator');
+        } catch (typingError) {
+          console.log('[waha-send-message] Could not start typing indicator:', typingError);
+        }
+      }
+      
+      // Esperar el delay
+      await sleep(delayMs);
+      
+      // Detener indicador de escribiendo
+      if (showTyping) {
+        try {
+          const stopTypingUrl = `${WAHA_BASE_URL}/api/stopTyping`;
+          await fetch(stopTypingUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Api-Key': WAHA_API_KEY,
+            },
+            body: JSON.stringify({
+              chatId: chatId,
+              session: sessionName
+            }),
+          });
+        } catch (typingError) {
+          console.log('[waha-send-message] Could not stop typing indicator');
+        }
+      }
+    }
+
+    // Enviar mensaje a WAHA
     const wahaUrl = `${WAHA_BASE_URL}/api/sendText`;
     const wahaPayload = {
       chatId: chatId,
@@ -96,8 +183,6 @@ serve(async (req) => {
 
     const wahaResult = await wahaResponse.json();
     console.log('Message sent via WAHA:', wahaResult);
-    console.log('WAHA response status:', wahaResult.status);
-    console.log('WAHA message ID:', wahaResult.id);
 
     // Guardar mensaje en la base de datos
     const messageData = {
@@ -113,7 +198,8 @@ serve(async (req) => {
         waha_id: wahaResult.id || null,
         waha_status: wahaResult.status || null,
         waha_timestamp: wahaResult.messageTimestamp || null,
-        sent_via: 'api'
+        sent_via: 'api',
+        humanization_delay_applied: isBot ? delayMs : null
       }
     };
 
@@ -125,11 +211,9 @@ serve(async (req) => {
 
     if (dbError) {
       console.error('Error saving message to database:', dbError);
-      // No lanzamos error aquí porque el mensaje ya se envió exitosamente
     } else {
       console.log('Message saved to database:', savedMessage.id);
       
-      // Actualizar última fecha de mensaje en la conversación
       await supabase
         .from('conversations')
         .update({
@@ -144,7 +228,8 @@ serve(async (req) => {
         success: true,
         message: 'Message sent successfully',
         wahaResult: wahaResult,
-        savedMessage: savedMessage
+        savedMessage: savedMessage,
+        humanizationApplied: isBot ? { delayMs, showTyping } : null
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

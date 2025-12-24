@@ -810,6 +810,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_humanization_settings: {
+        Row: {
+          ai_temperature: number
+          combine_multiple_messages: boolean
+          created_at: string | null
+          delay_between_messages_ms: number
+          emoji_frequency: number
+          enable_response_variation: boolean
+          enable_typing_indicator: boolean
+          id: number
+          max_response_delay_ms: number
+          max_responses_per_minute: number
+          min_response_delay_ms: number
+          updated_at: string | null
+        }
+        Insert: {
+          ai_temperature?: number
+          combine_multiple_messages?: boolean
+          created_at?: string | null
+          delay_between_messages_ms?: number
+          emoji_frequency?: number
+          enable_response_variation?: boolean
+          enable_typing_indicator?: boolean
+          id?: number
+          max_response_delay_ms?: number
+          max_responses_per_minute?: number
+          min_response_delay_ms?: number
+          updated_at?: string | null
+        }
+        Update: {
+          ai_temperature?: number
+          combine_multiple_messages?: boolean
+          created_at?: string | null
+          delay_between_messages_ms?: number
+          emoji_frequency?: number
+          enable_response_variation?: boolean
+          enable_typing_indicator?: boolean
+          id?: number
+          max_response_delay_ms?: number
+          max_responses_per_minute?: number
+          min_response_delay_ms?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       internal_messages: {
         Row: {
           content: string
