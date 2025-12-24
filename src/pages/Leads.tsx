@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
+import { useInfiniteLeads } from '@/hooks/useInfiniteLeads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +21,7 @@ import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 import ChatModal from '@/components/conversations/ChatModal';
 import { useMessages, useConversations } from '@/hooks/useConversations';
+
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 type Workspace = Tables<'workspaces'>;
@@ -77,6 +79,29 @@ const Leads = () => {
   const [filteredLeads, setFilteredLeads] = useState<LeadWithColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Obtener IDs de columnas y columna por defecto
+  const columnIds = useMemo(() => columns.map(c => c.id), [columns]);
+  const defaultColumnId = useMemo(() => {
+    const defaultCol = columns.find(c => c.is_default);
+    return defaultCol?.id || columns[0]?.id || null;
+  }, [columns]);
+
+  // Hook de paginación infinita
+  const {
+    getAllLeads,
+    getLeadsForColumn,
+    getColumnState,
+    loadMore,
+    refreshAll,
+    initialLoading: infiniteLoading
+  } = useInfiniteLeads({
+    userId: effectiveUserId,
+    workspaceId: selectedWorkspace,
+    columnIds,
+    defaultColumnId,
+    pageSize: 20
+  });
 
   // Ref para debounce de recargas realtime
   const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -349,12 +374,18 @@ const Leads = () => {
     };
   }, [effectiveUserId, debouncedLoadLeads]);
 
+  // Obtener leads desde el hook de paginación
+  const paginatedLeads = useMemo(() => getAllLeads(), [getAllLeads]);
+
   // Filtrar leads en tiempo real
   useEffect(() => {
+    // Usar leads paginados si están disponibles, sino usar leads locales
+    const sourceLeads = paginatedLeads.length > 0 ? paginatedLeads : leads;
+    
     if (!searchFilter.trim()) {
-      setFilteredLeads(leads);
+      setFilteredLeads(sourceLeads);
     } else {
-      const filtered = leads.filter(lead => {
+      const filtered = sourceLeads.filter(lead => {
         const searchTerm = searchFilter.toLowerCase();
         const nameMatch = lead.name?.toLowerCase().includes(searchTerm);
         const phoneMatch = lead.phone?.toLowerCase().includes(searchTerm);
@@ -362,7 +393,7 @@ const Leads = () => {
       });
       setFilteredLeads(filtered);
     }
-  }, [leads, searchFilter]);
+  }, [leads, paginatedLeads, searchFilter]);
   const loadData = async () => {
     try {
       setLoading(true);
@@ -1115,7 +1146,20 @@ const Leads = () => {
           {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No se encontraron resultados</span>}
         </div>}
 
-      <KanbanBoard columns={columns} leads={filteredLeads} onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} onConvertToContactList={openConvertDialog} onManageMessageTriggers={openMessageTriggersDialog} onOpenConversation={handleLeadClick} />
+      <KanbanBoard 
+        columns={columns} 
+        leads={filteredLeads} 
+        onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} 
+        onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} 
+        onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} 
+        onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} 
+        onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} 
+        onConvertToContactList={openConvertDialog} 
+        onManageMessageTriggers={openMessageTriggersDialog} 
+        onOpenConversation={handleLeadClick}
+        onLoadMore={loadMore}
+        getColumnState={getColumnState}
+      />
 
       {/* Column Dialog */}
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
