@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { unifiedAIService, UnifiedAISettings, SessionAIStatus } from '@/services/unifiedAIService';
-import { MessageSquare, Phone, Bot, Globe, Loader2 } from 'lucide-react';
+import { iaHumanizationService, IAHumanizationSettings } from '@/services/iaHumanizationService';
+import { MessageSquare, Phone, Bot, Globe, Loader2, Shield, Sparkles } from 'lucide-react';
 import AIUsageStats from './AIUsageStats';
 import BlockedContactsPanel from './BlockedContactsPanel';
 
@@ -48,6 +50,11 @@ const IADefaultTab: React.FC = () => {
   const [sessions, setSessions] = useState<SessionAIStatus[]>([]);
   const [togglingSession, setTogglingSession] = useState<string | null>(null);
 
+  // Humanization settings state
+  const [humanSettings, setHumanSettings] = useState<IAHumanizationSettings>(
+    iaHumanizationService.getDefaultSettings()
+  );
+
   useEffect(() => {
     const load = async () => {
       if (!effectiveUserId || userIdLoading) return;
@@ -66,6 +73,12 @@ const IADefaultTab: React.FC = () => {
         } else {
           setGlobalAIEnabled(true);
           setSystemPrompt(unifiedAIService.getDefaultPrompt());
+        }
+
+        // Load humanization settings
+        const humanData = await iaHumanizationService.getSettings();
+        if (humanData) {
+          setHumanSettings(humanData);
         }
 
         // Load all sessions
@@ -121,6 +134,7 @@ const IADefaultTab: React.FC = () => {
 
     setSaving(true);
     try {
+      // Save AI settings
       await unifiedAIService.saveSettings({
         user_id: effectiveUserId,
         is_enabled: globalAIEnabled,
@@ -131,7 +145,11 @@ const IADefaultTab: React.FC = () => {
         model,
         max_tokens: maxTokens,
       });
-      toast({ title: 'Guardado', description: 'Configuración de IA actualizada correctamente.' });
+
+      // Save humanization settings
+      await iaHumanizationService.saveSettings(humanSettings);
+
+      toast({ title: 'Guardado', description: 'Configuración de IA y humanización actualizada.' });
     } catch (error: any) {
       console.error(error);
       toast({ title: 'Error', description: error.message || 'No se pudo guardar.', variant: 'destructive' });
@@ -287,10 +305,134 @@ const IADefaultTab: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Anti-Spam / Humanization Settings */}
+      <Card className="border-2 border-orange-500/30 bg-orange-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-orange-500" />
+            Configuración Anti-Spam (Humanización)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Configura los parámetros para que la IA responda de forma más humana y evite bloqueos por spam de Meta/WhatsApp.
+          </p>
+
+          {/* Delays */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Delay mínimo antes de responder (ms)</Label>
+              <Input
+                type="number"
+                value={humanSettings.min_response_delay_ms}
+                onChange={(e) => setHumanSettings(prev => ({ ...prev, min_response_delay_ms: parseInt(e.target.value) || 2000 }))}
+                min={500}
+                max={10000}
+              />
+              <p className="text-xs text-muted-foreground">{humanSettings.min_response_delay_ms / 1000} segundos</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Delay máximo antes de responder (ms)</Label>
+              <Input
+                type="number"
+                value={humanSettings.max_response_delay_ms}
+                onChange={(e) => setHumanSettings(prev => ({ ...prev, max_response_delay_ms: parseInt(e.target.value) || 6000 }))}
+                min={1000}
+                max={15000}
+              />
+              <p className="text-xs text-muted-foreground">{humanSettings.max_response_delay_ms / 1000} segundos</p>
+            </div>
+          </div>
+
+          {/* Switches */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-card border">
+              <div>
+                <Label>Indicador de "escribiendo..."</Label>
+                <p className="text-xs text-muted-foreground">Muestra que está escribiendo antes de enviar</p>
+              </div>
+              <Switch
+                checked={humanSettings.enable_typing_indicator}
+                onCheckedChange={(v) => setHumanSettings(prev => ({ ...prev, enable_typing_indicator: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-card border">
+              <div>
+                <Label>Variación de respuestas</Label>
+                <p className="text-xs text-muted-foreground">Varía saludos, confirmaciones y emojis</p>
+              </div>
+              <Switch
+                checked={humanSettings.enable_response_variation}
+                onCheckedChange={(v) => setHumanSettings(prev => ({ ...prev, enable_response_variation: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-card border">
+              <div>
+                <Label>Combinar mensajes múltiples</Label>
+                <p className="text-xs text-muted-foreground">Agrupa varios mensajes en uno solo</p>
+              </div>
+              <Switch
+                checked={humanSettings.combine_multiple_messages}
+                onCheckedChange={(v) => setHumanSettings(prev => ({ ...prev, combine_multiple_messages: v }))}
+              />
+            </div>
+          </div>
+
+          {/* Sliders */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label>Frecuencia de emojis</Label>
+                <span className="text-sm text-muted-foreground">{humanSettings.emoji_frequency}%</span>
+              </div>
+              <Slider
+                value={[humanSettings.emoji_frequency]}
+                onValueChange={([v]) => setHumanSettings(prev => ({ ...prev, emoji_frequency: v }))}
+                min={0}
+                max={100}
+                step={5}
+              />
+              <p className="text-xs text-muted-foreground">0% = nunca usar emojis, 100% = siempre usar emojis</p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label>Temperatura de IA (creatividad)</Label>
+                <span className="text-sm text-muted-foreground">{humanSettings.ai_temperature}</span>
+              </div>
+              <Slider
+                value={[humanSettings.ai_temperature * 100]}
+                onValueChange={([v]) => setHumanSettings(prev => ({ ...prev, ai_temperature: v / 100 }))}
+                min={30}
+                max={100}
+                step={5}
+              />
+              <p className="text-xs text-muted-foreground">Más alto = respuestas más variadas y menos predecibles</p>
+            </div>
+          </div>
+
+          {/* Rate limiting */}
+          <div className="space-y-2">
+            <Label>Máx. respuestas por minuto</Label>
+            <Input
+              type="number"
+              value={humanSettings.max_responses_per_minute}
+              onChange={(e) => setHumanSettings(prev => ({ ...prev, max_responses_per_minute: parseInt(e.target.value) || 10 }))}
+              min={1}
+              max={30}
+            />
+            <p className="text-xs text-muted-foreground">Limita la velocidad de respuestas para evitar spam</p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* System Prompt */}
       <Card>
         <CardHeader>
-          <CardTitle>Prompt del Sistema</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Prompt del Sistema
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-sm text-muted-foreground">
