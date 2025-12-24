@@ -100,6 +100,43 @@ function combineMessages(messages: string[], delayBetween: number = 0): string[]
   return combined;
 }
 
+// ============= COMBINAR MENSAJES EXCEPTO CBU =============
+// Mantiene el CBU siempre como mensaje separado para facilitar copiar
+function combineMessagesExceptCBU(messages: string[], cbu: string): string[] {
+  if (messages.length <= 1) return messages;
+  if (!cbu || cbu.trim() === '') return combineMessages(messages, 0);
+  
+  // Encontrar el índice del mensaje que es SOLO el CBU
+  const cbuIndex = messages.findIndex(m => m.trim() === cbu.trim());
+  
+  if (cbuIndex === -1) {
+    // Si no hay CBU separado, combinar normal
+    return combineMessages(messages, 0);
+  }
+  
+  // Separar: mensajes antes del CBU, el CBU, mensajes después del CBU
+  const beforeCBU = messages.slice(0, cbuIndex);
+  const afterCBU = messages.slice(cbuIndex + 1);
+  
+  const result: string[] = [];
+  
+  // Combinar mensajes antes del CBU
+  if (beforeCBU.length > 0) {
+    result.push(beforeCBU.join('\n\n'));
+  }
+  
+  // CBU siempre como mensaje separado
+  result.push(cbu);
+  
+  // Combinar mensajes después del CBU
+  if (afterCBU.length > 0) {
+    result.push(afterCBU.join('\n\n'));
+  }
+  
+  console.log('[ia-default-agent] CBU separado en mensaje independiente');
+  return result;
+}
+
 // Función para verificar si un username ya existe GLOBALMENTE
 async function checkUsernameExists(supabase: any, username: string): Promise<boolean> {
   const { data, error } = await supabase
@@ -519,7 +556,7 @@ serve(async (req) => {
       ];
 
       if (combineMessages_enabled) {
-        mensajesMultiples = combineMessages(mensajesMultiples, 0);
+        mensajesMultiples = combineMessagesExceptCBU(mensajesMultiples, cbu);
       }
 
       const payload: DefaultAgentResponse = {
@@ -575,7 +612,7 @@ serve(async (req) => {
             ];
         
         if (combineMessages_enabled) {
-          mensajesMultiples = combineMessages(mensajesMultiples, 0);
+          mensajesMultiples = combineMessagesExceptCBU(mensajesMultiples, cbu);
         }
 
         const payload: DefaultAgentResponse = {
@@ -629,7 +666,7 @@ serve(async (req) => {
         ];
         
         if (combineMessages_enabled) {
-          mensajesMultiples = combineMessages(mensajesMultiples, 0);
+          mensajesMultiples = combineMessagesExceptCBU(mensajesMultiples, cbu);
         }
 
         const payload: DefaultAgentResponse = {
@@ -867,7 +904,7 @@ Mantené el tono natural y relajado. No seas repetitivo.`;
                 ];
                 
                 if (combineMessages_enabled) {
-                  mensajesMultiples = combineMessages(mensajesMultiples, 0);
+                  mensajesMultiples = combineMessagesExceptCBU(mensajesMultiples, cbu);
                 }
 
                 const payload: DefaultAgentResponse = {
