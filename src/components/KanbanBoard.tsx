@@ -641,6 +641,16 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
 }) => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+
+  // Filtrar leads según el estado del filtro
+  const filteredLeads = useMemo(() => {
+    if (!showOnlyUnread) return columnLeads;
+    return columnLeads.filter(lead => {
+      const conversation = lead.conversations?.[0];
+      return conversation && (conversation.unread_count || 0) > 0;
+    });
+  }, [columnLeads, showOnlyUnread]);
 
   // IntersectionObserver para detectar cuando llega al final
   useEffect(() => {
@@ -704,10 +714,25 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
           <div className="flex items-center gap-2 mt-3 justify-end">
             <Badge variant="secondary" className="text-xs font-bold shrink-0">
               {columnState?.totalCount !== undefined 
-                ? `${columnLeads.length}/${columnState.totalCount}`
-                : columnLeads.length
+                ? `${filteredLeads.length}/${columnState.totalCount}`
+                : filteredLeads.length
               }
             </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant={showOnlyUnread ? "default" : "ghost"} 
+                  size="sm" 
+                  className={`h-7 w-7 p-0 ${showOnlyUnread ? 'bg-primary text-primary-foreground' : ''}`}
+                  onClick={() => setShowOnlyUnread(!showOnlyUnread)}
+                >
+                  <Mail className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {showOnlyUnread ? 'Ver todos los leads' : 'Solo no leídos'}
+              </TooltipContent>
+            </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
@@ -771,7 +796,7 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
                       : 'border-2 border-transparent'
                   }`}
                 >
-                  {columnLeads.map((lead, index) => (
+                  {filteredLeads.map((lead, index) => (
                     <LeadCard
                       key={lead.id}
                       lead={lead}
@@ -789,6 +814,11 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
                       }}
                     />
                   ))}
+                  {filteredLeads.length === 0 && columnLeads.length > 0 && showOnlyUnread && (
+                    <div className="text-center text-muted-foreground text-sm py-8">
+                      No hay mensajes no leídos
+                    </div>
+                  )}
                   {provided.placeholder}
                   
                   {/* Sentinel para infinite scroll */}
