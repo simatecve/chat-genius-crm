@@ -21,7 +21,6 @@ import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 import ChatModal from '@/components/conversations/ChatModal';
 import { useMessages, useConversations } from '@/hooks/useConversations';
-
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 type Workspace = Tables<'workspaces'>;
@@ -40,11 +39,19 @@ interface LeadWithColumn extends Lead {
   originalConversationId?: string; // ID de la conversación original para leads virtuales
 }
 const Leads = () => {
-  const { user } = useAuth();
-  const { hasPermission, isAdmin } = useUserPermissions();
-  const { effectiveUserId, loading: effectiveUserIdLoading } = useEffectiveUserId();
+  const {
+    user
+  } = useAuth();
+  const {
+    hasPermission,
+    isAdmin
+  } = useUserPermissions();
+  const {
+    effectiveUserId,
+    loading: effectiveUserIdLoading
+  } = useEffectiveUserId();
   const navigate = useNavigate();
-  
+
   // Permisos específicos de embudos
   const canCreateFunnels = isAdmin || hasPermission('puede_crear_embudos');
   const canEditFunnels = isAdmin || hasPermission('puede_editar_embudos');
@@ -79,7 +86,7 @@ const Leads = () => {
   const [filteredLeads, setFilteredLeads] = useState<LeadWithColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
+
   // Obtener IDs de columnas y columna por defecto
   const columnIds = useMemo(() => columns.map(c => c.id), [columns]);
   const defaultColumnId = useMemo(() => {
@@ -120,12 +127,13 @@ const Leads = () => {
   } = useMessages(selectedConversationId);
 
   // Hook para marcar como leído
-  const { markAsRead } = useConversations();
+  const {
+    markAsRead
+  } = useConversations();
 
   // Manejar envío de mensaje desde el modal (soporta múltiples canales)
   const handleSendMessage = async (messageText: string, attachment?: File) => {
     if (!messageText.trim() && !attachment || !selectedConversation || !effectiveUserId) return;
-    
     try {
       const channelType = selectedConversation.channel_type || 'whatsapp';
       const phoneNumber = selectedConversation.phone_number;
@@ -144,23 +152,20 @@ const Leads = () => {
       // Si es Twilio
       if (channelType === 'twilio') {
         let twilioConnectionId = selectedConversation.twilio_connection_id;
-        
         if (!twilioConnectionId) {
-          const { data: twilioConnection } = await supabase
-            .from('twilio_connections')
-            .select('id')
-            .eq('user_id', effectiveUserId)
-            .eq('status', 'active')
-            .limit(1)
-            .single();
-            
+          const {
+            data: twilioConnection
+          } = await supabase.from('twilio_connections').select('id').eq('user_id', effectiveUserId).eq('status', 'active').limit(1).single();
           if (!twilioConnection) {
-            toast({ title: "Error", description: "No se encontró una conexión activa de Twilio", variant: "destructive" });
+            toast({
+              title: "Error",
+              description: "No se encontró una conexión activa de Twilio",
+              variant: "destructive"
+            });
             return;
           }
           twilioConnectionId = twilioConnection.id;
         }
-        
         await sendMessage({
           conversationId: selectedConversation.id,
           userId: effectiveUserId,
@@ -172,15 +177,18 @@ const Leads = () => {
         });
         return;
       }
-      
+
       // Si es Telegram
       if (channelType === 'telegram') {
         const telegramBotId = selectedConversation.telegram_bot_id;
         if (!telegramBotId) {
-          toast({ title: "Error", description: "No se encontró el bot de Telegram para esta conversación", variant: "destructive" });
+          toast({
+            title: "Error",
+            description: "No se encontró el bot de Telegram para esta conversación",
+            variant: "destructive"
+          });
           return;
         }
-        
         await sendMessage({
           conversationId: selectedConversation.id,
           userId: effectiveUserId,
@@ -192,21 +200,19 @@ const Leads = () => {
         });
         return;
       }
-      
+
       // Si es WhatsApp (WAHA) - default
-      const { data: whatsappConnection } = await supabase
-        .from('whatsapp_connections')
-        .select('name')
-        .eq('user_id', effectiveUserId)
-        .eq('status', 'WORKING')
-        .limit(1)
-        .single();
-        
+      const {
+        data: whatsappConnection
+      } = await supabase.from('whatsapp_connections').select('name').eq('user_id', effectiveUserId).eq('status', 'WORKING').limit(1).single();
       if (!whatsappConnection) {
-        toast({ title: "Error", description: "No se encontró una conexión activa de WhatsApp", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: "No se encontró una conexión activa de WhatsApp",
+          variant: "destructive"
+        });
         return;
       }
-      
       await sendMessage({
         conversationId: selectedConversation.id,
         userId: effectiveUserId,
@@ -215,7 +221,6 @@ const Leads = () => {
         phoneNumber: phoneNumber,
         channelType: 'whatsapp'
       });
-      
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -241,7 +246,7 @@ const Leads = () => {
         setSelectedConversation(fullConversation);
         setSelectedConversationId(fullConversation.id);
         setIsChatModalOpen(true);
-        
+
         // Marcar como leído al abrir
         markAsRead(fullConversation.id);
       } else {
@@ -300,75 +305,45 @@ const Leads = () => {
   // Suscripción realtime para reordenar cuando lleguen nuevos mensajes y detectar nuevos leads/conversaciones
   useEffect(() => {
     if (!effectiveUserId) return;
-    
+
     // Canal fijo sin Date.now() para reutilizar conexiones
     const channelName = `leads-realtime-${effectiveUserId}`;
-    const channel = supabase
-      .channel(channelName)
-      // Conversations: INSERT y UPDATE
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations',
-          filter: `user_id=eq.${effectiveUserId}`
-        },
-        () => debouncedLoadLeads()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'conversations',
-          filter: `user_id=eq.${effectiveUserId}`
-        },
-        () => debouncedLoadLeads()
-      )
-      // Leads: INSERT, UPDATE y DELETE
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'leads',
-          filter: `user_id=eq.${effectiveUserId}`
-        },
-        () => debouncedLoadLeads()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'leads',
-          filter: `user_id=eq.${effectiveUserId}`
-        },
-        () => debouncedLoadLeads()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'leads',
-          filter: `user_id=eq.${effectiveUserId}`
-        },
-        () => debouncedLoadLeads()
-      )
-      // Messages: INSERT (sin filtro porque no tiene user_id directo)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        () => debouncedLoadLeads()
-      )
-      .subscribe();
-    
+    const channel = supabase.channel(channelName)
+    // Conversations: INSERT y UPDATE
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'conversations',
+      filter: `user_id=eq.${effectiveUserId}`
+    }, () => debouncedLoadLeads()).on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'conversations',
+      filter: `user_id=eq.${effectiveUserId}`
+    }, () => debouncedLoadLeads())
+    // Leads: INSERT, UPDATE y DELETE
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'leads',
+      filter: `user_id=eq.${effectiveUserId}`
+    }, () => debouncedLoadLeads()).on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'leads',
+      filter: `user_id=eq.${effectiveUserId}`
+    }, () => debouncedLoadLeads()).on('postgres_changes', {
+      event: 'DELETE',
+      schema: 'public',
+      table: 'leads',
+      filter: `user_id=eq.${effectiveUserId}`
+    }, () => debouncedLoadLeads())
+    // Messages: INSERT (sin filtro porque no tiene user_id directo)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages'
+    }, () => debouncedLoadLeads()).subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
@@ -408,18 +383,12 @@ const Leads = () => {
   };
   const loadWorkspaces = async () => {
     if (!effectiveUserId) return;
-    
+
     // IMPORTANTE: Excluir workspaces de webchat - estos se manejan en LeadsWebChat.tsx
     const {
       data,
       error
-    } = await supabase
-      .from('workspaces')
-      .select('*')
-      .eq('user_id', effectiveUserId)
-      .or('channel_type.is.null,channel_type.neq.webchat')
-      .order('position');
-      
+    } = await supabase.from('workspaces').select('*').eq('user_id', effectiveUserId).or('channel_type.is.null,channel_type.neq.webchat').order('position');
     if (error) {
       console.error('Error loading workspaces:', error);
       return;
@@ -454,9 +423,8 @@ const Leads = () => {
       setSelectedWorkspace(newWorkspace.id);
       return;
     }
-    
     setWorkspaces(data || []);
-    
+
     // Verificar que el workspace seleccionado sea válido (no webchat)
     const validWorkspaceIds = data.map(w => w.id);
     if (selectedWorkspace && !validWorkspaceIds.includes(selectedWorkspace)) {
@@ -470,7 +438,6 @@ const Leads = () => {
   };
   const loadColumns = async () => {
     if (!effectiveUserId) return;
-    
     let query = supabase.from('lead_columns').select('*').eq('user_id', effectiveUserId);
 
     // Filtrar por workspace si está seleccionado (incluir también columnas sin workspace)
@@ -494,7 +461,6 @@ const Leads = () => {
   };
   const createDefaultColumn = async () => {
     if (!effectiveUserId) return;
-    
     const {
       data,
       error
@@ -514,11 +480,10 @@ const Leads = () => {
   };
   const loadLeads = async () => {
     if (!effectiveUserId) return;
-    
+
     // Si hay workspace seleccionado, primero obtener los IDs de las columnas
     let columnIds: string[] = [];
     let defaultColumnId: string | null = null;
-    
     if (selectedWorkspace) {
       // Incluir columnas con workspace_id igual al seleccionado O sin workspace (null)
       const {
@@ -530,7 +495,7 @@ const Leads = () => {
         return;
       }
       columnIds = columnsData?.map(col => col.id) || [];
-      
+
       // Encontrar columna por defecto para asignar leads virtuales
       const defaultCol = columnsData?.find(col => col.is_default);
       defaultColumnId = defaultCol?.id || columnsData?.[0]?.id || null;
@@ -538,25 +503,22 @@ const Leads = () => {
       // Si no hay columnas en el workspace, crear una por defecto
       if (columnIds.length === 0) {
         console.log('[Leads] No columns found, creating default column');
-        const { data: newColumn, error: createError } = await supabase
-          .from('lead_columns')
-          .insert({
-            user_id: effectiveUserId,
-            workspace_id: selectedWorkspace,
-            name: 'Nuevos Contactos',
-            color: '#22c55e',
-            position: 0,
-            is_default: true
-          })
-          .select()
-          .single();
-          
+        const {
+          data: newColumn,
+          error: createError
+        } = await supabase.from('lead_columns').insert({
+          user_id: effectiveUserId,
+          workspace_id: selectedWorkspace,
+          name: 'Nuevos Contactos',
+          color: '#22c55e',
+          position: 0,
+          is_default: true
+        }).select().single();
         if (createError) {
           console.error('Error creating default column:', createError);
           setLeads([]);
           return;
         }
-        
         columnIds = [newColumn.id];
         defaultColumnId = newColumn.id;
         setColumns([newColumn]);
@@ -582,13 +544,14 @@ const Leads = () => {
     if (selectedWorkspace && columnIds.length > 0) {
       query = query.in('column_id', columnIds);
     }
-    
+
     // Cargar leads reales - sin límite para no perder conversaciones
     const {
       data: realLeads,
       error
-    } = await query.order('updated_at', { ascending: false });
-    
+    } = await query.order('updated_at', {
+      ascending: false
+    });
     if (error) {
       console.error('Error loading leads:', error);
       return;
@@ -596,21 +559,18 @@ const Leads = () => {
 
     // Cargar conversaciones huérfanas (sin lead_id) - EXCLUYENDO webchat
     // Incluir channel_type NULL (conversaciones antiguas) y todos los canales excepto webchat
-    const { data: orphanConversations, error: orphanError } = await supabase
-      .from('conversations')
-      .select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at')
-      .eq('user_id', effectiveUserId)
-      .is('lead_id', null)
-      .or('channel_type.neq.webchat,channel_type.is.null')
-      .order('last_message_time', { ascending: false, nullsFirst: false })
-      .limit(200);
-
+    const {
+      data: orphanConversations,
+      error: orphanError
+    } = await supabase.from('conversations').select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at').eq('user_id', effectiveUserId).is('lead_id', null).or('channel_type.neq.webchat,channel_type.is.null').order('last_message_time', {
+      ascending: false,
+      nullsFirst: false
+    }).limit(200);
     if (orphanError) {
       console.error('Error loading orphan conversations:', orphanError);
     }
-    
     console.log('[Leads] Orphan conversations loaded:', orphanConversations?.length || 0, 'defaultColumnId:', defaultColumnId);
-    
+
     // Filtrar conversaciones webchat de los leads reales
     const filteredRealLeads = (realLeads || []).map(lead => ({
       ...lead,
@@ -647,16 +607,15 @@ const Leads = () => {
 
     // Combinar leads reales (sin webchat) + virtuales
     const allLeads = [...filteredRealLeads, ...virtualLeads];
-    
+
     // Ordenar leads por último mensaje (más reciente arriba) - ordenamiento global
     const sortedData = allLeads.sort((a, b) => {
       const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
       const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
-      
+
       // Más reciente primero (descendente)
       return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
     });
-    
     setLeads(sortedData);
   };
 
@@ -833,57 +792,50 @@ const Leads = () => {
   const handleMoveLeadToColumn = async (leadId: string, targetColumnId: string) => {
     // Verificar si es un lead virtual (conversación huérfana)
     const isVirtualLead = leadId.startsWith('virtual-');
-    
     if (isVirtualLead) {
       // Convertir lead virtual a lead real
       const virtualLead = leads.find(l => l.id === leadId);
       if (!virtualLead || !virtualLead.originalConversationId) return;
-      
       const previousLeads = [...leads];
-      
+
       // Remover el lead virtual de la UI inmediatamente
       setLeads(leads.filter(l => l.id !== leadId));
-      
       try {
         // Crear lead real en la base de datos
-        const { data: newLead, error: createError } = await supabase
-          .from('leads')
-          .insert({
-            name: virtualLead.name,
-            phone: virtualLead.phone,
-            column_id: targetColumnId,
-            position: leads.filter(l => l.column_id === targetColumnId).length,
-            user_id: effectiveUserId
-          })
-          .select(`
+        const {
+          data: newLead,
+          error: createError
+        } = await supabase.from('leads').insert({
+          name: virtualLead.name,
+          phone: virtualLead.phone,
+          column_id: targetColumnId,
+          position: leads.filter(l => l.column_id === targetColumnId).length,
+          user_id: effectiveUserId
+        }).select(`
             *,
             lead_columns(*)
-          `)
-          .single();
-        
+          `).single();
         if (createError) throw createError;
-        
+
         // Vincular la conversación al nuevo lead
-        const { error: linkError } = await supabase
-          .from('conversations')
-          .update({ lead_id: newLead.id })
-          .eq('id', virtualLead.originalConversationId);
-        
+        const {
+          error: linkError
+        } = await supabase.from('conversations').update({
+          lead_id: newLead.id
+        }).eq('id', virtualLead.originalConversationId);
         if (linkError) {
           console.error('Error linking conversation:', linkError);
         }
-        
+
         // Agregar el lead real a la lista
         setLeads(prev => [...prev.filter(l => l.id !== leadId), {
           ...newLead,
           conversations: virtualLead.conversations
         }]);
-        
         toast({
           title: "Lead creado",
           description: `${virtualLead.name} fue agregado al embudo`
         });
-        
       } catch (error) {
         console.error('Error converting virtual lead:', error);
         setLeads(previousLeads);
@@ -895,10 +847,10 @@ const Leads = () => {
       }
       return;
     }
-    
+
     // Lead real - comportamiento normal
     const previousLeads = [...leads];
-    
+
     // ✅ ACTUALIZACIÓN OPTIMISTA INMEDIATA - UI responde al instante
     setLeads(leads.map(lead => lead.id === leadId ? {
       ...lead,
@@ -908,11 +860,12 @@ const Leads = () => {
 
     // Llamada a BD en background (no bloquea UI)
     try {
-      const { error } = await supabase.from('leads').update({
+      const {
+        error
+      } = await supabase.from('leads').update({
         column_id: targetColumnId,
         position: leads.filter(l => l.column_id === targetColumnId).length
       }).eq('id', leadId);
-      
       if (error) throw error;
     } catch (error) {
       // Revertir si falla
@@ -1085,7 +1038,7 @@ const Leads = () => {
           </Button>
 
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Gestión de Embudos</h1>
+            <h1 className="text-3xl font-bold text-foreground">Gestión de Embudos </h1>
             <p className="text-muted-foreground mt-1">Organiza y gestiona tus leads en diferentes etapas</p>
           </div>
         </div>
@@ -1103,29 +1056,19 @@ const Leads = () => {
           </Select>
 
           {/* Indicador de actualización realtime */}
-          {isRefreshing && (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 rounded-md border border-primary/20">
+          {isRefreshing && <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 rounded-md border border-primary/20">
               <Loader2 className="h-3 w-3 animate-spin text-primary" />
               <span className="text-xs text-primary">Actualizando...</span>
-            </div>
-          )}
+            </div>}
 
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => loadLeads()}
-            disabled={loading || isRefreshing}
-            title="Recargar leads"
-          >
+          <Button variant="outline" size="icon" onClick={() => loadLeads()} disabled={loading || isRefreshing} title="Recargar leads">
             <RefreshCw className={`h-4 w-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} />
           </Button>
 
-          {canCreateFunnels && (
-            <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
+          {canCreateFunnels && <Button onClick={openCreateColumnDialog} className="bg-gradient-primary hover:opacity-90 transition-all duration-200 shadow-glow">
               <Plus className="h-4 w-4 mr-2" />
               Nueva Columna
-            </Button>
-          )}
+            </Button>}
         </div>
       </div>
 
@@ -1143,20 +1086,7 @@ const Leads = () => {
           {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No se encontraron resultados</span>}
         </div>}
 
-      <KanbanBoard 
-        columns={columns} 
-        leads={filteredLeads} 
-        onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} 
-        onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} 
-        onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} 
-        onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} 
-        onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} 
-        onConvertToContactList={openConvertDialog} 
-        onManageMessageTriggers={openMessageTriggersDialog} 
-        onOpenConversation={handleLeadClick}
-        onLoadMore={loadMore}
-        getColumnState={getColumnState}
-      />
+      <KanbanBoard columns={columns} leads={filteredLeads} onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} onConvertToContactList={openConvertDialog} onManageMessageTriggers={openMessageTriggersDialog} onOpenConversation={handleLeadClick} onLoadMore={loadMore} getColumnState={getColumnState} />
 
       {/* Column Dialog */}
       <Dialog open={showColumnDialog} onOpenChange={setShowColumnDialog}>
