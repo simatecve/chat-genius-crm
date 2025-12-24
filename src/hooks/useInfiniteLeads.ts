@@ -1,0 +1,327 @@
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
+
+type LeadColumn = Tables<'lead_columns'>;
+type Lead = Tables<'leads'>;
+
+interface ConversationSummary {
+  id: string;
+  phone_number: string;
+  pushname: string | null;
+  last_message: string | null;
+  last_message_time: string | null;
+  unread_count: number | null;
+}
+
+export interface LeadWithColumn extends Lead {
+  lead_columns?: LeadColumn;
+  conversations?: ConversationSummary[];
+  isVirtual?: boolean;
+  originalConversationId?: string;
+}
+
+interface ColumnLeadsState {
+  leads: LeadWithColumn[];
+  hasMore: boolean;
+  loading: boolean;
+  offset: number;
+  totalCount: number;
+}
+
+interface UseInfiniteLeadsOptions {
+  userId: string | null;
+  workspaceId: string | null;
+  columnIds: string[];
+  defaultColumnId: string | null;
+  pageSize?: number;
+}
+
+const LEADS_PER_PAGE = 20;
+
+export const useInfiniteLeads = ({
+  userId,
+  workspaceId,
+  columnIds,
+  defaultColumnId,
+  pageSize = LEADS_PER_PAGE
+}: UseInfiniteLeadsOptions) => {
+  const [columnLeadsState, setColumnLeadsState] = useState<Record<string, ColumnLeadsState>>({});
+  const [orphanLeads, setOrphanLeads] = useState<LeadWithColumn[]>([]);
+  const [orphanHasMore, setOrphanHasMore] = useState(true);
+  const [orphanLoading, setOrphanLoading] = useState(false);
+  const [orphanOffset, setOrphanOffset] = useState(0);
+  const [initialLoading, setInitialLoading] = useState(true);
+  
+  const isInitialized = useRef(false);
+
+  // Cargar leads de una columna específica
+  const loadLeadsForColumn = useCallback(async (
+    columnId: string, 
+    offset: number = 0, 
+    append: boolean = false
+  ) => {
+    if (!userId) return;
+
+    // Marcar columna como cargando
+    setColumnLeadsState(prev => ({
+      ...prev,
+      [columnId]: {
+        ...prev[columnId],
+        loading: true
+      }
+    }));
+
+    try {
+      // Obtener count total primero
+      const { count } = await supabase
+        .from('leads')
+        .select('id', { count: 'exact', head: true })
+        .eq('column_id', columnId);
+
+      // Cargar leads con paginación
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          lead_columns(*),
+          conversations:conversations!conversations_lead_id_fkey(
+            id,
+            phone_number,
+            pushname,
+            last_message,
+            last_message_time,
+            unread_count,
+            channel_type
+          )
+        `)
+        .eq('column_id', columnId)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + pageSize - 1);
+
+      if (error) {
+        console.error('Error loading leads for column:', error);
+        return;
+      }
+
+      // Filtrar conversaciones webchat
+      const filteredLeads = (data || []).map(lead => ({
+        ...lead,
+        conversations: lead.conversations?.filter((c: any) => c.channel_type !== 'webchat') || []
+      }));
+
+      // Ordenar por último mensaje
+      const sortedLeads = filteredLeads.sort((a, b) => {
+        const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
+        const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+        return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
+      });
+
+      setColumnLeadsState(prev => {
+        const currentLeads = append ? (prev[columnId]?.leads || []) : [];
+        return {
+          ...prev,
+          [columnId]: {
+            leads: [...currentLeads, ...sortedLeads],
+            hasMore: (data?.length || 0) === pageSize,
+            loading: false,
+            offset: offset + (data?.length || 0),
+            totalCount: count || 0
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Error in loadLeadsForColumn:', error);
+      setColumnLeadsState(prev => ({
+        ...prev,
+        [columnId]: {
+          ...prev[columnId],
+          loading: false
+        }
+      }));
+    }
+  }, [userId, pageSize]);
+
+  // Cargar más leads de una columna
+  const loadMoreForColumn = useCallback(async (columnId: string) => {
+    const currentState = columnLeadsState[columnId];
+    if (!currentState || currentState.loading || !currentState.hasMore) return;
+    
+    await loadLeadsForColumn(columnId, currentState.offset, true);
+  }, [columnLeadsState, loadLeadsForColumn]);
+
+  // Cargar conversaciones huérfanas (sin lead)
+  const loadOrphanConversations = useCallback(async (append: boolean = false) => {
+    if (!userId || !defaultColumnId) return;
+
+    setOrphanLoading(true);
+    const currentOffset = append ? orphanOffset : 0;
+
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at')
+        .eq('user_id', userId)
+        .is('lead_id', null)
+        .or('channel_type.neq.webchat,channel_type.is.null')
+        .order('last_message_time', { ascending: false, nullsFirst: false })
+        .range(currentOffset, currentOffset + pageSize - 1);
+
+      if (error) {
+        console.error('Error loading orphan conversations:', error);
+        return;
+      }
+
+      // Crear leads virtuales
+      const virtualLeads: LeadWithColumn[] = (data || []).map((conv, index) => ({
+        id: `virtual-${conv.id}`,
+        name: conv.pushname || conv.phone_number || 'Sin nombre',
+        phone: conv.phone_number,
+        email: null,
+        company: null,
+        notes: null,
+        value: null,
+        tags: null,
+        column_id: defaultColumnId,
+        position: currentOffset + index,
+        user_id: userId,
+        created_at: conv.created_at,
+        updated_at: conv.updated_at,
+        bot_active: true,
+        isVirtual: true,
+        originalConversationId: conv.id,
+        conversations: [{
+          id: conv.id,
+          phone_number: conv.phone_number,
+          pushname: conv.pushname,
+          last_message: conv.last_message,
+          last_message_time: conv.last_message_time,
+          unread_count: conv.unread_count
+        }]
+      }));
+
+      if (append) {
+        setOrphanLeads(prev => [...prev, ...virtualLeads]);
+      } else {
+        setOrphanLeads(virtualLeads);
+      }
+
+      setOrphanHasMore((data?.length || 0) === pageSize);
+      setOrphanOffset(currentOffset + (data?.length || 0));
+    } catch (error) {
+      console.error('Error in loadOrphanConversations:', error);
+    } finally {
+      setOrphanLoading(false);
+    }
+  }, [userId, defaultColumnId, orphanOffset, pageSize]);
+
+  // Cargar más conversaciones huérfanas
+  const loadMoreOrphans = useCallback(async () => {
+    if (orphanLoading || !orphanHasMore) return;
+    await loadOrphanConversations(true);
+  }, [orphanLoading, orphanHasMore, loadOrphanConversations]);
+
+  // Carga inicial de todas las columnas
+  const loadInitial = useCallback(async () => {
+    if (!userId || columnIds.length === 0) return;
+
+    setInitialLoading(true);
+    
+    try {
+      // Cargar todas las columnas en paralelo
+      await Promise.all([
+        ...columnIds.map(colId => loadLeadsForColumn(colId, 0, false)),
+        loadOrphanConversations(false)
+      ]);
+    } finally {
+      setInitialLoading(false);
+      isInitialized.current = true;
+    }
+  }, [userId, columnIds, loadLeadsForColumn, loadOrphanConversations]);
+
+  // Refrescar una columna específica
+  const refreshColumn = useCallback(async (columnId: string) => {
+    await loadLeadsForColumn(columnId, 0, false);
+  }, [loadLeadsForColumn]);
+
+  // Refrescar todo
+  const refreshAll = useCallback(async () => {
+    isInitialized.current = false;
+    setOrphanOffset(0);
+    await loadInitial();
+  }, [loadInitial]);
+
+  // Obtener todos los leads combinados (para compatibilidad)
+  const getAllLeads = useCallback((): LeadWithColumn[] => {
+    const allRealLeads = Object.values(columnLeadsState).flatMap(state => state.leads);
+    return [...allRealLeads, ...orphanLeads].sort((a, b) => {
+      const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
+      const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+      return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
+    });
+  }, [columnLeadsState, orphanLeads]);
+
+  // Obtener leads de una columna específica
+  const getLeadsForColumn = useCallback((columnId: string): LeadWithColumn[] => {
+    const realLeads = columnLeadsState[columnId]?.leads || [];
+    const virtualForColumn = orphanLeads.filter(lead => lead.column_id === columnId);
+    
+    return [...realLeads, ...virtualForColumn].sort((a, b) => {
+      const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
+      const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+      return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
+    });
+  }, [columnLeadsState, orphanLeads]);
+
+  // Obtener estado de una columna
+  const getColumnState = useCallback((columnId: string) => {
+    const state = columnLeadsState[columnId];
+    const isDefaultColumn = columnId === defaultColumnId;
+    
+    return {
+      hasMore: state?.hasMore || (isDefaultColumn && orphanHasMore),
+      loading: state?.loading || (isDefaultColumn && orphanLoading),
+      totalCount: (state?.totalCount || 0) + (isDefaultColumn ? orphanLeads.length : 0),
+      loadedCount: (state?.leads.length || 0) + (isDefaultColumn ? orphanLeads.length : 0)
+    };
+  }, [columnLeadsState, defaultColumnId, orphanHasMore, orphanLoading, orphanLeads.length]);
+
+  // Cargar más para una columna (incluye huérfanos si es la columna por defecto)
+  const loadMore = useCallback(async (columnId: string) => {
+    await loadMoreForColumn(columnId);
+    
+    // Si es la columna por defecto, también cargar más huérfanos
+    if (columnId === defaultColumnId) {
+      await loadMoreOrphans();
+    }
+  }, [loadMoreForColumn, loadMoreOrphans, defaultColumnId]);
+
+  // Effect para cargar datos cuando cambian las columnas
+  useEffect(() => {
+    if (userId && columnIds.length > 0 && defaultColumnId) {
+      loadInitial();
+    }
+  }, [userId, workspaceId]); // Solo depende de userId y workspaceId
+
+  return {
+    // Estado
+    columnLeadsState,
+    orphanLeads,
+    initialLoading,
+    
+    // Getters
+    getAllLeads,
+    getLeadsForColumn,
+    getColumnState,
+    
+    // Actions
+    loadMore,
+    loadMoreForColumn,
+    loadMoreOrphans,
+    refreshColumn,
+    refreshAll,
+    loadInitial
+  };
+};
+
+export default useInfiniteLeads;

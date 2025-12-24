@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo, useMemo } from 'react';
+import React, { useState, useCallback, memo, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Tables } from '@/integrations/supabase/types';
@@ -40,6 +40,13 @@ interface LeadWithColumn extends Lead {
   originalConversationId?: string;
 }
 
+interface ColumnState {
+  hasMore: boolean;
+  loading: boolean;
+  totalCount: number;
+  loadedCount: number;
+}
+
 interface KanbanBoardProps {
   columns: LeadColumn[];
   leads: LeadWithColumn[];
@@ -54,6 +61,9 @@ interface KanbanBoardProps {
   onOpenConversation?: (lead: LeadWithColumn) => void;
   allWorkspaces?: { id: string; name: string; channel_type?: string }[];
   onMoveLeadToWorkspace?: (leadId: string, targetWorkspaceId: string) => void;
+  // Nuevas props para paginación
+  onLoadMore?: (columnId: string) => void;
+  getColumnState?: (columnId: string) => ColumnState;
 }
 
 interface LeadCardProps {
@@ -483,7 +493,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onManageMessageTriggers,
   onOpenConversation,
   allWorkspaces,
-  onMoveLeadToWorkspace
+  onMoveLeadToWorkspace,
+  onLoadMore,
+  getColumnState
 }) => {
   const { user } = useAuth();
   const { getTagColor, etiquetas, refresh: refreshTags } = useTags();
@@ -555,148 +567,279 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <div className="flex gap-4 overflow-x-auto pb-4 px-1">
           {columns.map((column) => {
             const columnLeads = getLeadsByColumn(column.id);
+            const columnState = getColumnState?.(column.id);
+            
             // Contar conversaciones en este embudo
             const conversationsCount = columnLeads.reduce((count, lead) => {
               return count + (lead.conversations?.length || 0);
             }, 0);
             
             return (
-              <div 
-                key={column.id} 
-                className="flex-shrink-0 w-64"
-              >
-                <Card 
-                  className="h-full border-t-4 bg-card/50 backdrop-blur-sm"
-                  style={{ borderTopColor: column.color }}
-                >
-                  <CardHeader className="pb-3 pt-4 px-4">
-                    <div className="flex items-center justify-between">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center space-x-2 flex-1 cursor-help">
-                            <CardTitle className="text-sm font-semibold uppercase tracking-wide truncate">
-                              {column.name}
-                            </CardTitle>
-                            <Badge variant="secondary" className="text-xs font-bold shrink-0">
-                              {columnLeads.length}
-                            </Badge>
-                            {column.is_default && (
-                              <Badge variant="outline" className="text-xs shrink-0">
-                                Por defecto
-                              </Badge>
-                            )}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent 
-                          side="top" 
-                          className="bg-[#1f2c34] border-[#2a3942] px-3 py-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{column.name}</span>
-                            <div className="flex items-center gap-1">
-                              <MessageSquare className="h-3.5 w-3.5" />
-                              <span className="text-sm font-medium">{conversationsCount}</span>
-                            </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onEditColumn(column)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        {onManageMessageTriggers && (
-                          <DropdownMenuItem onClick={() => onManageMessageTriggers(column)}>
-                            <MessageSquare className="h-4 w-4 mr-2" />
-                            Disparadores de Mensaje
-                          </DropdownMenuItem>
-                        )}
-                        {onConvertToContactList && (
-                          <DropdownMenuItem onClick={() => onConvertToContactList(column)}>
-                            <Users className="h-4 w-4 mr-2" />
-                            Convertir a Lista de Contactos
-                          </DropdownMenuItem>
-                        )}
-                        {!column.is_default && (
-                          <DropdownMenuItem 
-                            onClick={() => onDeleteColumn(column.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2 px-3 pb-3">
-                  {/* Add Lead Button */}
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted/50 h-8"
-                    onClick={() => onCreateLead(column.id)}
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-2" />
-                    <span className="text-xs">Agregar Lead</span>
-                  </Button>
-
-                  {/* Droppable Area for Leads */}
-                  <Droppable droppableId={column.id}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`min-h-[200px] space-y-2 rounded-lg transition-all duration-200 ${
-                          snapshot.isDraggingOver 
-                            ? 'bg-primary/10 border-2 border-dashed border-primary/40 p-2 scale-[1.01]' 
-                            : 'border-2 border-transparent'
-                        }`}
-                      >
-                        {columnLeads.map((lead, index) => (
-                          <LeadCard
-                            key={lead.id}
-                            lead={lead}
-                            index={index}
-                            onEdit={onEditLead}
-                            onDelete={onDeleteLead}
-                            onOpenConversation={onOpenConversation}
-                            getTagColor={getTagColor}
-                            etiquetas={etiquetas}
-                            allWorkspaces={allWorkspaces}
-                            onMoveToWorkspace={onMoveLeadToWorkspace}
-                            onTagsUpdated={() => {
-                              refreshTags();
-                              queryClient.invalidateQueries({ queryKey: ['leads'] });
-                            }}
-                          />
-                        ))}
-                        {provided.placeholder}
-                        
-                        {columnLeads.length === 0 && (
-                          <div className="text-center text-muted-foreground text-sm py-8">
-                            No hay leads en esta columna
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Droppable>
-                </CardContent>
-              </Card>
-            </div>
-          );
-        })}
-      </div>
+              <ColumnWithInfiniteScroll
+                key={column.id}
+                column={column}
+                columnLeads={columnLeads}
+                columnState={columnState}
+                conversationsCount={conversationsCount}
+                onEditColumn={onEditColumn}
+                onDeleteColumn={onDeleteColumn}
+                onCreateLead={onCreateLead}
+                onEditLead={onEditLead}
+                onDeleteLead={onDeleteLead}
+                onConvertToContactList={onConvertToContactList}
+                onManageMessageTriggers={onManageMessageTriggers}
+                onOpenConversation={onOpenConversation}
+                onLoadMore={onLoadMore}
+                allWorkspaces={allWorkspaces}
+                onMoveLeadToWorkspace={onMoveLeadToWorkspace}
+                getTagColor={getTagColor}
+                etiquetas={etiquetas}
+                refreshTags={refreshTags}
+                queryClient={queryClient}
+              />
+            );
+          })}
+        </div>
       </TooltipProvider>
     </DragDropContext>
+  );
+};
+
+// Componente de columna con scroll infinito
+interface ColumnWithInfiniteScrollProps {
+  column: LeadColumn;
+  columnLeads: LeadWithColumn[];
+  columnState?: ColumnState;
+  conversationsCount: number;
+  onEditColumn: (column: LeadColumn) => void;
+  onDeleteColumn: (columnId: string) => void;
+  onCreateLead: (columnId: string) => void;
+  onEditLead?: (lead: Lead) => void;
+  onDeleteLead?: (leadId: string) => void;
+  onConvertToContactList?: (column: LeadColumn) => void;
+  onManageMessageTriggers?: (column: LeadColumn) => void;
+  onOpenConversation?: (lead: LeadWithColumn) => void;
+  onLoadMore?: (columnId: string) => void;
+  allWorkspaces?: { id: string; name: string; channel_type?: string }[];
+  onMoveLeadToWorkspace?: (leadId: string, targetWorkspaceId: string) => void;
+  getTagColor: (tagName: string) => string;
+  etiquetas: any[];
+  refreshTags: () => void;
+  queryClient: any;
+}
+
+const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
+  column,
+  columnLeads,
+  columnState,
+  conversationsCount,
+  onEditColumn,
+  onDeleteColumn,
+  onCreateLead,
+  onEditLead,
+  onDeleteLead,
+  onConvertToContactList,
+  onManageMessageTriggers,
+  onOpenConversation,
+  onLoadMore,
+  allWorkspaces,
+  onMoveLeadToWorkspace,
+  getTagColor,
+  etiquetas,
+  refreshTags,
+  queryClient
+}) => {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // IntersectionObserver para detectar cuando llega al final
+  useEffect(() => {
+    if (!onLoadMore || !columnState?.hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !columnState.loading && columnState.hasMore) {
+          onLoadMore(column.id);
+        }
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: '100px',
+        threshold: 0.1
+      }
+    );
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [column.id, onLoadMore, columnState?.hasMore, columnState?.loading]);
+
+  return (
+    <div className="flex-shrink-0 w-64">
+      <Card 
+        className="h-full border-t-4 bg-card/50 backdrop-blur-sm"
+        style={{ borderTopColor: column.color }}
+      >
+        <CardHeader className="pb-3 pt-4 px-4">
+          <div className="flex items-center justify-between">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center space-x-2 flex-1 cursor-help">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide truncate">
+                    {column.name}
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-xs font-bold shrink-0">
+                    {columnState?.totalCount !== undefined 
+                      ? `${columnLeads.length}/${columnState.totalCount}`
+                      : columnLeads.length
+                    }
+                  </Badge>
+                  {column.is_default && (
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      Por defecto
+                    </Badge>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent 
+                side="top" 
+                className="bg-[#1f2c34] border-[#2a3942] px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{column.name}</span>
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span className="text-sm font-medium">{conversationsCount}</span>
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEditColumn(column)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+                {onManageMessageTriggers && (
+                  <DropdownMenuItem onClick={() => onManageMessageTriggers(column)}>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Disparadores de Mensaje
+                  </DropdownMenuItem>
+                )}
+                {onConvertToContactList && (
+                  <DropdownMenuItem onClick={() => onConvertToContactList(column)}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Convertir a Lista de Contactos
+                  </DropdownMenuItem>
+                )}
+                {!column.is_default && (
+                  <DropdownMenuItem 
+                    onClick={() => onDeleteColumn(column.id)}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2 px-3 pb-3">
+          {/* Add Lead Button */}
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted/50 h-8"
+            onClick={() => onCreateLead(column.id)}
+          >
+            <Plus className="h-3.5 w-3.5 mr-2" />
+            <span className="text-xs">Agregar Lead</span>
+          </Button>
+
+          {/* Droppable Area for Leads con scroll */}
+          <div 
+            ref={scrollContainerRef}
+            className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+          >
+            <Droppable droppableId={column.id}>
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={`min-h-[200px] space-y-2 rounded-lg transition-all duration-200 ${
+                    snapshot.isDraggingOver 
+                      ? 'bg-primary/10 border-2 border-dashed border-primary/40 p-2 scale-[1.01]' 
+                      : 'border-2 border-transparent'
+                  }`}
+                >
+                  {columnLeads.map((lead, index) => (
+                    <LeadCard
+                      key={lead.id}
+                      lead={lead}
+                      index={index}
+                      onEdit={onEditLead}
+                      onDelete={onDeleteLead}
+                      onOpenConversation={onOpenConversation}
+                      getTagColor={getTagColor}
+                      etiquetas={etiquetas}
+                      allWorkspaces={allWorkspaces}
+                      onMoveToWorkspace={onMoveLeadToWorkspace}
+                      onTagsUpdated={() => {
+                        refreshTags();
+                        queryClient.invalidateQueries({ queryKey: ['leads'] });
+                      }}
+                    />
+                  ))}
+                  {provided.placeholder}
+                  
+                  {/* Sentinel para infinite scroll */}
+                  {columnState?.hasMore && (
+                    <div 
+                      ref={sentinelRef} 
+                      className="py-4 flex justify-center"
+                    >
+                      {columnState.loading ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => onLoadMore?.(column.id)}
+                          className="text-xs text-muted-foreground"
+                        >
+                          Cargar más...
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  
+                  {columnLeads.length === 0 && !columnState?.loading && (
+                    <div className="text-center text-muted-foreground text-sm py-8">
+                      No hay leads en esta columna
+                    </div>
+                  )}
+                  
+                  {columnLeads.length === 0 && columnState?.loading && (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </Droppable>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
