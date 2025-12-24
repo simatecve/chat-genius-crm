@@ -377,15 +377,12 @@ const Leads = () => {
   // Obtener leads desde el hook de paginación
   const paginatedLeads = useMemo(() => getAllLeads(), [getAllLeads]);
 
-  // Filtrar leads en tiempo real
+  // Filtrar leads en tiempo real - usar siempre los leads paginados
   useEffect(() => {
-    // Usar leads paginados si están disponibles, sino usar leads locales
-    const sourceLeads = paginatedLeads.length > 0 ? paginatedLeads : leads;
-    
     if (!searchFilter.trim()) {
-      setFilteredLeads(sourceLeads);
+      setFilteredLeads(paginatedLeads);
     } else {
-      const filtered = sourceLeads.filter(lead => {
+      const filtered = paginatedLeads.filter(lead => {
         const searchTerm = searchFilter.toLowerCase();
         const nameMatch = lead.name?.toLowerCase().includes(searchTerm);
         const phoneMatch = lead.phone?.toLowerCase().includes(searchTerm);
@@ -393,7 +390,7 @@ const Leads = () => {
       });
       setFilteredLeads(filtered);
     }
-  }, [leads, paginatedLeads, searchFilter]);
+  }, [paginatedLeads, searchFilter]);
   const loadData = async () => {
     try {
       setLoading(true);

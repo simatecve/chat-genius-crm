@@ -298,10 +298,16 @@ export const useInfiniteLeads = ({
 
   // Effect para cargar datos cuando cambian las columnas
   useEffect(() => {
-    if (userId && columnIds.length > 0 && defaultColumnId) {
+    if (userId && columnIds.length > 0 && defaultColumnId && !isInitialized.current) {
+      console.log('[useInfiniteLeads] Loading initial data for columns:', columnIds.length);
       loadInitial();
     }
-  }, [userId, workspaceId]); // Solo depende de userId y workspaceId
+  }, [userId, workspaceId, columnIds.length, defaultColumnId, loadInitial]);
+
+  // Reset cuando cambia el workspace
+  useEffect(() => {
+    isInitialized.current = false;
+  }, [workspaceId]);
 
   return {
     // Estado
