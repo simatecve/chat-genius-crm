@@ -392,7 +392,7 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-4xl font-bold">{stats.yearlyNewProspects.toLocaleString()}</h2>
+                  <h2 className="text-4xl font-bold">{(stats.yearlyNewProspects ?? 0).toLocaleString()}</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Nuevos prospectos</p>
               </div>
@@ -409,7 +409,7 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-4xl font-bold">{stats.yearlyRecurringClients.toLocaleString()}</h2>
+                  <h2 className="text-4xl font-bold">{(stats.yearlyRecurringClients ?? 0).toLocaleString()}</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Clientes recurrentes</p>
               </div>
@@ -426,7 +426,7 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-4xl font-bold">{stats.yearlyTotal.toLocaleString()}</h2>
+                  <h2 className="text-4xl font-bold">{(stats.yearlyTotal ?? 0).toLocaleString()}</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Totales</p>
               </div>
