@@ -7,9 +7,27 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2, Send, MessageCircle } from 'lucide-react';
+import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+// Helper function to get channel icon
+const getChannelIcon = (channelType: string | null | undefined) => {
+  if (!channelType) return null;
+  switch (channelType.toLowerCase()) {
+    case 'whatsapp':
+      return <MessageSquare className="h-2.5 w-2.5 text-green-500" />;
+    case 'telegram':
+      return <Send className="h-2.5 w-2.5 text-blue-500" />;
+    case 'twilio':
+      return <Phone className="h-2.5 w-2.5 text-red-500" />;
+    case 'webchat':
+    case 'web':
+      return <MessageCircle className="h-2.5 w-2.5 text-purple-500" />;
+    default:
+      return <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />;
+  }
+};
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { TriggerActivationService } from '@/services/triggerActivationService';
@@ -29,6 +47,7 @@ interface ConversationSummary {
   last_message: string | null;
   last_message_time: string | null;
   unread_count: number | null;
+  channel_type?: string | null;
 }
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
@@ -168,119 +187,165 @@ const LeadCardComponent: React.FC<LeadCardProps & {
       setSavingTags(false);
     }
   };
+  // Get display name (pushname first, then lead name)
+  const displayName = conversation?.pushname || lead.name;
+  const channelType = conversation?.channel_type || null;
+  const lastMessage = conversation?.last_message;
+  const lastMessageTime = conversation?.last_message_time;
+  
+  // Format time naturally (e.g., "08:17 p.m.")
+  const formattedTime = lastMessageTime 
+    ? format(new Date(lastMessageTime), 'hh:mm a', { locale: es })
+    : null;
+
   return <>
     <Draggable draggableId={lead.id} index={index}>
-      {(provided, snapshot) => <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`mb-3 transition-all duration-200 ${snapshot.isDragging ? 'scale-105 rotate-1 z-50 opacity-95' : 'animate-kanban-drop'}`}>
-          <Card className={`p-2.5 transition-all cursor-grab border-border/40 bg-card/80 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' : 'hover:bg-muted/30 hover:shadow-md'} ${lead.isVirtual ? 'border-l-4 border-l-amber-500/70' : ''}`} onClick={e => {
-          // Solo navegar si no se hizo clic en un botón o menú
+      {(provided, snapshot) => <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`mb-2 transition-all duration-200 ${snapshot.isDragging ? 'scale-105 rotate-1 z-50 opacity-95' : 'animate-kanban-drop'}`}>
+          <Card className={`p-3 transition-all cursor-grab border-border/40 bg-card/80 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' : 'hover:bg-muted/30 hover:shadow-md'} ${lead.isVirtual ? 'border-l-4 border-l-amber-500/70' : ''}`} onClick={e => {
           const target = e.target as HTMLElement;
           if (!target.closest('button') && lead.phone) {
             handleOpenConversation();
           }
         }}>
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-medium ${lead.isVirtual ? 'bg-amber-500/20 text-amber-600' : 'bg-muted'}`}>
-                    {lead.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                      {lead.name}
-                      {lead.isVirtual && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-amber-500/10 text-amber-600 border-amber-500/30">
-                          Nuevo
-                        </Badge>}
-                    </div>
-                    {lead.phone && <div className="text-xs text-muted-foreground truncate flex items-center gap-2">
-                        <span>{lead.phone}</span>
-                        {(hasConversation && conversation?.last_message_time || lead.updated_at) && <span className="text-muted-foreground/70">
-                            · {formatDistanceToNow(new Date(hasConversation && conversation?.last_message_time ? conversation.last_message_time : lead.updated_at!), {
-                        addSuffix: false,
-                        locale: es
-                      })}
-                          </span>}
-                      </div>}
-                  </div>
+            <div className="flex items-start gap-3">
+              {/* Avatar con icono de canal superpuesto */}
+              <div className="relative shrink-0">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${lead.isVirtual ? 'bg-amber-500/20 text-amber-600' : 'bg-muted'}`}>
+                  {displayName.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex items-center gap-0.5 shrink-0">
-                  {lead.phone && <>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10" onClick={toggleBotBlock} disabled={isBotToggling} title={isBlocked ? 'Bot desactivado - Click para activar' : 'Bot activo - Click para desactivar'}>
-                        {isBlocked ? <BotOff className="h-3 w-3 text-destructive" /> : <Bot className="h-3 w-3 text-green-500" />}
-                      </Button>
-                      
-                    </>}
-                  {(onEdit || onDelete || lead.phone) && <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {lead.phone && <DropdownMenuItem onClick={handleOpenConversation}>
-                            <MessageSquare className="h-3 w-3 mr-2" />
-                            Ver Conversación
-                          </DropdownMenuItem>}
-                        {lead.phone && <DropdownMenuItem onClick={toggleBotBlock} disabled={isBotToggling}>
-                            {isBlocked ? <>
-                                <Bot className="h-3 w-3 mr-2" />
-                                Activar Bot
-                              </> : <>
-                                <BotOff className="h-3 w-3 mr-2" />
-                                Desactivar Bot
-                              </>}
-                          </DropdownMenuItem>}
-                        {onEdit && <DropdownMenuItem onClick={() => onEdit(lead)}>
-                            <Edit className="h-3 w-3 mr-2" />
-                            Editar
-                          </DropdownMenuItem>}
-                        <DropdownMenuItem onClick={() => setShowTagDialog(true)}>
-                          <Tag className="h-3 w-3 mr-2" />
-                          Etiquetas
-                        </DropdownMenuItem>
-                        {allWorkspaces && allWorkspaces.length > 1 && onMoveToWorkspace && <DropdownMenuItem onClick={() => setShowMoveDialog(true)}>
-                            <Users className="h-3 w-3 mr-2" />
-                            Mover a otro espacio
-                          </DropdownMenuItem>}
-                        {onDelete && <DropdownMenuItem onClick={() => onDelete(lead.id)} className="text-destructive">
-                            <Trash2 className="h-3 w-3 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>}
-                      </DropdownMenuContent>
-                    </DropdownMenu>}
-                </div>
+                {/* Icono de canal superpuesto */}
+                {channelType && (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-background flex items-center justify-center border border-border shadow-sm">
+                    {getChannelIcon(channelType)}
+                  </div>
+                )}
               </div>
               
-              {(lead.company || lead.email || lead.notes) && <div className="space-y-1 text-xs text-muted-foreground">
-                  {lead.company && <div className="flex items-center gap-1">
-                      <Building className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{lead.company}</span>
-                    </div>}
-                  {lead.email && <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{lead.email}</span>
-                    </div>}
-                </div>}
-
-              {/* Etiquetas del lead */}
-              {lead.tags && lead.tags.length > 0 && <div className="flex flex-wrap gap-1">
-                  {lead.tags.slice(0, 3).map(tag => <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-0" style={{
-                backgroundColor: `${getTagColor(tag)}20`,
-                color: getTagColor(tag)
-              }}>
-                      {tag}
-                    </Badge>)}
-                  {lead.tags.length > 3 && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                      +{lead.tags.length - 3}
-                    </Badge>}
-                </div>}
-              
-              {lead.value && <Badge variant="secondary" className="text-xs font-medium w-fit">
-                  ${lead.value.toLocaleString()}
-                </Badge>}
-              
-              {hasConversation && conversation && conversation.unread_count > 0 && <div className="flex items-center justify-end pt-2 border-t border-border/40">
-                  <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
-                    {conversation.unread_count}
-                  </Badge>
-                </div>}
+              {/* Contenido principal */}
+              <div className="flex-1 min-w-0">
+                {/* Fila 1: Nombre + Hora */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-semibold text-sm truncate">
+                      {displayName}
+                    </span>
+                    {lead.isVirtual && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-amber-500/10 text-amber-600 border-amber-500/30 shrink-0">
+                        Nuevo
+                      </Badge>
+                    )}
+                    {hasConversation && conversation && conversation.unread_count > 0 && (
+                      <Badge variant="destructive" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] shrink-0">
+                        {conversation.unread_count}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {formattedTime}
+                  </span>
+                </div>
+                
+                {/* Fila 2: Último mensaje + Icono bot */}
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <span className="text-xs text-muted-foreground truncate flex-1">
+                    {lastMessage 
+                      ? (lastMessage.length > 35 ? lastMessage.substring(0, 35) + '...' : lastMessage)
+                      : 'Sin mensajes'}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {lead.phone && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 w-5 p-0 hover:bg-primary/10" 
+                        onClick={toggleBotBlock} 
+                        disabled={isBotToggling}
+                        title={isBlocked ? 'Bot desactivado - Click para activar' : 'Bot activo - Click para desactivar'}
+                      >
+                        {isBlocked ? <BotOff className="h-3.5 w-3.5 text-destructive" /> : <Bot className="h-3.5 w-3.5 text-green-500" />}
+                      </Button>
+                    )}
+                    {(onEdit || onDelete || lead.phone) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {lead.phone && (
+                            <DropdownMenuItem onClick={handleOpenConversation}>
+                              <MessageSquare className="h-3 w-3 mr-2" />
+                              Ver Conversación
+                            </DropdownMenuItem>
+                          )}
+                          {lead.phone && (
+                            <DropdownMenuItem onClick={toggleBotBlock} disabled={isBotToggling}>
+                              {isBlocked ? (
+                                <>
+                                  <Bot className="h-3 w-3 mr-2" />
+                                  Activar Bot
+                                </>
+                              ) : (
+                                <>
+                                  <BotOff className="h-3 w-3 mr-2" />
+                                  Desactivar Bot
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          )}
+                          {onEdit && (
+                            <DropdownMenuItem onClick={() => onEdit(lead)}>
+                              <Edit className="h-3 w-3 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => setShowTagDialog(true)}>
+                            <Tag className="h-3 w-3 mr-2" />
+                            Etiquetas
+                          </DropdownMenuItem>
+                          {allWorkspaces && allWorkspaces.length > 1 && onMoveToWorkspace && (
+                            <DropdownMenuItem onClick={() => setShowMoveDialog(true)}>
+                              <Users className="h-3 w-3 mr-2" />
+                              Mover a otro espacio
+                            </DropdownMenuItem>
+                          )}
+                          {onDelete && (
+                            <DropdownMenuItem onClick={() => onDelete(lead.id)} className="text-destructive">
+                              <Trash2 className="h-3 w-3 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Fila 3: Etiquetas */}
+                {lead.tags && lead.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {lead.tags.slice(0, 3).map(tag => (
+                      <Badge 
+                        key={tag} 
+                        variant="outline" 
+                        className="text-[10px] px-1.5 py-0 h-4 border-0" 
+                        style={{
+                          backgroundColor: `${getTagColor(tag)}20`,
+                          color: getTagColor(tag)
+                        }}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                    {lead.tags.length > 3 && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                        +{lead.tags.length - 3}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         </div>}
