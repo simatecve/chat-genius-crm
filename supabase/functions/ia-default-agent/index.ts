@@ -65,7 +65,7 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API
   try {
     console.log('Analyzing image for payment receipt:', imageUrl);
     
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -202,6 +202,14 @@ serve(async (req) => {
     const cbu: string = settings?.cbu || '';
     const casinoLink: string = settings?.casino_link || 'https://bet32.fun/';
 
+    // ===== LOGGING CRÍTICO: Verificar valores de configuración =====
+    console.log('[ia-default-agent] ===== CONFIGURACIÓN CARGADA =====');
+    console.log(`[ia-default-agent] CBU desde BD: "${cbu}"`);
+    console.log(`[ia-default-agent] Cajero desde BD: "${cashierNumbersText}"`);
+    console.log(`[ia-default-agent] Casino Link desde BD: "${casinoLink}"`);
+    console.log(`[ia-default-agent] Settings completos:`, JSON.stringify(settings));
+    console.log('[ia-default-agent] ================================');
+
     // ANÁLISIS DE IMÁGENES: Si hay imágenes, verificar si alguna es comprobante de pago
     if (imageUrls && imageUrls.length > 0 && GOOGLE_GEMINI_API_KEY) {
       console.log(`Analyzing ${imageUrls.length} images for payment receipts...`);
@@ -210,6 +218,7 @@ serve(async (req) => {
         const isReceipt = await analyzeImageForPaymentReceipt(imageUrl, GOOGLE_GEMINI_API_KEY);
         
         if (isReceipt) {
+          console.log('[ia-default-agent] RAMA: comprobante_detectado_imagen');
           console.log('Payment receipt detected in image:', imageUrl);
           
           const cajas = cashierNumbersText?.trim() || '';
@@ -238,6 +247,76 @@ serve(async (req) => {
     }
 
     const text = (messageContent || '').toLowerCase();
+
+    // ===== DETECCIÓN AMPLIADA DE INTENCIÓN BANCARIA =====
+    // Estos patrones SIEMPRE deben responder con CBU de la BD, NUNCA el modelo
+    const bankInfoPatterns = [
+      // Solicitudes de CBU/alias
+      'cbu', 'alias', 'qr', 
+      // Solicitudes de transferencia/depósito
+      'transferir', 'transferencia', 'depositar', 'deposito', 'depósito',
+      // Intenciones de carga
+      'cargar', 'recargar', 'cargar fichas', 'cargar saldo', 'quiero cargar',
+      'como cargo', 'cómo cargo', 'para cargar', 
+      // Intenciones de retiro
+      'retirar', 'retiro', 'sacar plata', 'sacar dinero', 'cobrar',
+      // Solicitudes de pago
+      'pagar', 'pago', 'abonar',
+      // Solicitudes de datos bancarios
+      'datos bancarios', 'datos para transferir', 'a donde transfiero', 'adonde transfiero',
+      'numero de caja', 'número de caja', 'cajero', 'caja',
+      // Preguntas sobre carga
+      'como hago para cargar', 'cómo hago para cargar',
+      'como deposito', 'cómo deposito',
+      'pasame el cbu', 'pásame el cbu', 'pasame cbu', 'dame el cbu', 'mandame el cbu'
+    ];
+    
+    const bankInfoRequested = bankInfoPatterns.some(p => text.includes(p));
+    
+    // Si detectamos intención bancaria, RESPUESTA DETERMINÍSTICA (nunca el modelo)
+    if (bankInfoRequested) {
+      console.log('[ia-default-agent] RAMA: bankInfoRequested - Respuesta determinística');
+      console.log(`[ia-default-agent] Patrón detectado en: "${text}"`);
+      console.log(`[ia-default-agent] Usando CBU de BD: "${cbu}"`);
+      console.log(`[ia-default-agent] Usando Cajero de BD: "${cashierNumbersText}"`);
+      
+      // Validar que tenemos CBU configurado
+      if (!cbu || cbu.trim() === '') {
+        console.error('[ia-default-agent] ERROR: CBU no configurado en ia_default_settings');
+        const payload: DefaultAgentResponse = {
+          isActivated: true,
+          intencionCargaFichas: true,
+          comprobanteDetectado: false,
+          respuesta: 'Los datos bancarios no están configurados. Por favor contactá a soporte.',
+          mensajesMultiples: ['Los datos bancarios no están configurados. Por favor contactá a soporte.']
+        };
+        return new Response(JSON.stringify(payload), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+      
+      const cajas = cashierNumbersText?.trim() || 'Contacta a soporte para obtener el número del cajero';
+      const mensajesMultiples = [
+        'Para transferir te dejo el CBU a continuación ↓',
+        cbu,
+        'Una vez realizada la transferencia, enviá el comprobante al cajero para acreditar tu saldo ↓',
+        cajas
+      ];
+
+      const payload: DefaultAgentResponse = {
+        isActivated: true,
+        intencionCargaFichas: true,
+        comprobanteDetectado: false,
+        respuesta: mensajesMultiples[0],
+        mensajesMultiples
+      };
+
+      return new Response(JSON.stringify(payload), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
 
     // DETECCIÓN: Usuario dice que YA tiene cuenta
     const yaTieneCuentaPatterns = [
@@ -279,6 +358,7 @@ serve(async (req) => {
 
     // FLUJO: Usuario dice que ya tiene cuenta O la conversación tiene casino_user_created
     if (yaTieneCuenta || (existingCasinoUser && existingCasinoUsername)) {
+      console.log('[ia-default-agent] RAMA: usuario_existente');
       console.log(`[ia-default-agent] User has existing account. yaTieneCuenta: ${yaTieneCuenta}, existingCasinoUser: ${existingCasinoUser}, existingCasinoUsername: ${existingCasinoUsername}`);
       
       // Si dice que ya tiene cuenta, asumimos que quiere recargar
@@ -330,38 +410,9 @@ serve(async (req) => {
     ];
     const comprobanteDetectado = comprobantePatterns.some(p => text.includes(p));
 
-    // Solicitud explícita de datos bancarios (CBU, alias, etc.)
-    const bankInfoPatterns = [
-      'cbu','alias','qr','numero de caja','número de caja','cajero','caja','transferir','transferencia','depositar','deposito','depósito'
-    ];
-    const bankInfoRequested = bankInfoPatterns.some(p => text.includes(p));
-
-    // Si pide CBU o datos bancarios, responder con mensajes múltiples estructurados
-    if (bankInfoRequested && cbu) {
-      const cajas = cashierNumbersText?.trim() || '';
-      const mensajesMultiples = [
-        'Para transferir te dejo el CBU a continuación ↓',
-        cbu,
-        'Una vez realizada la transferencia, enviá el comprobante al cajero para acreditar tu saldo ↓',
-        cajas || 'Contacta a soporte para obtener el número del cajero'
-      ];
-
-      const payload: DefaultAgentResponse = {
-        isActivated: true,
-        intencionCargaFichas: true,
-        comprobanteDetectado: false,
-        respuesta: mensajesMultiples[0],
-        mensajesMultiples
-      };
-
-      return new Response(JSON.stringify(payload), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
-    }
-
     // Caso derivación por intención/comprobante (sin datos bancarios)
     if (intencionCargaFichas || comprobanteDetectado) {
+      console.log('[ia-default-agent] RAMA: intencion_carga_o_comprobante_texto');
       let respuesta = 'Por seguridad, te derivo con un asesor que te ayuda con eso 💸';
 
       const payload: DefaultAgentResponse = {
@@ -377,7 +428,9 @@ serve(async (req) => {
       });
     }
 
-    // Caso conversación normal: usar Gemini 2.5 Flash vía Lovable con tools
+    // ===== Caso conversación normal: usar Gemini 2.5 Flash =====
+    console.log('[ia-default-agent] RAMA: conversacion_normal_llm');
+    
     let respuesta = '';
     let actionExecuted: DefaultAgentResponse['actionExecuted'] = undefined;
     
@@ -409,6 +462,7 @@ serve(async (req) => {
 - Si quiere cargar fichas, darle el CBU directamente`
       : '';
     
+    // SYSTEM PROMPT con datos de la BD
     const systemPrompt = `Sos el asistente virtual del casino online CAPIBET, con tonada argentina y estilo conversacional humano.
 
 **IMPORTANTE - ESTILO CONVERSACIONAL:**
@@ -422,11 +476,17 @@ ${existingUserInfo}
 1. Podés crear cuentas de jugadores usando la función crear_jugador
 2. Para consultas sobre depósitos/cargas o retiros, debés proporcionar el CBU y derivar al cajero
 
-**INFORMACIÓN DEL CASINO:**
+**INFORMACIÓN DEL CASINO (DATOS EXACTOS - NO INVENTAR):**
 - Nombre del casino: CAPIBET
 - Link del casino: ${casinoLink}
 - CBU para cargas: ${cbu || '[no configurado]'}
 - Contacto del cajero: ${cashierNumbersText || '[no configurado]'}
+
+**REGLA CRÍTICA - CBU Y DATOS BANCARIOS:**
+- NUNCA inventes CBU, alias, o datos bancarios
+- Si te piden CBU, usá EXACTAMENTE este: ${cbu}
+- Si te piden el cajero, usá EXACTAMENTE este: ${cashierNumbersText}
+- Si estos datos están vacíos o no configurados, decí: "Los datos bancarios no están configurados, por favor contactá a soporte"
 
 **CUÁNDO MENCIONAR AL CAJERO (SOLO en estos casos):**
 - Cuando el usuario EXPLÍCITAMENTE pida: cargar saldo, depositar, retirar dinero, enviar comprobante
@@ -473,9 +533,9 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
           parts: [{ text: msg.content }]
         }));
 
-        // Primera llamada a la IA con tools (Gemini no soporta tools nativamente igual que OpenAI)
-        // Usamos el prompt para incluir instrucciones de tools
-        const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
+        // Primera llamada a la IA con tools - USANDO GEMINI 2.5 FLASH
+        console.log('[ia-default-agent] Llamando a Gemini 2.5 Flash...');
+        const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -483,7 +543,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
           body: JSON.stringify({
             contents: [
               { role: 'user', parts: [{ text: systemPrompt }] },
-              { role: 'model', parts: [{ text: 'Entendido, soy el asistente de CAPIBET.' }] },
+              { role: 'model', parts: [{ text: 'Entendido, soy el asistente de CAPIBET. Usaré los datos exactos de configuración para CBU y cajero.' }] },
               ...geminiHistory,
               { role: 'user', parts: [{ text: messageContent }] }
             ],
@@ -508,7 +568,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
               }]
             }],
             generationConfig: {
-              temperature: 0.7,
+              temperature: 0.5, // Reducido para menos creatividad/alucinaciones
               maxOutputTokens: 500
             }
           }),
@@ -525,7 +585,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
           if (functionCall) {
             const toolCallName = functionCall.name;
             const args = functionCall.args || {};
-            console.log('Function call detected:', toolCallName, args);
+            console.log('[ia-default-agent] Function call detected:', toolCallName, args);
             
             if (args) {
               let toolResult;
@@ -632,7 +692,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
                 }
                 
                 // Para otras tools, segunda llamada a la IA con el resultado
-                const followUpResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
+                const followUpResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -646,7 +706,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
                       { role: 'function', parts: [{ functionResponse: { name: toolCallName, response: toolResult } }] }
                     ],
                     generationConfig: {
-                      temperature: 0.7,
+                      temperature: 0.5,
                       maxOutputTokens: 500
                     }
                   }),
@@ -668,13 +728,14 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
           } else {
             // No hay function call, respuesta normal de texto
             respuesta = candidate?.content?.parts?.[0]?.text || '';
+            console.log('[ia-default-agent] Respuesta LLM:', respuesta.substring(0, 100) + '...');
           }
         } else {
           const errorText = await aiResponse.text();
-          console.error('Lovable AI error:', errorText);
+          console.error('[ia-default-agent] Gemini API error:', errorText);
         }
       } catch (e) {
-        console.error('Lovable AI call failed:', e);
+        console.error('[ia-default-agent] Gemini call failed:', e);
       }
     }
 
