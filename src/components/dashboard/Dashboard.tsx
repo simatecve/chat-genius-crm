@@ -4,7 +4,9 @@ import {
   MessageSquare, 
   Target,
   Send,
-  ArrowDown
+  ArrowDown,
+  ArrowUp,
+  Clock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,9 +27,12 @@ import {
   Bar
 } from 'recharts';
 
+const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+
 export const Dashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
-  const { stats, recentLeads, activeConversations, messagesByHour, conversationsByHour, isLoading } = useDashboard(selectedPeriod);
+  const { stats, recentLeads, activeConversations, messagesByHour, conversationsByHour, heatmapData, isLoading } = useDashboard(selectedPeriod);
 
   const periodMap: { [key: string]: 'today' | 'week' | 'month' | 'year' } = {
     'Hoy': 'today',
@@ -49,6 +54,18 @@ export const Dashboard = () => {
     recibidos: item.incoming,
     enviados: item.outgoing
   })), [messagesByHour]);
+
+  // Procesar datos del heatmap
+  const maxHeatmapValue = useMemo(() => Math.max(...heatmapData.map(d => d.value), 1), [heatmapData]);
+  
+  const getHeatmapColor = (value: number) => {
+    if (value === 0) return 'bg-muted';
+    const intensity = value / maxHeatmapValue;
+    if (intensity < 0.25) return 'bg-emerald-200 dark:bg-emerald-900';
+    if (intensity < 0.5) return 'bg-emerald-400 dark:bg-emerald-700';
+    if (intensity < 0.75) return 'bg-emerald-500 dark:bg-emerald-600';
+    return 'bg-emerald-600 dark:bg-emerald-500';
+  };
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -166,11 +183,13 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Total de Mensajes Recibidos</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-3xl font-bold">{Math.floor(stats.totalMessages * 0.6)}</h2>
-                  <span className="text-sm text-red-500 flex items-center">
-                    <ArrowDown className="h-3 w-3 mr-1" />
-                    34%
-                  </span>
+                  <h2 className="text-3xl font-bold">{stats.incomingMessages}</h2>
+                  {stats.incomingMessages > 0 && (
+                    <span className="text-sm text-green-500 flex items-center">
+                      <ArrowUp className="h-3 w-3 mr-1" />
+                      {Math.round((stats.incomingMessages / Math.max(stats.totalMessages, 1)) * 100)}%
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="w-12 h-12 rounded-lg bg-orange-500/20 flex items-center justify-center">
@@ -186,11 +205,13 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Total de Mensajes Enviados</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-3xl font-bold">{Math.floor(stats.totalMessages * 0.4)}</h2>
-                  <span className="text-sm text-red-500 flex items-center">
-                    <ArrowDown className="h-3 w-3 mr-1" />
-                    64%
-                  </span>
+                  <h2 className="text-3xl font-bold">{stats.outgoingMessages}</h2>
+                  {stats.outgoingMessages > 0 && (
+                    <span className="text-sm text-green-500 flex items-center">
+                      <ArrowUp className="h-3 w-3 mr-1" />
+                      {Math.round((stats.outgoingMessages / Math.max(stats.totalMessages, 1)) * 100)}%
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center">
@@ -305,6 +326,64 @@ export const Dashboard = () => {
         </CardContent>
       </Card>
 
+      {/* Heatmap de Actividad */}
+      <Card className="bg-gradient-to-br from-card to-card/80">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            Mapa de Calor - Actividad por Horario (Últimos 30 días)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              {/* Header con horas */}
+              <div className="flex gap-1 mb-1">
+                <div className="w-12 shrink-0" />
+                {HOURS.filter((_, i) => i % 2 === 0).map(hour => (
+                  <div key={hour} className="flex-1 text-xs text-muted-foreground text-center">
+                    {hour}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Filas por día */}
+              {DAYS.map((day, dayIndex) => (
+                <div key={day} className="flex gap-1 mb-1">
+                  <div className="w-12 shrink-0 text-xs text-muted-foreground flex items-center">
+                    {day}
+                  </div>
+                  <div className="flex-1 flex gap-0.5">
+                    {Array.from({ length: 24 }, (_, hour) => {
+                      const data = heatmapData.find(d => d.day === dayIndex && d.hour === hour);
+                      const value = data?.value || 0;
+                      return (
+                        <div
+                          key={hour}
+                          className={`flex-1 h-6 rounded-sm ${getHeatmapColor(value)} transition-colors`}
+                          title={`${day} ${String(hour).padStart(2, '0')}:00 - ${value} mensajes`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Leyenda */}
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <span className="text-xs text-muted-foreground">Menos</span>
+                <div className="w-4 h-4 rounded-sm bg-muted" />
+                <div className="w-4 h-4 rounded-sm bg-emerald-200 dark:bg-emerald-900" />
+                <div className="w-4 h-4 rounded-sm bg-emerald-400 dark:bg-emerald-700" />
+                <div className="w-4 h-4 rounded-sm bg-emerald-500 dark:bg-emerald-600" />
+                <div className="w-4 h-4 rounded-sm bg-emerald-600 dark:bg-emerald-500" />
+                <span className="text-xs text-muted-foreground">Más</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Annual Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-l-4 border-l-teal-500 bg-gradient-to-br from-card to-card/80">
@@ -313,10 +392,7 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-4xl font-bold">36,279</h2>
-                  <span className="text-sm text-green-500 flex items-center">
-                    100%
-                  </span>
+                  <h2 className="text-4xl font-bold">{stats.yearlyNewProspects.toLocaleString()}</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Nuevos prospectos</p>
               </div>
@@ -333,10 +409,7 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-4xl font-bold">54</h2>
-                  <span className="text-sm text-green-500 flex items-center">
-                    100%
-                  </span>
+                  <h2 className="text-4xl font-bold">{stats.yearlyRecurringClients.toLocaleString()}</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Clientes recurrentes</p>
               </div>
@@ -353,10 +426,7 @@ export const Dashboard = () => {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground font-medium">Todo el Año</p>
                 <div className="flex items-baseline gap-2">
-                  <h2 className="text-4xl font-bold">36,333</h2>
-                  <span className="text-sm text-green-500 flex items-center">
-                    100%
-                  </span>
+                  <h2 className="text-4xl font-bold">{stats.yearlyTotal.toLocaleString()}</h2>
                 </div>
                 <p className="text-sm text-muted-foreground">Totales</p>
               </div>
