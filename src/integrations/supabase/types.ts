@@ -203,6 +203,42 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       automated_message_logs: {
         Row: {
           created_at: string | null
@@ -1149,6 +1185,7 @@ export type Database = {
           message: string | null
           message_type: string | null
           metadata: Json | null
+          responded_by: string | null
           status: string | null
           user_id: string
         }
@@ -1164,6 +1201,7 @@ export type Database = {
           message?: string | null
           message_type?: string | null
           metadata?: Json | null
+          responded_by?: string | null
           status?: string | null
           user_id: string
         }
@@ -1179,6 +1217,7 @@ export type Database = {
           message?: string | null
           message_type?: string | null
           metadata?: Json | null
+          responded_by?: string | null
           status?: string | null
           user_id?: string
         }
@@ -1188,6 +1227,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_responded_by_fkey"
+            columns: ["responded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1568,6 +1614,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      system_status: {
+        Row: {
+          component_name: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          last_check_at: string | null
+          metadata: Json | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          component_name: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          last_check_at?: string | null
+          metadata?: Json | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          component_name?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          last_check_at?: string | null
+          metadata?: Json | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       tareas: {
         Row: {

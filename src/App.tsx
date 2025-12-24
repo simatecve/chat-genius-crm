@@ -40,6 +40,7 @@ const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminStatistics = lazy(() => import("./pages/admin/AdminStatistics"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
 const AdminConversations = lazy(() => import("./pages/admin/AdminConversations"));
+const AuditPanel = lazy(() => import("./pages/admin/AuditPanel"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -206,6 +207,11 @@ const App = () => (
               <Route path="/admin/conversaciones" element={
                 <ProtectedRoute requireSuperAdmin>
                   <AdminConversations />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/auditoria" element={
+                <ProtectedRoute requireSuperAdmin>
+                  <AuditPanel />
                 </ProtectedRoute>
               } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
