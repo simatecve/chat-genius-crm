@@ -198,8 +198,16 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
                       )}
                     </div>
                     {lead.phone && (
-                      <div className="text-xs text-muted-foreground truncate">
-                        {lead.phone}
+                      <div className="text-xs text-muted-foreground truncate flex items-center gap-2">
+                        <span>{lead.phone}</span>
+                        {hasConversation && conversation?.last_message_time && (
+                          <span className="text-muted-foreground/70">
+                            · {formatDistanceToNow(new Date(conversation.last_message_time), { 
+                              addSuffix: false, 
+                              locale: es 
+                            })}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -342,34 +350,11 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
                 </Badge>
               )}
               
-              {hasConversation && conversation && (
-                <div className="flex flex-col gap-1 pt-2 border-t border-border/40">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
-                      <span className="text-xs text-muted-foreground truncate">
-                        {conversation.last_message && conversation.last_message.length > 25 
-                          ? `${conversation.last_message.substring(0, 25)}...` 
-                          : conversation.last_message || "Activo"}
-                      </span>
-                    </div>
-                    {conversation.unread_count > 0 && (
-                      <Badge variant="destructive" className="h-4 px-1.5 text-[10px] shrink-0">
-                        {conversation.unread_count}
-                      </Badge>
-                    )}
-                  </div>
-                  {conversation.last_message_time && (
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
-                      <Clock className="h-2.5 w-2.5" />
-                      <span>
-                        {formatDistanceToNow(new Date(conversation.last_message_time), { 
-                          addSuffix: true, 
-                          locale: es 
-                        })}
-                      </span>
-                    </div>
-                  )}
+              {hasConversation && conversation && conversation.unread_count > 0 && (
+                <div className="flex items-center justify-end pt-2 border-t border-border/40">
+                  <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
+                    {conversation.unread_count}
+                  </Badge>
                 </div>
               )}
             </div>
