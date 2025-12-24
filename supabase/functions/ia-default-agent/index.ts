@@ -124,7 +124,7 @@ const casinoTools = [
         properties: {
           userName: { 
             type: "string", 
-            description: "Nombre de usuario para el casino (username único)" 
+            description: "Nombre de usuario para el casino. SIEMPRE generar en formato: nombreMinúscula + díaMes (DDMM) + 2 números aleatorios (00-99). Ejemplo: roberto241237" 
           },
           password: { 
             type: "string", 
@@ -518,6 +518,13 @@ ${existingUserInfo}
 
 **CREACIÓN DE CUENTAS:**
 - Contraseña por defecto: "Capibet1234" (si el usuario no especifica una)
+- **GENERACIÓN DE USERNAME:**
+  - Cuando el usuario te dé su nombre, generá el username así: [nombreEnMinúscula][DDMM][XX]
+  - DDMM = día y mes actual (ej: 2412 para 24 de diciembre)
+  - XX = 2 números aleatorios del 00 al 99
+  - Ejemplo: Si dice "Roberto" el 24/12 → "roberto241237" o "roberto241205"
+  - SIEMPRE usá este formato para evitar duplicados
+  - NUNCA uses solo el nombre sin los números de fecha y random
 - Después de crear la cuenta, SIEMPRE enviá las credenciales completas: usuario y contraseña
 - Formato de respuesta: "¡Listo! Tu cuenta fue creada. Usuario: [usuario] - Contraseña: [contraseña]. Ingresá desde: ${casinoLink}"
 - SIEMPRE incluí el link ${casinoLink} cuando crees una cuenta o cuando pregunten cómo acceder al casino
@@ -567,7 +574,7 @@ Mantené un tono amigable, claro y profesional. Recordá: no repitas saludos en 
                   properties: {
                     userName: { 
                       type: "string", 
-                      description: "Nombre de usuario para el casino (username único)" 
+                      description: "Nombre de usuario para el casino. SIEMPRE generar en formato: nombreMinúscula + díaMes (DDMM) + 2 números aleatorios (00-99). Ejemplo: roberto241237" 
                     },
                     password: { 
                       type: "string", 
