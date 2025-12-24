@@ -209,7 +209,8 @@ async function processBuffer(supabase: any, buffer: any) {
           userId,
           messageContent: combinedMessage,
           phoneNumber: conversation.phone_number,
-          twilioConnectionId: buffer.twilio_connection_id
+          twilioConnectionId: buffer.twilio_connection_id,
+          imageUrls // Pasar URLs de imágenes para detección de comprobantes
         }
       });
       aiResponse = aiResult;
