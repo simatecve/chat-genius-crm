@@ -65,6 +65,50 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API
   try {
     console.log('Analyzing image for payment receipt:', imageUrl);
     
+    let imagePart: any;
+    
+    if (imageUrl.startsWith('data:')) {
+      // Imagen en formato base64
+      const base64Data = imageUrl.split(',')[1];
+      const mimeType = imageUrl.split(':')[1]?.split(';')[0] || 'image/jpeg';
+      console.log('Processing base64 image with mimeType:', mimeType);
+      imagePart = {
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Data
+        }
+      };
+    } else {
+      // URL HTTP - descargar y convertir a base64
+      console.log('Downloading image from URL:', imageUrl);
+      try {
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          console.error('Failed to download image:', imageResponse.status, imageResponse.statusText);
+          return false;
+        }
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const uint8Array = new Uint8Array(imageBuffer);
+        let binaryString = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+          binaryString += String.fromCharCode(uint8Array[i]);
+        }
+        const base64Data = btoa(binaryString);
+        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        console.log('Downloaded image, size:', uint8Array.length, 'bytes, contentType:', contentType);
+        
+        imagePart = {
+          inlineData: {
+            mimeType: contentType.split(';')[0], // Remove charset if present
+            data: base64Data
+          }
+        };
+      } catch (downloadError) {
+        console.error('Error downloading image:', downloadError);
+        return false;
+      }
+    }
+
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -81,12 +125,7 @@ o cualquier documento/captura que demuestre que se realizó una transacción fin
 
 Responde SOLO "SI" o "NO", sin explicaciones.`
             },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: imageUrl.startsWith('data:') ? imageUrl.split(',')[1] : ''
-              }
-            }
+            imagePart
           ]
         }],
         generationConfig: {
@@ -100,7 +139,9 @@ Responde SOLO "SI" o "NO", sin explicaciones.`
       const result = await response.json();
       const answer = (result.candidates?.[0]?.content?.parts?.[0]?.text || '').toUpperCase().trim();
       console.log('Image analysis result:', answer);
-      return answer.includes('SI') || answer.includes('SÍ') || answer === 'YES';
+      const isReceipt = answer.includes('SI') || answer.includes('SÍ') || answer === 'YES';
+      console.log(`[ia-default-agent] ¿Es comprobante de pago? ${isReceipt ? 'SÍ' : 'NO'}`);
+      return isReceipt;
     } else {
       const errorText = await response.text();
       console.error('Error analyzing image:', errorText);
