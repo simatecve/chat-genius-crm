@@ -20,14 +20,12 @@ type DefaultAgentResponse = {
   };
   schedulePaymentReminder?: boolean;
   casinoUsername?: string;
-  // Nuevos campos para humanización
   humanizationDelay?: number;
   combinedMessage?: boolean;
 };
 
 // ============= CONFIGURACIÓN DE HUMANIZACIÓN =============
 
-// Variantes de saludos para evitar patrones repetitivos
 const saludoVariantes = [
   "Buenas! 🎰",
   "Hola! 👋",
@@ -38,7 +36,6 @@ const saludoVariantes = [
   "Hey!",
 ];
 
-// Variantes de confirmaciones
 const confirmacionVariantes = [
   "Dale",
   "Listo",
@@ -50,39 +47,29 @@ const confirmacionVariantes = [
   "Ahí va",
 ];
 
-// Variantes de emojis para carga
 const emojisCarga = ["💸", "💰", "🎰", "✨", "👌", "🙌"];
 const emojisPositivos = ["😊", "👍", "✌️", "🔥", "💪"];
 
-// Función para obtener elemento aleatorio
 function getRandomElement<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// Función para generar delay aleatorio
 function getRandomDelay(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// Función para humanizar texto (agregar pequeñas variaciones)
 function humanizeText(text: string, emojiFrequency: number = 50): string {
-  // Decidir aleatoriamente si incluir emoji
   const includeEmoji = Math.random() * 100 < emojiFrequency;
-  
-  // Pequeñas variaciones en el texto
   let humanized = text;
   
-  // A veces usar minúsculas al inicio
   if (Math.random() > 0.6 && humanized.length > 0) {
     humanized = humanized.charAt(0).toLowerCase() + humanized.slice(1);
   }
   
-  // A veces eliminar signos de exclamación dobles
   if (Math.random() > 0.7) {
     humanized = humanized.replace(/!!/g, '!').replace(/¡¡/g, '¡');
   }
   
-  // Si no incluir emoji, quitarlos del texto
   if (!includeEmoji) {
     humanized = humanized.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '').trim();
   }
@@ -90,17 +77,13 @@ function humanizeText(text: string, emojiFrequency: number = 50): string {
   return humanized;
 }
 
-// Función para combinar mensajes múltiples en uno solo
 function combineMessages(messages: string[], delayBetween: number = 0): string[] {
   if (messages.length <= 1) return messages;
   
-  // Si delay es 0, combinar todo en un mensaje
   if (delayBetween === 0) {
     return [messages.join('\n\n')];
   }
   
-  // Si hay delay, mantener separados pero reducir cantidad
-  // Combinar mensajes cortos
   const combined: string[] = [];
   let current = '';
   
@@ -133,6 +116,92 @@ async function checkUsernameExists(supabase: any, username: string): Promise<boo
   const exists = data && data.length > 0;
   console.log(`[ia-default-agent] Username "${username}" exists: ${exists}`);
   return exists;
+}
+
+// ============= GENERADOR ROBUSTO DE USERNAME =============
+// Genera username único con reintentos automáticos
+async function generateUniqueUsername(
+  supabase: any, 
+  contactName: string, 
+  maxRetries: number = 5
+): Promise<string> {
+  // Normalizar nombre: solo letras minúsculas, sin espacios ni acentos
+  const normalizedName = (contactName || 'user')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // quitar acentos
+    .replace(/[^a-z]/g, '') // solo letras
+    .slice(0, 8); // máximo 8 caracteres
+  
+  const baseName = normalizedName || 'user';
+  const now = new Date();
+  const ddmm = `${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // Generar 2 dígitos aleatorios
+    const randomDigits = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    const username = `${baseName}${ddmm}${randomDigits}`;
+    
+    const exists = await checkUsernameExists(supabase, username);
+    if (!exists) {
+      console.log(`[ia-default-agent] Generated unique username: ${username} (attempt ${attempt + 1})`);
+      return username;
+    }
+    
+    console.log(`[ia-default-agent] Username ${username} already exists, retrying...`);
+  }
+  
+  // Fallback: agregar timestamp
+  const fallback = `${baseName}${ddmm}${Date.now().toString().slice(-4)}`;
+  console.log(`[ia-default-agent] Using fallback username: ${fallback}`);
+  return fallback;
+}
+
+// ============= FILTRO ANTI-CAJERO =============
+// Remueve cualquier mención del cajero si no hay comprobante verificado
+function sanitizeCashierFromResponse(
+  respuesta: string, 
+  cashierNumbers: string, 
+  comprobanteDetectado: boolean
+): string {
+  if (comprobanteDetectado) {
+    return respuesta; // Si hay comprobante, no filtrar
+  }
+  
+  let sanitized = respuesta;
+  
+  // Lista de patrones a filtrar
+  const patternsToRemove = [
+    cashierNumbers, // El link/número del cajero
+    'wa.link',
+    'http://wa.link',
+    'https://wa.link',
+  ];
+  
+  for (const pattern of patternsToRemove) {
+    if (pattern && pattern.trim()) {
+      // Escapar caracteres especiales para regex
+      const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      sanitized = sanitized.replace(new RegExp(escaped, 'gi'), '[disponible después del comprobante]');
+    }
+  }
+  
+  // Detectar si menciona "cajero" en contexto de enviar link
+  const cajeroPhrases = [
+    /pasale\s+(ese\s+)?comprobante\s+al\s+cajero/gi,
+    /contacta\s+(al\s+)?cajero/gi,
+    /manda(le)?\s+al\s+cajero/gi,
+    /habla\s+con\s+(el\s+)?cajero/gi,
+  ];
+  
+  for (const phrase of cajeroPhrases) {
+    if (phrase.test(sanitized)) {
+      console.warn('[ia-default-agent] FILTRO: Bloqueando mención de cajero sin comprobante');
+      sanitized = sanitized.replace(phrase, 'primero mandame el comprobante de transferencia');
+    }
+  }
+  
+  return sanitized;
 }
 
 // Función helper para crear jugador en el casino
@@ -318,15 +387,15 @@ serve(async (req) => {
     // Calcular delay aleatorio para esta respuesta
     const humanizationDelay = getRandomDelay(minDelay, maxDelay);
 
-    // ANÁLISIS DE IMÁGENES
+    // ============= RAMA 1: ANÁLISIS DE IMÁGENES (COMPROBANTE) =============
     if (imageUrls && imageUrls.length > 0 && GOOGLE_GEMINI_API_KEY) {
-      console.log(`Analyzing ${imageUrls.length} images for payment receipts...`);
+      console.log(`[ia-default-agent] RAMA: analizando ${imageUrls.length} imágenes...`);
       
       for (const imageUrl of imageUrls) {
         const isReceipt = await analyzeImageForPaymentReceipt(imageUrl, GOOGLE_GEMINI_API_KEY);
         
         if (isReceipt) {
-          console.log('[ia-default-agent] RAMA: comprobante_detectado_imagen');
+          console.log('[ia-default-agent] RAMA: comprobante_detectado_imagen ✓');
           
           const cajas = cashierNumbersText?.trim() || '';
           const confirmacion = enableVariation ? getRandomElement(confirmacionVariantes) : 'Perfecto';
@@ -338,7 +407,6 @@ serve(async (req) => {
             cajas || 'Contacta a soporte para obtener el número del cajero'
           ];
 
-          // Combinar mensajes si está habilitado
           if (combineMessages_enabled) {
             mensajesMultiples = combineMessages(mensajesMultiples, 0);
           }
@@ -346,7 +414,7 @@ serve(async (req) => {
           const payload: DefaultAgentResponse = {
             isActivated: true,
             intencionCargaFichas: true,
-            comprobanteDetectado: true,
+            comprobanteDetectado: true, // ← IMPORTANTE: Solo aquí es true
             respuesta: mensajesMultiples[0],
             mensajesMultiples,
             humanizationDelay,
@@ -359,11 +427,52 @@ serve(async (req) => {
           });
         }
       }
+      console.log('[ia-default-agent] Imagen analizada: NO es comprobante de pago');
     }
 
     const text = (messageContent || '').toLowerCase();
 
-    // DETECCIÓN DE INTENCIÓN BANCARIA
+    // ============= RAMA 2: PREGUNTA INICIAL "CÓMO JUEGO" (ANTES del LLM) =============
+    const preguntaInicialPatterns = [
+      'como juego', 'cómo juego', 'como empiezo', 'cómo empiezo',
+      'quiero jugar', 'puedo jugar', 'quiero empezar', 'como funciona',
+      'cómo funciona', 'que tengo que hacer', 'qué tengo que hacer',
+      'como hago para jugar', 'cómo hago para jugar', 'como es',
+      'como me registro', 'cómo me registro', 'como creo cuenta',
+      'cómo creo cuenta', 'como abro cuenta', 'cómo abro cuenta',
+      'quiero apostar', 'como apuesto', 'cómo apuesto',
+      'explicame', 'explícame', 'como arranco', 'cómo arranco'
+    ];
+    
+    const esPreguntaInicial = preguntaInicialPatterns.some(p => text.includes(p));
+    
+    // Solo aplicar si NO tiene cuenta existente
+    if (esPreguntaInicial && !existingCasinoUser && !existingCasinoUsername) {
+      console.log('[ia-default-agent] RAMA: pregunta_inicial (cómo juego) ✓');
+      
+      const saludo = enableVariation ? getRandomElement(['Buenas!', 'Hola!', 'Hey!', 'Holaa']) : 'Hola!';
+      const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
+      
+      const respuesta = humanizeText(
+        `${saludo}${emoji} Para jugar primero necesitás una cuenta. ¿Ya tenés usuario o querés que te cree uno?`, 
+        emojiFrequency
+      );
+      
+      const payload: DefaultAgentResponse = {
+        isActivated: true,
+        intencionCargaFichas: false,
+        comprobanteDetectado: false,
+        respuesta,
+        humanizationDelay
+      };
+      
+      return new Response(JSON.stringify(payload), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+
+    // ============= RAMA 3: DETECCIÓN DE INTENCIÓN BANCARIA (CBU/CARGAR) =============
     const bankInfoPatterns = [
       'cbu', 'alias', 'qr', 
       'transferir', 'transferencia', 'depositar', 'deposito', 'depósito',
@@ -372,16 +481,18 @@ serve(async (req) => {
       'retirar', 'retiro', 'sacar plata', 'sacar dinero', 'cobrar',
       'pagar', 'pago', 'abonar',
       'datos bancarios', 'datos para transferir', 'a donde transfiero', 'adonde transfiero',
-      'numero de caja', 'número de caja', 'cajero', 'caja',
       'como hago para cargar', 'cómo hago para cargar',
       'como deposito', 'cómo deposito',
       'pasame el cbu', 'pásame el cbu', 'pasame cbu', 'dame el cbu', 'mandame el cbu'
     ];
     
+    // EXCLUIR "cajero" y "caja" de bankInfoPatterns para evitar dar el link
+    // El cajero SOLO se da después del comprobante
+    
     const bankInfoRequested = bankInfoPatterns.some(p => text.includes(p));
     
     if (bankInfoRequested) {
-      console.log('[ia-default-agent] RAMA: bankInfoRequested');
+      console.log('[ia-default-agent] RAMA: bankInfoRequested ✓');
       
       if (!cbu || cbu.trim() === '') {
         const payload: DefaultAgentResponse = {
@@ -427,7 +538,7 @@ serve(async (req) => {
       });
     }
 
-    // DETECCIÓN: Usuario dice que YA tiene cuenta
+    // ============= RAMA 4: USUARIO DICE QUE YA TIENE CUENTA =============
     const yaTieneCuentaPatterns = [
       'ya tengo cuenta', 'ya tengo usuario', 'mi usuario es', 'mi cuenta es',
       'tengo cuenta', 'tengo usuario', 'ya estoy registrado', 'ya me registré', 'ya me registre',
@@ -444,7 +555,7 @@ serve(async (req) => {
     const quiereRecargar = quiereRecargarPatterns.some(p => text.includes(p));
 
     if (yaTieneCuenta || (existingCasinoUser && existingCasinoUsername)) {
-      console.log('[ia-default-agent] RAMA: usuario_existente');
+      console.log('[ia-default-agent] RAMA: usuario_existente ✓');
       
       if (yaTieneCuenta || quiereRecargar) {
         const confirmacion = enableVariation ? getRandomElement(['Genial', 'Perfecto', 'Dale', 'Joya']) : 'Perfecto';
@@ -486,7 +597,79 @@ serve(async (req) => {
       }
     }
 
-    // Detección de comprobante por texto
+    // ============= RAMA 5: QUIERE CREAR CUENTA (detección directa) =============
+    const quiereCrearCuentaPatterns = [
+      'creame', 'créame', 'creame cuenta', 'créame cuenta', 'creame usuario', 'créame usuario',
+      'quiero cuenta', 'quiero una cuenta', 'quiero usuario', 'quiero un usuario',
+      'no tengo cuenta', 'no tengo usuario', 'crear cuenta', 'crear usuario',
+      'haceme cuenta', 'haceme una cuenta', 'haceme usuario',
+      'registrarme', 'registrame', 'regístrame', 'quiero registrarme'
+    ];
+    const quiereCrearCuenta = quiereCrearCuentaPatterns.some(p => text.includes(p));
+
+    if (quiereCrearCuenta && !existingCasinoUser) {
+      console.log('[ia-default-agent] RAMA: quiere_crear_cuenta (directo) ✓');
+      
+      // Generar username único automáticamente
+      const generatedUsername = await generateUniqueUsername(supabase, contactName || 'user');
+      const password = 'Capibet1234';
+      
+      // Crear jugador
+      const result = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '');
+      
+      if (result.success) {
+        const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
+        
+        let mensajesMultiples = [
+          humanizeText(`listo${emoji} tu cuenta:\nUsuario: ${generatedUsername}\nContraseña: ${password}`, emojiFrequency),
+          humanizeText(`ingresá desde: ${casinoLink}`, emojiFrequency),
+          humanizeText('para cargar fichas, transferí al CBU ↓', emojiFrequency),
+          cbu || '[CBU no configurado]',
+          humanizeText('mandame el comprobante acá cuando transfieras', emojiFrequency)
+        ];
+        
+        if (combineMessages_enabled) {
+          mensajesMultiples = combineMessages(mensajesMultiples, 0);
+        }
+
+        const payload: DefaultAgentResponse = {
+          isActivated: true,
+          intencionCargaFichas: false,
+          comprobanteDetectado: false,
+          respuesta: mensajesMultiples[0],
+          mensajesMultiples,
+          actionExecuted: {
+            type: 'crear_jugador',
+            success: true,
+            result: { credentials: { userName: generatedUsername, password } }
+          },
+          schedulePaymentReminder: true,
+          casinoUsername: generatedUsername,
+          humanizationDelay,
+          combinedMessage: combineMessages_enabled
+        };
+        
+        return new Response(JSON.stringify(payload), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      } else {
+        const payload: DefaultAgentResponse = {
+          isActivated: true,
+          intencionCargaFichas: false,
+          comprobanteDetectado: false,
+          respuesta: humanizeText('hubo un problema creando la cuenta, probá de nuevo en unos minutos', emojiFrequency),
+          humanizationDelay
+        };
+        
+        return new Response(JSON.stringify(payload), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+    }
+
+    // ============= RAMA 6: MENCIÓN DE COMPROBANTE SIN IMAGEN → DERIVAR =============
     const cargaPatterns = [
       'cargar fichas','cargar saldo','quiero cargar','pasame el cbu','pásame el cbu','alias','qr',
       'ya hice la transferencia','transferi','transferí','transferir','te paso el comprobante','te mando el comprobante',
@@ -494,16 +677,16 @@ serve(async (req) => {
     ];
     const intencionCargaFichas = cargaPatterns.some(p => text.includes(p));
     const comprobantePatterns = ['comprobante','voucher','recibo','captura','screenshot','foto del pago','ticket'];
-    const comprobanteDetectado = comprobantePatterns.some(p => text.includes(p));
+    const comprobanteDetectadoTexto = comprobantePatterns.some(p => text.includes(p));
 
-    if (intencionCargaFichas || comprobanteDetectado) {
-      console.log('[ia-default-agent] RAMA: intencion_carga_o_comprobante_texto');
+    if (intencionCargaFichas || comprobanteDetectadoTexto) {
+      console.log('[ia-default-agent] RAMA: intencion_carga_o_comprobante_texto ✓');
       const respuesta = humanizeText('Por seguridad, te derivo con un asesor que te ayuda con eso 💸', emojiFrequency);
 
       const payload: DefaultAgentResponse = {
         isActivated: false,
         intencionCargaFichas,
-        comprobanteDetectado,
+        comprobanteDetectado: false, // No es comprobante real, solo texto
         respuesta,
         humanizationDelay
       };
@@ -514,7 +697,7 @@ serve(async (req) => {
       });
     }
 
-    // ===== CONVERSACIÓN NORMAL: usar Gemini con prompt humanizado =====
+    // ============= RAMA 7: CONVERSACIÓN NORMAL CON GEMINI =============
     console.log('[ia-default-agent] RAMA: conversacion_normal_llm');
     
     let respuesta = '';
@@ -544,7 +727,8 @@ serve(async (req) => {
       ? `\n**USUARIO CON CUENTA EXISTENTE:** ${existingCasinoUsername} - NO crear cuenta nueva.`
       : '';
     
-    // SYSTEM PROMPT HUMANIZADO
+    // ============= SYSTEM PROMPT MEJORADO (SIN CAJERO VISIBLE) =============
+    // IMPORTANTE: El cajero NO está en el prompt para que Gemini no lo mencione
     const systemPrompt = `Sos el asistente virtual de CAPIBET, un casino online. Hablás en argentino, de forma natural y relajada.
 
 **ESTILO DE COMUNICACIÓN (MUY IMPORTANTE):**
@@ -562,26 +746,25 @@ ${existingUserInfo}
 - Nombre: CAPIBET
 - Link: ${casinoLink}
 - CBU para cargas: ${cbu || '[no configurado]'}
-- Cajero: ${cashierNumbersText || '[no configurado]'}
+
+**FLUJO OBLIGATORIO - SEGUÍ ESTOS PASOS EN ORDEN:**
+1. Si preguntan cómo jugar/empezar → Primero preguntá: "¿Ya tenés cuenta o querés que te cree una?"
+2. Si quieren crear cuenta → Usá la función crear_jugador
+3. Si quieren cargar → Dales el CBU y pedí que manden el comprobante
+4. SOLO después de que envíen comprobante → Ahí recién los derivamos al cajero
 
 **REGLAS CRÍTICAS:**
-- NUNCA inventes datos bancarios, usá EXACTAMENTE los de arriba
+- NUNCA menciones "cajero", "caja", ni "wa.link" en tus respuestas
+- El link del cajero se envía automáticamente SOLO después de verificar el comprobante
 - Si piden CBU, respondé: "${cbu}"
-- Si piden cajero, respondé: "${cashierNumbersText}"
 - Para crear cuentas usá la función crear_jugador
 - Contraseña por defecto: Capibet1234
-- Generá usernames así: [nombre][DDMM][XX] (ej: juan241237)
 
 **PREGUNTAS FRECUENTES:**
 - Mínimo carga: $2.000
 - Mínimo retiro: $5.000
 - 1 retiro por día sin límite
 - CBU a nombre de: Edgardo Barrientos
-
-**CUÁNDO DERIVAR AL CAJERO:**
-- Solo después de recibir comprobante de transferencia verificado
-- Cuando pidan RETIRO de dinero
-- Problemas técnicos que no puedas resolver
 
 Mantené el tono natural y relajado. No seas repetitivo.`;
 
@@ -599,27 +782,27 @@ Mantené el tono natural y relajado. No seas repetitivo.`;
           body: JSON.stringify({
             contents: [
               { role: 'user', parts: [{ text: systemPrompt }] },
-              { role: 'model', parts: [{ text: 'dale, entendido. hablo natural y uso los datos exactos' }] },
+              { role: 'model', parts: [{ text: 'dale, entendido. hablo natural, uso los datos exactos, y NUNCA menciono cajero ni wa.link' }] },
               ...geminiHistory,
               { role: 'user', parts: [{ text: messageContent }] }
             ],
             tools: [{
               functionDeclarations: [{
                 name: "crear_jugador",
-                description: "Crear un nuevo jugador en el casino.",
+                description: "Crear un nuevo jugador en el casino. Llamá a esta función cuando el usuario quiera crear una cuenta.",
                 parameters: {
                   type: "object",
                   properties: {
                     userName: { 
                       type: "string", 
-                      description: "Username en formato: nombreMinúscula + DDMM + 2 números random. Ej: roberto241237" 
+                      description: "Username sugerido. El sistema lo generará automáticamente si no se proporciona." 
                     },
                     password: { 
                       type: "string", 
                       description: "Contraseña. Default: Capibet1234"
                     }
                   },
-                  required: ["userName"]
+                  required: []
                 }
               }]
             }],
@@ -640,126 +823,72 @@ Mantené el tono natural y relajado. No seas repetitivo.`;
             const args = functionCall.args || {};
             console.log('[ia-default-agent] Function call:', toolCallName, args);
             
-            if (args) {
-              let toolResult;
-              let actionType: 'crear_jugador' = 'crear_jugador';
-              
-              switch (toolCallName) {
-                case 'crear_jugador':
-                  if (existingCasinoUser) {
-                    const payload: DefaultAgentResponse = {
-                      isActivated: true,
-                      intencionCargaFichas: false,
-                      comprobanteDetectado: false,
-                      respuesta: humanizeText(`ya tenés cuenta! tu usuario es ${existingCasinoUsername}. querés cargar fichas?`, emojiFrequency),
-                      humanizationDelay
-                    };
-                    return new Response(JSON.stringify(payload), {
-                      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                      status: 200
-                    });
-                  }
-                  
-                  const usernameExists = await checkUsernameExists(supabase, args.userName);
-                  
-                  if (usernameExists) {
-                    const payload: DefaultAgentResponse = {
-                      isActivated: true,
-                      intencionCargaFichas: false,
-                      comprobanteDetectado: false,
-                      respuesta: humanizeText(`ese usuario "${args.userName}" ya está en uso, probá con otro nombre`, emojiFrequency),
-                      humanizationDelay
-                    };
-                    return new Response(JSON.stringify(payload), {
-                      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                      status: 200
-                    });
-                  }
-                  
-                  const password = args.password || 'Capibet1234';
-                  toolResult = await crearJugador(args.userName, password, contactName || 'Usuario', phoneNumber || '');
-                  
-                  if (toolResult.success && toolResult.data) {
-                    toolResult.data.credentials = { userName: args.userName, password };
-                  }
-                  break;
-                  
-                default:
-                  respuesta = humanizeText('para eso necesitás hablar con un asesor, te contactamos', emojiFrequency);
-                  toolResult = null;
-                  break;
+            if (toolCallName === 'crear_jugador') {
+              if (existingCasinoUser) {
+                const payload: DefaultAgentResponse = {
+                  isActivated: true,
+                  intencionCargaFichas: false,
+                  comprobanteDetectado: false,
+                  respuesta: humanizeText(`ya tenés cuenta! tu usuario es ${existingCasinoUsername}. querés cargar fichas?`, emojiFrequency),
+                  humanizationDelay
+                };
+                return new Response(JSON.stringify(payload), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  status: 200
+                });
               }
               
-              if (toolResult) {
-                actionExecuted = {
-                  type: actionType!,
-                  success: toolResult.success,
-                  result: toolResult
+              // Usar generador robusto de username (ignora lo que sugiera Gemini)
+              const generatedUsername = await generateUniqueUsername(supabase, contactName || 'user');
+              const password = args.password || 'Capibet1234';
+              
+              console.log(`[ia-default-agent] Creating user with generated username: ${generatedUsername}`);
+              const toolResult = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '');
+              
+              if (toolResult.success && toolResult.data) {
+                toolResult.data.credentials = { userName: generatedUsername, password };
+              }
+              
+              actionExecuted = {
+                type: 'crear_jugador',
+                success: toolResult.success,
+                result: toolResult
+              };
+              
+              if (toolResult.success) {
+                const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
+                
+                let mensajesMultiples = [
+                  humanizeText(`listo${emoji} tu cuenta:\nUsuario: ${generatedUsername}\nContraseña: ${password}`, emojiFrequency),
+                  humanizeText(`ingresá desde: ${casinoLink}`, emojiFrequency),
+                  humanizeText('para cargar fichas, transferí al CBU ↓', emojiFrequency),
+                  cbu || '[CBU no configurado]',
+                  humanizeText('mandame el comprobante acá cuando transfieras', emojiFrequency)
+                ];
+                
+                if (combineMessages_enabled) {
+                  mensajesMultiples = combineMessages(mensajesMultiples, 0);
+                }
+
+                const payload: DefaultAgentResponse = {
+                  isActivated: true,
+                  intencionCargaFichas: false,
+                  comprobanteDetectado: false,
+                  respuesta: mensajesMultiples[0],
+                  mensajesMultiples,
+                  actionExecuted,
+                  schedulePaymentReminder: true,
+                  casinoUsername: generatedUsername,
+                  humanizationDelay,
+                  combinedMessage: combineMessages_enabled
                 };
                 
-                if (actionType === 'crear_jugador' && toolResult.success) {
-                  const userName = args.userName;
-                  const password = args.password || 'Capibet1234';
-                  const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
-                  
-                  let mensajesMultiples = [
-                    humanizeText(`listo${emoji} tu cuenta:\nUsuario: ${userName}\nContraseña: ${password}`, emojiFrequency),
-                    humanizeText(`ingresá desde: ${casinoLink}`, emojiFrequency),
-                    humanizeText('para cargar fichas, transferí al CBU ↓', emojiFrequency),
-                    cbu || '[CBU no configurado]',
-                    humanizeText('mandame el comprobante acá cuando transfieras', emojiFrequency)
-                  ];
-                  
-                  if (combineMessages_enabled) {
-                    mensajesMultiples = combineMessages(mensajesMultiples, 0);
-                  }
-
-                  const payload: DefaultAgentResponse = {
-                    isActivated: true,
-                    intencionCargaFichas: false,
-                    comprobanteDetectado: false,
-                    respuesta: mensajesMultiples[0],
-                    mensajesMultiples,
-                    actionExecuted,
-                    schedulePaymentReminder: true,
-                    casinoUsername: userName,
-                    humanizationDelay,
-                    combinedMessage: combineMessages_enabled
-                  };
-                  
-                  return new Response(JSON.stringify(payload), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    status: 200
-                  });
-                }
-                
-                // Segunda llamada para otras tools
-                const followUpResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_GEMINI_API_KEY}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: [
-                      { role: 'user', parts: [{ text: systemPrompt }] },
-                      { role: 'model', parts: [{ text: 'dale' }] },
-                      { role: 'user', parts: [{ text: messageContent }] },
-                      { role: 'model', parts: [{ functionCall: { name: toolCallName, args } }] },
-                      { role: 'function', parts: [{ functionResponse: { name: toolCallName, response: toolResult } }] }
-                    ],
-                    generationConfig: {
-                      temperature: aiTemperature,
-                      maxOutputTokens: 400
-                    }
-                  }),
+                return new Response(JSON.stringify(payload), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  status: 200
                 });
-                
-                if (followUpResponse.ok) {
-                  const followUpResult = await followUpResponse.json();
-                  respuesta = followUpResult.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                } else {
-                  respuesta = toolResult.success 
-                    ? humanizeText('listo, operación completada', emojiFrequency)
-                    : humanizeText(`hubo un problema: ${toolResult.error || 'error desconocido'}. intentá de nuevo`, emojiFrequency);
-                }
+              } else {
+                respuesta = humanizeText(`hubo un problema creando la cuenta. intentá de nuevo en unos minutos`, emojiFrequency);
               }
             }
           } else {
@@ -776,6 +905,10 @@ Mantené el tono natural y relajado. No seas repetitivo.`;
     if (!respuesta) {
       respuesta = humanizeText('depende del juego. las fichas arrancan desde $100. querés q te cuente las opciones?', emojiFrequency);
     }
+
+    // ============= FILTRO ANTI-CAJERO FINAL =============
+    // Sanitizar la respuesta para asegurar que no contenga cajero sin comprobante
+    respuesta = sanitizeCashierFromResponse(respuesta, cashierNumbersText, false);
 
     const payload: DefaultAgentResponse = {
       isActivated: true,
