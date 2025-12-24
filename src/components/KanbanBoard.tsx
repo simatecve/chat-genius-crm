@@ -495,6 +495,16 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
 }) => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showOnlyUnread, setShowOnlyUnread] = useState(false);
+
+  // Filtrar leads por no leídos si está activo
+  const filteredLeads = useMemo(() => {
+    if (!showOnlyUnread) return columnLeads;
+    return columnLeads.filter(lead => {
+      const conversation = lead.conversations?.[0];
+      return conversation && (conversation.unread_count || 0) > 0;
+    });
+  }, [columnLeads, showOnlyUnread]);
 
   // IntersectionObserver para detectar cuando llega al final
   useEffect(() => {
@@ -545,9 +555,24 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
             </Tooltip>
           </div>
           <div className="flex items-center gap-2 mt-3">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant={showOnlyUnread ? "default" : "ghost"} 
+                  size="sm" 
+                  className={`ml-auto h-7 w-7 p-0 ${showOnlyUnread ? 'bg-primary text-primary-foreground' : ''}`}
+                  onClick={() => setShowOnlyUnread(!showOnlyUnread)}
+                >
+                  <Mail className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {showOnlyUnread ? 'Ver todos los leads' : 'Solo no leídos'}
+              </TooltipContent>
+            </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -583,7 +608,7 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
           <div ref={scrollContainerRef} className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
             <Droppable droppableId={column.id}>
               {(provided, snapshot) => <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[200px] space-y-2 rounded-lg transition-all duration-200 ${snapshot.isDraggingOver ? 'bg-primary/10 border-2 border-dashed border-primary/40 p-2 scale-[1.01]' : 'border-2 border-transparent'}`}>
-                  {columnLeads.map((lead, index) => <LeadCard key={lead.id} lead={lead} index={index} onEdit={onEditLead} onDelete={onDeleteLead} onOpenConversation={onOpenConversation} getTagColor={getTagColor} etiquetas={etiquetas} allWorkspaces={allWorkspaces} onMoveToWorkspace={onMoveLeadToWorkspace} onTagsUpdated={() => {
+                  {filteredLeads.map((lead, index) => <LeadCard key={lead.id} lead={lead} index={index} onEdit={onEditLead} onDelete={onDeleteLead} onOpenConversation={onOpenConversation} getTagColor={getTagColor} etiquetas={etiquetas} allWorkspaces={allWorkspaces} onMoveToWorkspace={onMoveLeadToWorkspace} onTagsUpdated={() => {
                 refreshTags();
                 queryClient.invalidateQueries({
                   queryKey: ['leads']
@@ -592,10 +617,14 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
                   {provided.placeholder}
                   
                   {/* Sentinel para infinite scroll */}
-                  {columnState?.hasMore && <div ref={sentinelRef} className="py-4 flex justify-center">
+                  {columnState?.hasMore && !showOnlyUnread && <div ref={sentinelRef} className="py-4 flex justify-center">
                       {columnState.loading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : <Button variant="ghost" size="sm" onClick={() => onLoadMore?.(column.id)} className="text-xs text-muted-foreground">
                           Cargar más...
                         </Button>}
+                    </div>}
+                  
+                  {filteredLeads.length === 0 && columnLeads.length > 0 && showOnlyUnread && <div className="text-center text-muted-foreground text-sm py-8">
+                      No hay mensajes no leídos
                     </div>}
                   
                   {columnLeads.length === 0 && !columnState?.loading && <div className="text-center text-muted-foreground text-sm py-8">
