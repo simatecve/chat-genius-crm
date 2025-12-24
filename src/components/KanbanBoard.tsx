@@ -213,9 +213,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                     </>}
                   {(onEdit || onDelete || lead.phone) && <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                          <MoreVertical className="h-3 w-3" />
-                        </Button>
+                        
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {lead.phone && <DropdownMenuItem onClick={handleOpenConversation}>
