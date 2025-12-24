@@ -7,7 +7,18 @@ export interface DashboardStats {
   whatsappConnections: number;
   totalCampaigns: number;
   totalMessages: number;
+  incomingMessages: number;
+  outgoingMessages: number;
   conversionRate: number;
+  yearlyNewProspects: number;
+  yearlyRecurringClients: number;
+  yearlyTotal: number;
+}
+
+export interface HeatmapData {
+  day: number;
+  hour: number;
+  value: number;
 }
 
 export interface RecentLead {
@@ -53,6 +64,11 @@ export const dashboardService = {
 
       const instanceNames = whatsappInstances?.map(instance => instance.name) || [];
 
+      // Calcular fecha inicio del año
+      const yearStart = new Date();
+      yearStart.setMonth(0, 1);
+      yearStart.setHours(0, 0, 0, 0);
+
       // Ejecutar consultas en paralelo
       const [
         leadsResult,
@@ -60,7 +76,9 @@ export const dashboardService = {
         whatsappResult,
         campaignsResult,
         conversationsResult,
-        messagesResult
+        incomingMessagesResult,
+        outgoingMessagesResult,
+        yearlyConversationsResult
       ] = await Promise.all([
         // Total de leads
         supabase
@@ -92,12 +110,26 @@ export const dashboardService = {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId),
         
+        // Mensajes recibidos del usuario
+        supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .in('direction', ['incoming', 'inbound']),
+        
         // Mensajes enviados del usuario
         supabase
           .from('messages')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
-          .eq('direction', 'outgoing')
+          .in('direction', ['outgoing', 'outbound']),
+        
+        // Conversaciones del año para estadísticas anuales
+        supabase
+          .from('conversations')
+          .select('id, created_at')
+          .eq('user_id', userId)
+          .gte('created_at', yearStart.toISOString())
       ]);
 
       // Calcular tasa de conversión (leads calificados vs total)
@@ -116,14 +148,34 @@ export const dashboardService = {
       const totalLeads = leadsResult.count || 0;
       const conversionRate = totalLeads > 0 ? (qualifiedCount / totalLeads) * 100 : 0;
 
+      // Calcular estadísticas anuales
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const yearlyConversations = yearlyConversationsResult.data || [];
+      const yearlyNewProspects = yearlyConversations.filter(c => 
+        new Date(c.created_at) > thirtyDaysAgo
+      ).length;
+      const yearlyRecurringClients = yearlyConversations.filter(c => 
+        new Date(c.created_at) <= thirtyDaysAgo
+      ).length;
+
+      const incomingMessages = incomingMessagesResult.count || 0;
+      const outgoingMessages = outgoingMessagesResult.count || 0;
+
       return {
         totalLeads,
         activeConversations: conversationsResult.count || 0,
         totalContacts: contactsResult.count || 0,
         whatsappConnections: whatsappResult.count || 0,
         totalCampaigns: campaignsResult.count || 0,
-        totalMessages: messagesResult.count || 0,
-        conversionRate: Math.round(conversionRate * 10) / 10 // Redondear a 1 decimal
+        totalMessages: incomingMessages + outgoingMessages,
+        incomingMessages,
+        outgoingMessages,
+        conversionRate: Math.round(conversionRate * 10) / 10,
+        yearlyNewProspects,
+        yearlyRecurringClients,
+        yearlyTotal: yearlyConversations.length
       };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -134,7 +186,12 @@ export const dashboardService = {
         whatsappConnections: 0,
         totalCampaigns: 0,
         totalMessages: 0,
-        conversionRate: 0
+        incomingMessages: 0,
+        outgoingMessages: 0,
+        conversionRate: 0,
+        yearlyNewProspects: 0,
+        yearlyRecurringClients: 0,
+        yearlyTotal: 0
       };
     }
   },
@@ -320,6 +377,57 @@ export const dashboardService = {
       }));
     } catch (error) {
       console.error('Error fetching conversations by hour:', error);
+      return [];
+    }
+  },
+
+  async getMessagesHeatmap(userId: string): Promise<HeatmapData[]> {
+    try {
+      // Obtener mensajes de los últimos 30 días
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('user_id', userId)
+        .gte('created_at', thirtyDaysAgo.toISOString());
+
+      if (error) throw error;
+
+      // Crear matriz de 7 días x 24 horas
+      const heatmapData: { [key: string]: number } = {};
+      
+      // Inicializar con ceros
+      for (let day = 0; day < 7; day++) {
+        for (let hour = 0; hour < 24; hour++) {
+          heatmapData[`${day}-${hour}`] = 0;
+        }
+      }
+
+      // Contar mensajes por día y hora
+      data?.forEach(message => {
+        const date = new Date(message.created_at);
+        const day = date.getDay(); // 0=Domingo, 1=Lunes...
+        const hour = date.getHours();
+        heatmapData[`${day}-${hour}`]++;
+      });
+
+      // Convertir a array
+      const result: HeatmapData[] = [];
+      for (let day = 0; day < 7; day++) {
+        for (let hour = 0; hour < 24; hour++) {
+          result.push({
+            day,
+            hour,
+            value: heatmapData[`${day}-${hour}`]
+          });
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error fetching messages heatmap:', error);
       return [];
     }
   }

@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { dashboardService, DashboardStats, RecentLead, ActiveConversation, MessagesByHour, ConversationStats } from '@/services/dashboardService';
+import { dashboardService, DashboardStats, RecentLead, ActiveConversation, MessagesByHour, ConversationStats, HeatmapData } from '@/services/dashboardService';
 import { useAuth } from './useAuth';
 
 export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'today') => {
@@ -14,7 +13,7 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     queryKey: ['dashboard-stats', user?.id],
     queryFn: () => user ? dashboardService.getDashboardStats(user.id) : null,
     enabled: !!user,
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const {
@@ -25,7 +24,7 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     queryKey: ['recent-leads', user?.id],
     queryFn: () => user ? dashboardService.getRecentLeads(user.id) : null,
     enabled: !!user,
-    refetchInterval: 2 * 60 * 1000, // Refetch every 2 minutes
+    refetchInterval: 2 * 60 * 1000,
   });
 
   const {
@@ -36,7 +35,7 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     queryKey: ['active-conversations', user?.id],
     queryFn: () => user ? dashboardService.getActiveConversations(user.id) : null,
     enabled: !!user,
-    refetchInterval: 30 * 1000, // Refetch every 30 seconds for real-time feel
+    refetchInterval: 30 * 1000,
   });
 
   const {
@@ -61,6 +60,17 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     refetchInterval: 2 * 60 * 1000,
   });
 
+  const {
+    data: heatmapData,
+    isLoading: heatmapLoading,
+    error: heatmapError
+  } = useQuery({
+    queryKey: ['messages-heatmap', user?.id],
+    queryFn: () => user ? dashboardService.getMessagesHeatmap(user.id) : null,
+    enabled: !!user,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
   return {
     stats: stats || {
       totalLeads: 0,
@@ -69,13 +79,19 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
       whatsappConnections: 0,
       totalCampaigns: 0,
       totalMessages: 0,
-      conversionRate: 0
+      incomingMessages: 0,
+      outgoingMessages: 0,
+      conversionRate: 0,
+      yearlyNewProspects: 0,
+      yearlyRecurringClients: 0,
+      yearlyTotal: 0
     },
     recentLeads: recentLeads || [],
     activeConversations: activeConversations || [],
     messagesByHour: messagesByHour || [],
     conversationsByHour: conversationsByHour || [],
-    isLoading: statsLoading || leadsLoading || conversationsLoading || messagesLoading || conversationsByHourLoading,
-    error: statsError || leadsError || conversationsError || messagesError || conversationsByHourError
+    heatmapData: heatmapData || [],
+    isLoading: statsLoading || leadsLoading || conversationsLoading || messagesLoading || conversationsByHourLoading || heatmapLoading,
+    error: statsError || leadsError || conversationsError || messagesError || conversationsByHourError || heatmapError
   };
 };
