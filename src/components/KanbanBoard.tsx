@@ -200,12 +200,16 @@ const LeadCardComponent: React.FC<LeadCardProps & { etiquetas: any[], onTagsUpda
                     {lead.phone && (
                       <div className="text-xs text-muted-foreground truncate flex items-center gap-2">
                         <span>{lead.phone}</span>
-                        {hasConversation && conversation?.last_message_time && (
+                        {((hasConversation && conversation?.last_message_time) || lead.updated_at) && (
                           <span className="text-muted-foreground/70">
-                            · {formatDistanceToNow(new Date(conversation.last_message_time), { 
-                              addSuffix: false, 
-                              locale: es 
-                            })}
+                            · {formatDistanceToNow(
+                              new Date(
+                                (hasConversation && conversation?.last_message_time) 
+                                  ? conversation.last_message_time 
+                                  : lead.updated_at!
+                              ), 
+                              { addSuffix: false, locale: es }
+                            )}
                           </span>
                         )}
                       </div>
