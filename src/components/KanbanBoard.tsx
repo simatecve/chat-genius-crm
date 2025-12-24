@@ -207,9 +207,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10" onClick={toggleBotBlock} disabled={isBotToggling} title={isBlocked ? 'Bot desactivado - Click para activar' : 'Bot activo - Click para desactivar'}>
                         {isBlocked ? <BotOff className="h-3 w-3 text-destructive" /> : <Bot className="h-3 w-3 text-green-500" />}
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10" onClick={handleOpenConversation} title="Abrir conversación">
-                        <MessageSquare className="h-3 w-3" />
-                      </Button>
+                      
                     </>}
                   {(onEdit || onDelete || lead.phone) && <DropdownMenu>
                       <DropdownMenuTrigger asChild>
