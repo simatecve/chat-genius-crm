@@ -101,7 +101,7 @@ export const useInfiniteLeads = ({
           )
         `)
         .eq('column_id', columnId)
-        .order('updated_at', { ascending: false })
+        .order('last_inbound_message_time', { ascending: false, nullsFirst: false })
         .range(offset, offset + pageSize - 1);
 
       if (error) {
@@ -222,6 +222,7 @@ export const useInfiniteLeads = ({
         user_id: userId,
         created_at: conv.created_at,
         updated_at: conv.updated_at,
+        last_inbound_message_time: conv.last_inbound_message_time,
         bot_active: true,
         isVirtual: true,
         originalConversationId: conv.id,
@@ -231,6 +232,7 @@ export const useInfiniteLeads = ({
           pushname: conv.pushname,
           last_message: conv.last_message,
           last_message_time: conv.last_message_time,
+          last_inbound_message_time: conv.last_inbound_message_time,
           unread_count: conv.unread_count,
           channel_type: conv.channel_type
         }]

@@ -559,8 +559,9 @@ const Leads = () => {
     const {
       data: realLeads,
       error
-    } = await query.order('updated_at', {
-      ascending: false
+    } = await query.order('last_inbound_message_time', {
+      ascending: false,
+      nullsFirst: false
     });
     if (error) {
       console.error('Error loading leads:', error);
@@ -643,6 +644,7 @@ const Leads = () => {
       user_id: effectiveUserId,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
+      last_inbound_message_time: conv.last_inbound_message_time,
       bot_active: true,
       isVirtual: true,
       originalConversationId: conv.id,

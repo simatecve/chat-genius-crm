@@ -1035,6 +1035,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          last_inbound_message_time: string | null
           name: string
           notes: string | null
           phone: string
@@ -1051,6 +1052,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          last_inbound_message_time?: string | null
           name: string
           notes?: string | null
           phone: string
@@ -1067,6 +1069,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          last_inbound_message_time?: string | null
           name?: string
           notes?: string | null
           phone?: string
