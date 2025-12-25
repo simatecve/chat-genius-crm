@@ -30,6 +30,7 @@ interface ConversationSummary {
   pushname: string | null;
   last_message: string | null;
   last_message_time: string | null;
+  last_inbound_message_time?: string | null;
   unread_count: number | null;
   channel_type?: string | null;
 }
@@ -536,6 +537,7 @@ const Leads = () => {
           pushname,
           last_message,
           last_message_time,
+          last_inbound_message_time,
           unread_count,
           channel_type
         )
@@ -563,7 +565,7 @@ const Leads = () => {
     const {
       data: orphanConversations,
       error: orphanError
-    } = await supabase.from('conversations').select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at').eq('user_id', effectiveUserId).is('lead_id', null).or('channel_type.neq.webchat,channel_type.is.null').order('last_message_time', {
+    } = await supabase.from('conversations').select('id, phone_number, pushname, last_message, last_message_time, last_inbound_message_time, unread_count, channel_type, created_at, updated_at').eq('user_id', effectiveUserId).is('lead_id', null).or('channel_type.neq.webchat,channel_type.is.null').order('last_inbound_message_time', {
       ascending: false,
       nullsFirst: false
     }).limit(200);
@@ -602,6 +604,7 @@ const Leads = () => {
         pushname: conv.pushname,
         last_message: conv.last_message,
         last_message_time: conv.last_message_time,
+        last_inbound_message_time: conv.last_inbound_message_time,
         unread_count: conv.unread_count,
         channel_type: conv.channel_type
       }]
@@ -610,10 +613,10 @@ const Leads = () => {
     // Combinar leads reales (sin webchat) + virtuales
     const allLeads = [...filteredRealLeads, ...virtualLeads];
 
-    // Ordenar leads por último mensaje (más reciente arriba) - ordenamiento global
+    // Ordenar leads por último mensaje recibido (más reciente arriba) - ordenamiento global
     const sortedData = allLeads.sort((a, b) => {
-      const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
-      const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+      const aTime = a.conversations?.[0]?.last_inbound_message_time || a.conversations?.[0]?.last_message_time || a.updated_at;
+      const bTime = b.conversations?.[0]?.last_inbound_message_time || b.conversations?.[0]?.last_message_time || b.updated_at;
 
       // Más reciente primero (descendente)
       return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();

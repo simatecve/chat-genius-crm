@@ -46,6 +46,7 @@ interface ConversationSummary {
   pushname: string | null;
   last_message: string | null;
   last_message_time: string | null;
+  last_inbound_message_time?: string | null;
   unread_count: number | null;
   channel_type?: string | null;
 }
