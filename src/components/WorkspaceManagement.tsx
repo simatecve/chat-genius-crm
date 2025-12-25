@@ -15,6 +15,7 @@ type LeadColumn = Tables<'lead_columns'>;
 
 const CHANNEL_TYPES = [
   { value: 'whatsapp', label: 'WhatsApp', color: 'bg-green-500' },
+  { value: 'twilio', label: 'Twilio', color: 'bg-red-500' },
   { value: 'webchat', label: 'WebChat', color: 'bg-blue-500' },
   { value: 'telegram', label: 'Telegram', color: 'bg-sky-500' },
   { value: 'all', label: 'Todos', color: 'bg-purple-500' }
