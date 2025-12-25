@@ -667,6 +667,7 @@ export type Database = {
           contact_name: string | null
           created_at: string | null
           id: string
+          last_inbound_message_time: string | null
           last_message: string | null
           last_message_time: string | null
           lead_id: string | null
@@ -689,6 +690,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string | null
           id?: string
+          last_inbound_message_time?: string | null
           last_message?: string | null
           last_message_time?: string | null
           lead_id?: string | null
@@ -711,6 +713,7 @@ export type Database = {
           contact_name?: string | null
           created_at?: string | null
           id?: string
+          last_inbound_message_time?: string | null
           last_message?: string | null
           last_message_time?: string | null
           lead_id?: string | null

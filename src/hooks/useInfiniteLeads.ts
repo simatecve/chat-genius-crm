@@ -11,6 +11,7 @@ interface ConversationSummary {
   pushname: string | null;
   last_message: string | null;
   last_message_time: string | null;
+  last_inbound_message_time?: string | null;
   unread_count: number | null;
   channel_type?: string | null;
 }
@@ -92,6 +93,7 @@ export const useInfiniteLeads = ({
             pushname,
             last_message,
             last_message_time,
+            last_inbound_message_time,
             unread_count,
             channel_type
           )
@@ -111,10 +113,10 @@ export const useInfiniteLeads = ({
         conversations: lead.conversations?.filter((c: any) => c.channel_type !== 'webchat') || []
       }));
 
-      // Ordenar por último mensaje
+      // Ordenar por último mensaje recibido (inbound)
       const sortedLeads = filteredLeads.sort((a, b) => {
-        const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
-        const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+        const aTime = a.conversations?.[0]?.last_inbound_message_time || a.conversations?.[0]?.last_message_time || a.updated_at;
+        const bTime = b.conversations?.[0]?.last_inbound_message_time || b.conversations?.[0]?.last_message_time || b.updated_at;
         return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
       });
 
@@ -257,8 +259,8 @@ export const useInfiniteLeads = ({
   const getAllLeads = useCallback((): LeadWithColumn[] => {
     const allRealLeads = Object.values(columnLeadsState).flatMap(state => state.leads);
     return [...allRealLeads, ...orphanLeads].sort((a, b) => {
-      const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
-      const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+      const aTime = a.conversations?.[0]?.last_inbound_message_time || a.conversations?.[0]?.last_message_time || a.updated_at;
+      const bTime = b.conversations?.[0]?.last_inbound_message_time || b.conversations?.[0]?.last_message_time || b.updated_at;
       return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
     });
   }, [columnLeadsState, orphanLeads]);
@@ -269,8 +271,8 @@ export const useInfiniteLeads = ({
     const virtualForColumn = orphanLeads.filter(lead => lead.column_id === columnId);
     
     return [...realLeads, ...virtualForColumn].sort((a, b) => {
-      const aTime = a.conversations?.[0]?.last_message_time || a.updated_at;
-      const bTime = b.conversations?.[0]?.last_message_time || b.updated_at;
+      const aTime = a.conversations?.[0]?.last_inbound_message_time || a.conversations?.[0]?.last_message_time || a.updated_at;
+      const bTime = b.conversations?.[0]?.last_inbound_message_time || b.conversations?.[0]?.last_message_time || b.updated_at;
       return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
     });
   }, [columnLeadsState, orphanLeads]);
