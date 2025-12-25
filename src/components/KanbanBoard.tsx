@@ -441,7 +441,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   } = useTags();
   const queryClient = useQueryClient();
   const getLeadsByColumn = (columnId: string) => {
-    return leads.filter(lead => lead.column_id === columnId).sort((a, b) => {
+    return leads.filter(lead => lead && lead.column_id === columnId).sort((a, b) => {
       // Obtener el último mensaje de cada lead
       const lastMessageA = a.conversations?.[0]?.last_message_time;
       const lastMessageB = b.conversations?.[0]?.last_message_time;
