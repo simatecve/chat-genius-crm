@@ -34,6 +34,7 @@ interface ColumnLeadsState {
 interface UseInfiniteLeadsOptions {
   userId: string | null;
   workspaceId: string | null;
+  workspaceChannelType?: string | null;
   columnIds: string[];
   defaultColumnId: string | null;
   pageSize?: number;
@@ -44,6 +45,7 @@ const LEADS_PER_PAGE = 20;
 export const useInfiniteLeads = ({
   userId,
   workspaceId,
+  workspaceChannelType,
   columnIds,
   defaultColumnId,
   pageSize = LEADS_PER_PAGE
@@ -153,7 +155,7 @@ export const useInfiniteLeads = ({
     await loadLeadsForColumn(columnId, currentState.offset, true);
   }, [columnLeadsState, loadLeadsForColumn]);
 
-  // Cargar conversaciones huérfanas (sin lead)
+  // Cargar conversaciones huérfanas (sin lead) - filtradas por workspace/conexión
   const loadOrphanConversations = useCallback(async (append: boolean = false) => {
     if (!userId || !defaultColumnId) return;
 
@@ -161,12 +163,42 @@ export const useInfiniteLeads = ({
     const currentOffset = append ? orphanOffset : 0;
 
     try {
-      const { data, error } = await supabase
+      // Obtener IDs de conexiones según el channel_type del workspace
+      let connectionIds: string[] = [];
+      
+      if (workspaceId && workspaceChannelType === 'twilio') {
+        const { data: twilioConns } = await supabase
+          .from('twilio_connections')
+          .select('id')
+          .eq('workspace_id', workspaceId);
+        connectionIds = twilioConns?.map(c => c.id) || [];
+      } else if (workspaceId && workspaceChannelType === 'telegram') {
+        const { data: telegramBots } = await supabase
+          .from('telegram_bots')
+          .select('id')
+          .eq('workspace_id', workspaceId);
+        connectionIds = telegramBots?.map(b => b.id) || [];
+      }
+
+      // Base query para conversaciones huérfanas
+      let query = supabase
         .from('conversations')
-        .select('id, phone_number, pushname, last_message, last_message_time, unread_count, channel_type, created_at, updated_at')
+        .select('id, phone_number, pushname, last_message, last_message_time, last_inbound_message_time, unread_count, channel_type, twilio_connection_id, telegram_bot_id, created_at, updated_at')
         .eq('user_id', userId)
         .is('lead_id', null)
-        .or('channel_type.neq.webchat,channel_type.is.null')
+        .or('channel_type.neq.webchat,channel_type.is.null');
+
+      // Aplicar filtro por conexiones si el workspace tiene channel_type específico
+      if (workspaceChannelType === 'twilio' && connectionIds.length > 0) {
+        query = query.in('twilio_connection_id', connectionIds);
+      } else if (workspaceChannelType === 'telegram' && connectionIds.length > 0) {
+        query = query.in('telegram_bot_id', connectionIds);
+      } else if (workspaceChannelType === 'whatsapp') {
+        query = query.eq('channel_type', 'whatsapp');
+      }
+      // Si channel_type es null o 'all', no aplicar filtro adicional (comportamiento original)
+
+      const { data, error } = await query
         .order('last_message_time', { ascending: false, nullsFirst: false })
         .range(currentOffset, currentOffset + pageSize - 1);
 
@@ -217,7 +249,7 @@ export const useInfiniteLeads = ({
     } finally {
       setOrphanLoading(false);
     }
-  }, [userId, defaultColumnId, orphanOffset, pageSize]);
+  }, [userId, workspaceId, workspaceChannelType, defaultColumnId, orphanOffset, pageSize]);
 
   // Cargar más conversaciones huérfanas
   const loadMoreOrphans = useCallback(async () => {
