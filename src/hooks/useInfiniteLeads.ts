@@ -12,6 +12,7 @@ interface ConversationSummary {
   last_message: string | null;
   last_message_time: string | null;
   unread_count: number | null;
+  channel_type?: string | null;
 }
 
 export interface LeadWithColumn extends Lead {
@@ -196,7 +197,8 @@ export const useInfiniteLeads = ({
           pushname: conv.pushname,
           last_message: conv.last_message,
           last_message_time: conv.last_message_time,
-          unread_count: conv.unread_count
+          unread_count: conv.unread_count,
+          channel_type: conv.channel_type
         }]
       }));
 

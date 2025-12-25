@@ -193,9 +193,12 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   const lastMessage = conversation?.last_message;
   const lastMessageTime = conversation?.last_message_time;
   
-  // Format time naturally (e.g., "08:17 p.m.")
+  // Format time and date (hour above, date below)
   const formattedTime = lastMessageTime 
     ? format(new Date(lastMessageTime), 'hh:mm a', { locale: es })
+    : null;
+  const formattedDate = lastMessageTime
+    ? format(new Date(lastMessageTime), 'dd/MM', { locale: es })
     : null;
 
   return <>
@@ -240,9 +243,14 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                       </Badge>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {formattedTime}
-                  </span>
+                  <div className="flex flex-col items-end shrink-0">
+                    <span className="text-[10px] text-muted-foreground leading-tight">
+                      {formattedTime}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground/70 leading-tight">
+                      {formattedDate}
+                    </span>
+                  </div>
                 </div>
                 
                 {/* Fila 2: Último mensaje + Icono bot */}
