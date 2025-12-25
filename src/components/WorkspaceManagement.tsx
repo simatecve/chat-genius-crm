@@ -125,9 +125,9 @@ const WorkspaceManagement = () => {
   const handleUpdateWorkspace = async () => {
     if (!editingWorkspace || !workspaceName.trim()) return;
 
-    const { error } = await supabase
-      .from('workspaces')
-      .update({ name: workspaceName })
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ name: workspaceName, channel_type: workspaceChannelType })
       .eq('id', editingWorkspace.id);
 
     if (error) {
@@ -140,9 +140,9 @@ const WorkspaceManagement = () => {
       return;
     }
 
-    setWorkspaces(workspaces.map(ws => 
-      ws.id === editingWorkspace.id ? { ...ws, name: workspaceName } : ws
-    ));
+      setWorkspaces(workspaces.map(ws => 
+        ws.id === editingWorkspace.id ? { ...ws, name: workspaceName, channel_type: workspaceChannelType } : ws
+      ));
     setEditingWorkspace(null);
     setWorkspaceName('');
     setShowWorkspaceDialog(false);
