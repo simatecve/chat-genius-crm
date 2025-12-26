@@ -499,6 +499,53 @@ serve(async (req) => {
 
     const text = (messageContent || '').toLowerCase();
 
+    // ============= RAMA 1.5: DETECCIÓN DE SALUDO/PRIMER CONTACTO =============
+    // Si es un saludo o mensaje inicial, preguntar si tiene cuenta ANTES de hacer nada
+    const saludoPatterns = [
+      'hola', 'buenas', 'buen dia', 'buenos dias', 'buen día', 'buenos días',
+      'buenas tardes', 'buenas noches', 'hey', 'que tal', 'qué tal',
+      'como andas', 'cómo andás', 'como estas', 'cómo estás', 'ola', 'wenas'
+    ];
+    const esSaludo = saludoPatterns.some(p => text.includes(p));
+    
+    // Verificar si es primera interacción (conversación nueva o solo saludo sin contexto)
+    const esConversacionNueva = !conversationId;
+    const mensajeMuyCorto = text.length < 20 && esSaludo;
+    
+    // Solo aplicar si NO tiene cuenta existente Y es saludo/nuevo
+    if ((esSaludo || mensajeMuyCorto) && !existingCasinoUser && !existingCasinoUsername) {
+      // Verificar que no esté pidiendo algo específico (no solo saludando)
+      const tienePedidoEspecifico = [
+        'cargar', 'cbu', 'cuenta', 'usuario', 'jugar', 'fichas', 'saldo',
+        'recargar', 'depositar', 'transferir', 'registrar', 'crear'
+      ].some(p => text.includes(p));
+      
+      if (!tienePedidoEspecifico) {
+        console.log('[ia-default-agent] RAMA: saludo_inicial ✓');
+        
+        const saludo = getRandomElement(['Buenas!', 'Hola!', 'Holaa', 'Hey!', 'Qué onda!']);
+        const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
+        
+        const respuesta = humanizeText(
+          `${saludo}${emoji} ¿Ya tenés cuenta en CAPIBET o querés que te cree una?`, 
+          emojiFrequency
+        );
+        
+        const payload: DefaultAgentResponse = {
+          isActivated: true,
+          intencionCargaFichas: false,
+          comprobanteDetectado: false,
+          respuesta,
+          humanizationDelay
+        };
+        
+        return new Response(JSON.stringify(payload), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
+      }
+    }
+
     // ============= RAMA 2: PREGUNTA INICIAL "CÓMO JUEGO" (ANTES del LLM) =============
     const preguntaInicialPatterns = [
       'como juego', 'cómo juego', 'como empiezo', 'cómo empiezo',
@@ -815,16 +862,21 @@ ${existingUserInfo}
 - CBU para cargas: ${cbu || '[no configurado]'}
 
 **FLUJO OBLIGATORIO - SEGUÍ ESTOS PASOS EN ORDEN:**
-1. Si preguntan cómo jugar/empezar → Primero preguntá: "¿Ya tenés cuenta o querés que te cree una?"
-2. Si quieren crear cuenta → Usá la función crear_jugador
+1. SIEMPRE empezá preguntando: "¿Ya tenés cuenta o querés que te cree una?"
+2. Si dicen que NO tienen cuenta y EXPLÍCITAMENTE piden crearla → Usá la función crear_jugador
 3. Si quieren cargar → Dales el CBU y pedí que manden el comprobante
 4. SOLO después de que envíen comprobante → Ahí recién los derivamos al cajero
+
+**REGLA ABSOLUTA SOBRE CREAR CUENTAS:**
+- SOLO usá crear_jugador cuando el usuario EXPLÍCITAMENTE diga que quiere crear cuenta
+- Ejemplos VÁLIDOS para crear cuenta: "créame una cuenta", "quiero registrarme", "no tengo cuenta créame una", "dale", "si créame", "haceme una"
+- Ejemplos INVÁLIDOS (NO crear cuenta): "hola", "buenas", "quiero jugar", "cómo funciona" → Primero preguntá si tiene cuenta
+- Si tenés dudas, NO crees cuenta, preguntá primero: "¿Querés que te cree una cuenta?"
 
 **REGLAS CRÍTICAS:**
 - NUNCA menciones "cajero", "caja", ni "wa.link" en tus respuestas
 - El link del cajero se envía automáticamente SOLO después de verificar el comprobante
 - Si piden CBU, respondé: "${cbu}"
-- Para crear cuentas usá la función crear_jugador
 - Contraseña por defecto: Capibet1234
 
 **PREGUNTAS FRECUENTES:**
@@ -891,6 +943,31 @@ Mantené el tono natural y relajado. No seas repetitivo.`;
             console.log('[ia-default-agent] Function call:', toolCallName, args);
             
             if (toolCallName === 'crear_jugador') {
+              // VALIDACIÓN: Verificar que el usuario realmente pidió crear cuenta
+              const confirmacionPatterns = [
+                'si', 'sí', 'dale', 'creame', 'créame', 'quiero una', 'no tengo', 
+                'registrame', 'regístrame', 'haceme', 'abrí', 'abrime', 'ok', 'oka',
+                'bueno', 'va', 'vamos', 'dale que si', 'claro', 'obvio', 'por favor',
+                'porfa', 'porfavor', 'quiero cuenta', 'quiero usuario'
+              ];
+              const usuarioConfirmo = confirmacionPatterns.some(p => text.includes(p));
+              
+              if (!usuarioConfirmo) {
+                // Gemini quiso crear cuenta pero usuario no lo pidió explícitamente → Preguntar primero
+                console.log('[ia-default-agent] BLOQUEANDO crear_jugador: usuario no confirmó explícitamente');
+                const payload: DefaultAgentResponse = {
+                  isActivated: true,
+                  intencionCargaFichas: false,
+                  comprobanteDetectado: false,
+                  respuesta: humanizeText('¿Querés que te cree una cuenta?', emojiFrequency),
+                  humanizationDelay
+                };
+                return new Response(JSON.stringify(payload), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  status: 200
+                });
+              }
+              
               if (existingCasinoUser) {
                 const payload: DefaultAgentResponse = {
                   isActivated: true,
