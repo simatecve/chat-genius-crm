@@ -262,87 +262,59 @@ async function saveMessage(
   return data;
 }
 
-// Buscar o crear lead - AISLADO POR WORKSPACE/CONEXIÓN TWILIO
+// Buscar o crear lead - AISLADO POR CONVERSACIÓN (cada conexión Twilio = lead separado)
 async function getOrCreateLead(
   supabase: any,
   userId: string,
   phoneNumber: string,
   pushName: string | null,
-  connectionId: string
+  connectionId: string,
+  conversationId: string  // ← NUEVO: vincular lead a conversación específica
 ) {
-  // Paso 1: Obtener el workspace_id de la conexión Twilio
-  const { data: connection, error: connError } = await supabase
-    .from('twilio_connections')
-    .select('workspace_id, default_column_id')
-    .eq('id', connectionId)
+  // Paso 1: Verificar si la conversación YA tiene un lead vinculado
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('lead_id')
+    .eq('id', conversationId)
     .single();
 
-  if (connError) {
-    console.error('Error getting connection workspace:', connError);
+  if (convError) {
+    console.error('[getOrCreateLead] Error getting conversation:', convError);
   }
 
-  const workspaceId = connection?.workspace_id;
-  console.log(`[getOrCreateLead] Connection ${connectionId} has workspace_id: ${workspaceId}`);
-
-  // Paso 2: Obtener las columnas del workspace (si hay workspace)
-  let columnIdsInWorkspace: string[] = [];
-  if (workspaceId) {
-    const { data: columns, error: colError } = await supabase
-      .from('lead_columns')
-      .select('id')
-      .eq('workspace_id', workspaceId);
-
-    if (!colError && columns) {
-      columnIdsInWorkspace = columns.map((c: any) => c.id);
-      console.log(`[getOrCreateLead] Found ${columnIdsInWorkspace.length} columns in workspace`);
-    }
-  }
-
-  // Paso 3: Buscar lead existente por teléfono Y dentro del workspace
-  let existingLead = null;
-  
-  if (columnIdsInWorkspace.length > 0) {
-    // Buscar solo en columnas del mismo workspace
-    const { data: lead, error } = await supabase
+  if (conversation?.lead_id) {
+    // La conversación ya tiene un lead, retornarlo
+    const { data: existingLead, error: leadError } = await supabase
       .from('leads')
       .select('*')
-      .eq('user_id', userId)
-      .eq('phone', phoneNumber)
-      .in('column_id', columnIdsInWorkspace)
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error searching lead in workspace:', error);
+      .eq('id', conversation.lead_id)
+      .single();
+    
+    if (!leadError && existingLead) {
+      console.log(`[getOrCreateLead] Conversation ${conversationId} already has lead: ${existingLead.id}`);
+      return { lead: existingLead, isNew: false };
     }
-    existingLead = lead;
-  } else {
-    // Sin workspace, buscar solo por teléfono (comportamiento legacy)
-    const { data: lead, error } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('phone', phoneNumber)
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error searching lead:', error);
-    }
-    existingLead = lead;
   }
 
-  if (existingLead) {
-    console.log(`[getOrCreateLead] Lead already exists in workspace: ${existingLead.id}`);
-    return { lead: existingLead, isNew: false };
-  }
+  // Paso 2: NO tiene lead, SIEMPRE crear uno nuevo para esta conexión específica
+  console.log(`[getOrCreateLead] Creating NEW lead for conversation ${conversationId} (connection: ${connectionId})`);
 
-  // Paso 4: Crear nuevo lead en la columna por defecto de la conexión
   const defaultColumnId = await getDefaultColumn(supabase, userId, connectionId);
   if (!defaultColumnId) {
-    console.error('No default column found for connection');
+    console.error('[getOrCreateLead] No default column found for connection');
     return { lead: null, isNew: false };
   }
 
   const position = await getNextPosition(supabase, defaultColumnId);
+
+  // Obtener nombre de la conexión para notas descriptivas
+  const { data: connection } = await supabase
+    .from('twilio_connections')
+    .select('connection_name, phone_number')
+    .eq('id', connectionId)
+    .single();
+
+  const connectionLabel = connection?.connection_name || connection?.phone_number || connectionId.substring(0, 8);
 
   const newLead = {
     user_id: userId,
@@ -350,7 +322,7 @@ async function getOrCreateLead(
     name: pushName || phoneNumber,
     phone: phoneNumber,
     position: position,
-    notes: `Lead creado automáticamente desde Twilio (conexión: ${connectionId})`,
+    notes: `Lead desde línea Twilio: ${connectionLabel}`,
     bot_active: true,
   };
 
@@ -361,11 +333,11 @@ async function getOrCreateLead(
     .single();
 
   if (createError) {
-    console.error('Error creating lead:', createError);
+    console.error('[getOrCreateLead] Error creating lead:', createError);
     return { lead: null, isNew: false };
   }
 
-  console.log(`[getOrCreateLead] New lead created: ${created.id} in column ${defaultColumnId}`);
+  console.log(`[getOrCreateLead] NEW lead created: ${created.id} in column ${defaultColumnId} for connection ${connectionLabel}`);
   return { lead: created, isNew: true };
 }
 
@@ -525,8 +497,8 @@ serve(async (req) => {
     // Guardar mensaje CON MEDIA
     await saveMessage(supabase, conversation.id, userId, displayContent, false, twilioMessageId, mediaUrl, mediaType, mimeType);
 
-    // Crear lead si es nuevo contacto
-    const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, profileName, connectionId);
+    // Crear lead para esta conversación específica (un lead por conexión Twilio)
+    const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, profileName, connectionId, conversation.id);
     
     if (lead && !conversation.lead_id) {
       await linkConversationToLead(supabase, conversation.id, lead.id);
