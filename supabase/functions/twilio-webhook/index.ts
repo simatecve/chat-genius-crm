@@ -548,10 +548,11 @@ serve(async (req) => {
       console.log('[twilio-webhook] Bot enabled, adding to buffer...');
       
       // Estructura del mensaje para el buffer (compatible con WAHA)
+      // INCLUIR imageUrl para imágenes Y documentos/PDFs
       const bufferMessage = {
         type: mediaType,
         content: displayContent,
-        imageUrl: mediaType === 'image' ? mediaUrl : null
+        imageUrl: (mediaType === 'image' || mediaType === 'document') ? mediaUrl : null
       };
       
       const { data: existingBuffer } = await supabase
@@ -574,9 +575,9 @@ serve(async (req) => {
           })
           .eq('id', existingBuffer.id);
 
-        // Si alcanzó 2 mensajes O ES UNA IMAGEN, procesar inmediatamente
-        if (existingBuffer.message_count + 1 >= 2 || mediaType === 'image') {
-          console.log('[twilio-webhook] Buffer reached 2 messages or has image, processing...');
+        // Si alcanzó 2 mensajes O ES UNA IMAGEN/DOCUMENTO, procesar inmediatamente
+        if (existingBuffer.message_count + 1 >= 2 || mediaType === 'image' || mediaType === 'document') {
+          console.log('[twilio-webhook] Buffer reached 2 messages or has image/document, processing...');
           await supabase.functions.invoke('process-ai-buffer', { body: {} });
         }
       } else {
@@ -595,9 +596,9 @@ serve(async (req) => {
           .select()
           .single();
 
-        // Si es una imagen, procesar INMEDIATAMENTE (puede ser comprobante de pago)
-        if (mediaType === 'image') {
-          console.log('[twilio-webhook] Image received, processing immediately...');
+        // Si es una imagen o documento/PDF, procesar INMEDIATAMENTE (puede ser comprobante de pago)
+        if (mediaType === 'image' || mediaType === 'document') {
+          console.log('[twilio-webhook] Image/document received, processing immediately...');
           await supabase.functions.invoke('process-ai-buffer', { body: {} });
         } else {
           console.log('[twilio-webhook] New buffer created, scheduling processing in 10 seconds...');

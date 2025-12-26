@@ -260,16 +260,31 @@ async function crearJugador(userName: string, password: string, contactName: str
   }
 }
 
-// Función para analizar si una imagen es un comprobante de pago
+// Función para analizar si una imagen o PDF es un comprobante de pago
 async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API_KEY: string): Promise<boolean> {
   try {
-    console.log('Analyzing image for payment receipt:', imageUrl);
+    console.log('[ia-default-agent] Analyzing image/document for payment receipt:', imageUrl);
+    
+    // Detectar si es un PDF por la URL o extensión
+    const isPdf = imageUrl.toLowerCase().includes('.pdf') || 
+                  imageUrl.toLowerCase().includes('application/pdf') ||
+                  imageUrl.toLowerCase().includes('pdf');
+    
+    if (isPdf) {
+      console.log('[ia-default-agent] PDF detected, will analyze as document');
+    }
     
     let imagePart: any;
     
     if (imageUrl.startsWith('data:')) {
       const base64Data = imageUrl.split(',')[1];
-      const mimeType = imageUrl.split(':')[1]?.split(';')[0] || 'image/jpeg';
+      let mimeType = imageUrl.split(':')[1]?.split(';')[0] || 'image/jpeg';
+      
+      // Si es PDF, asegurar el mimeType correcto
+      if (isPdf || mimeType.includes('pdf')) {
+        mimeType = 'application/pdf';
+      }
+      
       imagePart = {
         inlineData: {
           mimeType: mimeType,
@@ -280,7 +295,7 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API
       try {
         const imageResponse = await fetch(imageUrl);
         if (!imageResponse.ok) {
-          console.error('Failed to download image:', imageResponse.status);
+          console.error('[ia-default-agent] Failed to download image/document:', imageResponse.status);
           return false;
         }
         const imageBuffer = await imageResponse.arrayBuffer();
@@ -290,7 +305,13 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API
           binaryString += String.fromCharCode(uint8Array[i]);
         }
         const base64Data = btoa(binaryString);
-        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        let contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        
+        // Si es PDF, asegurar el mimeType correcto
+        if (isPdf || contentType.includes('pdf')) {
+          contentType = 'application/pdf';
+          console.log('[ia-default-agent] Setting mimeType to application/pdf');
+        }
         
         imagePart = {
           inlineData: {
@@ -298,8 +319,10 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API
             data: base64Data
           }
         };
+        
+        console.log(`[ia-default-agent] Downloaded file, contentType: ${contentType}, size: ${base64Data.length} chars`);
       } catch (downloadError) {
-        console.error('Error downloading image:', downloadError);
+        console.error('[ia-default-agent] Error downloading image/document:', downloadError);
         return false;
       }
     }

@@ -168,10 +168,12 @@ async function processBuffer(supabase: any, buffer: any) {
         console.log('[process-ai-buffer] Using NEW object format');
         combinedMessage = messages.map((m: any) => m.content || '').join('\n\n');
         
-        // Extraer imageUrls de mensajes tipo imagen
+        // Extraer imageUrls de mensajes tipo imagen Y documentos/PDFs (pueden ser comprobantes)
         for (const m of messages) {
           console.log(`[process-ai-buffer] Message: type=${m.type}, hasImageUrl=${!!m.imageUrl}, imageUrl=${m.imageUrl}`);
-          if (m.type === 'image' && m.imageUrl) {
+          // Incluir imágenes, archivos (PDFs) y documentos
+          if ((m.type === 'image' || m.type === 'file' || m.type === 'document') && m.imageUrl) {
+            console.log(`[process-ai-buffer] Adding ${m.type} URL to analysis: ${m.imageUrl}`);
             imageUrls.push(m.imageUrl);
           }
         }
