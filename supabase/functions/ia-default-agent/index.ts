@@ -312,10 +312,16 @@ async function analyzeImageForPaymentReceipt(imageUrl: string, GOOGLE_GEMINI_API
           parts: [
             {
               text: `Analiza esta imagen y responde ÚNICAMENTE con "SI" o "NO":
-¿Es esta imagen un comprobante de pago, transferencia bancaria, voucher de depósito, 
-captura de pantalla de una transferencia realizada, recibo de pago, ticket de depósito,
-o cualquier documento/captura que demuestre que se realizó una transacción financiera o pago?
+¿Es esta imagen un comprobante de transacción bancaria de CUALQUIER tipo?
 
+Incluye como válidos:
+- Comprobante de pago, transferencia, depósito, RETIRO, extracción
+- Envío de dinero, recepción de dinero, voucher, ticket bancario
+- Captura de home banking, captura de billetera virtual
+- Apps como Mercado Pago, Palta, Ualá, Brubank, Naranja X, Personal Pay, etc.
+- Cualquier documento que muestre datos de operación financiera (CBU, CVU, monto, fecha, número de operación)
+
+EN CASO DE DUDA, responde "SI".
 Responde SOLO "SI" o "NO", sin explicaciones.`
             },
             imagePart
@@ -331,8 +337,9 @@ Responde SOLO "SI" o "NO", sin explicaciones.`
     if (response.ok) {
       const result = await response.json();
       const answer = (result.candidates?.[0]?.content?.parts?.[0]?.text || '').toUpperCase().trim();
+      console.log(`[ia-default-agent] Gemini Vision raw response: "${answer}"`);
       const isReceipt = answer.includes('SI') || answer.includes('SÍ') || answer === 'YES';
-      console.log(`[ia-default-agent] ¿Es comprobante de pago? ${isReceipt ? 'SÍ' : 'NO'}`);
+      console.log(`[ia-default-agent] ¿Es comprobante de pago? ${isReceipt ? 'SÍ' : 'NO'} (imageUrl: ${imageUrl.substring(0, 50)}...)`);
       return isReceipt;
     } else {
       console.error('Error analyzing image:', await response.text());
@@ -464,7 +471,30 @@ serve(async (req) => {
           });
         }
       }
-      console.log('[ia-default-agent] Imagen analizada: NO es comprobante de pago');
+      // FALLBACK SEGURO: Si hay imagen pero no se detectó como comprobante,
+      // igual derivar al cajero por seguridad (mejor falso positivo que perder una carga)
+      console.log('[ia-default-agent] RAMA: imagen_no_reconocida_derivar_cajero ✓');
+      
+      const cajas = cashierNumbersText?.trim() || '';
+      
+      let mensajesMultiples = [
+        humanizeText('Recibí tu imagen. Para validar la operación, pasale esa imagen al cajero ↓', emojiFrequency),
+        cajas || 'Contacta a soporte para obtener el número del cajero'
+      ];
+
+      if (combineMessages_enabled) {
+        mensajesMultiples = combineMessages(mensajesMultiples, 0);
+      }
+
+      return new Response(JSON.stringify({
+        isActivated: true,
+        intencionCargaFichas: true,
+        comprobanteDetectado: false,
+        respuesta: mensajesMultiples[0],
+        mensajesMultiples,
+        humanizationDelay,
+        combinedMessage: combineMessages_enabled
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
     const text = (messageContent || '').toLowerCase();
