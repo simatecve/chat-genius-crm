@@ -736,11 +736,12 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
 
         if (existingBuffer) {
           // Actualizar buffer existente - estructura con type, content, imageUrl
+          // INCLUIR imageUrl para imágenes Y documentos/PDFs
           const currentMessages = JSON.parse(existingBuffer.accumulated_messages);
           currentMessages.push({
             type: mediaType,
             content: messageContent,
-            imageUrl: mediaType === 'image' ? mediaUrl : null
+            imageUrl: (mediaType === 'image' || mediaType === 'file' || mediaType === 'document') ? mediaUrl : null
           });
           
           await supabase
@@ -754,13 +755,14 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
 
           console.log(`Buffer updated: ${existingBuffer.message_count + 1} messages, mediaType: ${mediaType}`);
 
-          // Si alcanzó 2 mensajes O ES UNA IMAGEN, procesar inmediatamente
-          if (existingBuffer.message_count + 1 >= 2 || mediaType === 'image') {
-            console.log('Buffer reached 2 messages or has image, processing immediately...');
+          // Si alcanzó 2 mensajes O ES UNA IMAGEN/DOCUMENTO, procesar inmediatamente
+          if (existingBuffer.message_count + 1 >= 2 || mediaType === 'image' || mediaType === 'file' || mediaType === 'document') {
+            console.log('Buffer reached 2 messages or has image/document, processing immediately...');
             await supabase.functions.invoke('process-ai-buffer', { body: {} });
           }
         } else {
           // Crear nuevo buffer - estructura con type, content, imageUrl
+          // INCLUIR imageUrl para imágenes Y documentos/PDFs
           const { data: newBuffer } = await supabase
             .from('ai_response_buffer')
             .insert({
@@ -770,7 +772,7 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
               accumulated_messages: JSON.stringify([{
                 type: mediaType,
                 content: messageContent,
-                imageUrl: mediaType === 'image' ? mediaUrl : null
+                imageUrl: (mediaType === 'image' || mediaType === 'file' || mediaType === 'document') ? mediaUrl : null
               }]),
               channel_type: 'whatsapp',
               session_name: session,
@@ -780,9 +782,9 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
             .select()
             .single();
 
-          // Si es una imagen, procesar INMEDIATAMENTE (puede ser comprobante de pago)
-          if (mediaType === 'image') {
-            console.log('Image received, processing immediately for potential payment receipt...');
+          // Si es una imagen o documento/PDF, procesar INMEDIATAMENTE (puede ser comprobante de pago)
+          if (mediaType === 'image' || mediaType === 'file' || mediaType === 'document') {
+            console.log('Image/document received, processing immediately for potential payment receipt...');
             await supabase.functions.invoke('process-ai-buffer', { body: {} });
           } else {
             console.log('New buffer created, scheduling processing in 10 seconds...');
