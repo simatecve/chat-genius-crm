@@ -745,10 +745,40 @@ serve(async (req) => {
     const quiereCrearCuenta = quiereCrearCuentaPatterns.some(p => text.includes(p));
 
     if (quiereCrearCuenta && !existingCasinoUser) {
-      console.log('[ia-default-agent] RAMA: quiere_crear_cuenta (directo) ✓');
+      console.log('[ia-default-agent] RAMA: quiere_crear_cuenta ✓');
+      
+      // Verificar si tenemos un nombre válido (no genérico, no número de teléfono)
+      const nombreEsValido = contactName && 
+        contactName.trim().length > 2 && 
+        !/^\+?\d+$/.test(contactName.trim()) &&  // No es solo números (teléfono)
+        contactName.toLowerCase() !== 'user' &&
+        contactName.toLowerCase() !== 'usuario' &&
+        !contactName.toLowerCase().startsWith('cliente') &&
+        !contactName.toLowerCase().includes('unknown');
+      
+      if (!nombreEsValido) {
+        // NO tenemos nombre válido → Preguntar primero
+        console.log('[ia-default-agent] RAMA: quiere_crear_cuenta SIN nombre válido → Preguntar nombre');
+        
+        const respuesta = humanizeText(
+          'Dale! ¿Cómo te llamo para crear tu usuario?', 
+          emojiFrequency
+        );
+        
+        return new Response(JSON.stringify({
+          isActivated: true,
+          intencionCargaFichas: false,
+          comprobanteDetectado: false,
+          respuesta,
+          humanizationDelay
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+      
+      // Si tenemos nombre válido, proceder con creación
+      console.log('[ia-default-agent] RAMA: quiere_crear_cuenta CON nombre válido → Crear cuenta');
       
       // Generar username único automáticamente
-      const generatedUsername = await generateUniqueUsername(supabase, contactName || 'user');
+      const generatedUsername = await generateUniqueUsername(supabase, contactName);
       const password = 'Capibet1234';
       
       // Crear jugador
@@ -803,6 +833,78 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200
         });
+      }
+    }
+
+    // ============= RAMA 5.5: DETECTAR NOMBRE DESPUÉS DE PREGUNTAR =============
+    // Si el mensaje anterior de la IA fue preguntando el nombre, crear cuenta con ese nombre
+    const mensajeCortoPosibleNombre = text.length < 40 && text.split(' ').length <= 4;
+    const noEsSaludo = !saludoPatterns.some(p => text.includes(p));
+    const noEsPregunta = !text.includes('?') && !text.includes('como') && !text.includes('cómo');
+
+    if (mensajeCortoPosibleNombre && noEsSaludo && noEsPregunta && !existingCasinoUser && !existingCasinoUsername) {
+      // Verificar si el mensaje anterior del bot preguntó por el nombre
+      if (conversationId) {
+        const { data: lastBotMessage } = await supabase
+          .from('messages')
+          .select('content')
+          .eq('conversation_id', conversationId)
+          .eq('direction', 'outbound')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        const preguntoPorNombre = lastBotMessage?.content?.toLowerCase().includes('cómo te llamo') ||
+                                   lastBotMessage?.content?.toLowerCase().includes('como te llamo') ||
+                                   lastBotMessage?.content?.toLowerCase().includes('tu nombre');
+        
+        if (preguntoPorNombre) {
+          console.log('[ia-default-agent] RAMA: nombre_recibido_crear_cuenta ✓');
+          
+          // Usar el mensaje del usuario como nombre para crear la cuenta
+          const nombreUsuario = messageContent.trim();
+          const generatedUsername = await generateUniqueUsername(supabase, nombreUsuario);
+          const password = 'Capibet1234';
+          
+          const result = await crearJugador(generatedUsername, password, nombreUsuario, phoneNumber || '');
+          
+          if (result.success) {
+            const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
+            
+            let mensajesMultiples = [
+              humanizeText(`Listo ${nombreUsuario}!${emoji} tu cuenta:\nUsuario: ${generatedUsername}\nContraseña: ${password}`, emojiFrequency),
+              humanizeText(`Ingresá desde: ${casinoLink}`, emojiFrequency),
+              humanizeText('Para cargar fichas, transferí al CBU ↓', emojiFrequency),
+              cbu || '[CBU no configurado]',
+              humanizeText('Mandame el comprobante acá cuando transfieras', emojiFrequency)
+            ];
+            
+            if (combineMessages_enabled) {
+              mensajesMultiples = combineMessagesExceptCBU(mensajesMultiples, cbu);
+            }
+
+            return new Response(JSON.stringify({
+              isActivated: true,
+              intencionCargaFichas: false,
+              comprobanteDetectado: false,
+              respuesta: mensajesMultiples[0],
+              mensajesMultiples,
+              actionExecuted: { type: 'crear_jugador', success: true, result: { credentials: { userName: generatedUsername, password } } },
+              schedulePaymentReminder: true,
+              casinoUsername: generatedUsername,
+              humanizationDelay,
+              combinedMessage: combineMessages_enabled
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          } else {
+            return new Response(JSON.stringify({
+              isActivated: true,
+              intencionCargaFichas: false,
+              comprobanteDetectado: false,
+              respuesta: humanizeText('hubo un problema creando la cuenta, probá de nuevo en unos minutos', emojiFrequency),
+              humanizationDelay
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          }
+        }
       }
     }
 
