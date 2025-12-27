@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil, Building2, GitBranch, MessageSquare, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Link2, Plus, Smartphone, CheckCircle, XCircle, Clock, Trash2, RefreshCw, Loader2, Pencil, MessageSquare, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useTwilioUsage } from '@/hooks/useTwilioUsage';
 import { useSessionStats } from '@/hooks/useSessionStats';
@@ -16,6 +13,7 @@ import TelegramConnectionForm from './TelegramConnectionForm';
 import TelegramBotConnectionForm from './TelegramBotConnectionForm';
 import TwilioConnectionForm from './TwilioConnectionForm';
 import WebChatConnectionForm from './WebChatConnectionForm';
+import EditSessionDialog from './EditSessionDialog';
 import { useToast } from '@/hooks/use-toast';
 interface Channel {
   id: string;
@@ -71,12 +69,8 @@ const SessionsManager = () => {
   const [deletingSession, setDeletingSession] = useState<string | null>(null);
   const [verifyingSession, setVerifyingSession] = useState<string | null>(null);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
-  const [editedName, setEditedName] = useState('');
-  const [editedWorkspaceId, setEditedWorkspaceId] = useState<string | null>(null);
-  const [editedEmbudoId, setEditedEmbudoId] = useState<string | null>(null);
-  const [savingEdit, setSavingEdit] = useState(false);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [embudos, setEmbudos] = useState<LeadColumn[]>([]);
+  const [embudos, setEmbudos] = useState<LeadColumn[]>();
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
   const { getUsageByConnectionId, getUsagePercentage, getRemainingMessages, dailyLimit, isNearLimit } = useTwilioUsage();
@@ -115,11 +109,6 @@ const SessionsManager = () => {
     }
   };
 
-  // Filtrar embudos por workspace seleccionado
-  const filteredEmbudos = useMemo(() => {
-    if (!editedWorkspaceId) return embudos;
-    return embudos.filter(e => e.workspace_id === editedWorkspaceId);
-  }, [editedWorkspaceId, embudos]);
 
   const fetchAllSessions = async () => {
     if (!effectiveUserId) return;
@@ -336,76 +325,10 @@ const SessionsManager = () => {
 
   const handleEditSession = (session: Session) => {
     setEditingSession(session);
-    setEditedName(session.name);
-    setEditedWorkspaceId(session.workspace_id || null);
-    setEditedEmbudoId(session.default_column_id || null);
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingSession || !editedName.trim()) return;
-
-    setSavingEdit(true);
-    try {
-      let error = null;
-
-      const commonData = {
-        workspace_id: editedWorkspaceId || null,
-        default_column_id: editedEmbudoId || null
-      };
-
-      switch (editingSession.type) {
-        case 'whatsapp':
-          const { error: waError } = await supabase
-            .from('whatsapp_connections')
-            .update({ name: editedName.trim(), ...commonData })
-            .eq('id', editingSession.id);
-          error = waError;
-          break;
-
-        case 'telegram-bot':
-          const { error: tgError } = await supabase
-            .from('telegram_bots')
-            .update({ bot_name: editedName.trim(), ...commonData })
-            .eq('id', editingSession.id);
-          error = tgError;
-          break;
-
-        case 'twilio':
-          const { error: twError } = await supabase
-            .from('twilio_connections')
-            .update({ connection_name: editedName.trim(), ...commonData })
-            .eq('id', editingSession.id);
-          error = twError;
-          break;
-
-        case 'webchat':
-          const { error: wcError } = await supabase
-            .from('web_chatbots')
-            .update({ name: editedName.trim(), ...commonData })
-            .eq('id', editingSession.id);
-          error = wcError;
-          break;
-      }
-
-      if (error) throw error;
-
-      toast({
-        title: "Sesión actualizada",
-        description: "La sesión ha sido actualizada correctamente",
-      });
-
-      setEditingSession(null);
-      fetchAllSessions();
-    } catch (error: any) {
-      console.error('Error updating session:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar la sesión",
-        variant: "destructive",
-      });
-    } finally {
-      setSavingEdit(false);
-    }
+  const handleEditSuccess = () => {
+    fetchAllSessions();
   };
 
   const handleDeleteSession = async (session: Session) => {
@@ -737,95 +660,20 @@ const SessionsManager = () => {
       )}
 
       {/* Edit Session Dialog */}
-      <Dialog open={!!editingSession} onOpenChange={(open) => !open && setEditingSession(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Editar Sesión</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Nombre */}
-            <div className="space-y-2">
-              <Label htmlFor="session-name">Nombre</Label>
-              <Input
-                id="session-name"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                placeholder="Nombre de la sesión"
-              />
-            </div>
-
-            {/* Workspace */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Espacio de Trabajo
-              </Label>
-              <Select 
-                value={editedWorkspaceId || 'none'} 
-                onValueChange={(val) => {
-                  setEditedWorkspaceId(val === 'none' ? null : val);
-                  // Reset embudo when workspace changes
-                  setEditedEmbudoId(null);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar espacio..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {workspaces.map(ws => (
-                    <SelectItem key={ws.id} value={ws.id}>{ws.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Embudo */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <GitBranch className="h-4 w-4" />
-                Embudo por Defecto
-              </Label>
-              <Select 
-                value={editedEmbudoId || 'none'} 
-                onValueChange={(val) => setEditedEmbudoId(val === 'none' ? null : val)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar embudo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {filteredEmbudos.map(embudo => (
-                    <SelectItem key={embudo.id} value={embudo.id}>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: embudo.color || '#3b82f6' }} 
-                        />
-                        <span>{embudo.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {editedWorkspaceId && filteredEmbudos.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No hay embudos en este espacio de trabajo
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingSession(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveEdit} disabled={savingEdit || !editedName.trim()}>
-              {savingEdit ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Guardar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {editingSession && (
+        <EditSessionDialog
+          open={!!editingSession}
+          onClose={() => setEditingSession(null)}
+          sessionType={editingSession.type === 'telegram-bot' ? 'telegram' : editingSession.type === 'webchat' ? 'whatsapp' : editingSession.type}
+          session={{
+            id: editingSession.id,
+            name: editingSession.name,
+            workspace_id: editingSession.workspace_id,
+            default_column_id: editingSession.default_column_id
+          }}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </div>
   );
 };
