@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Phone, List, Trash2, QrCode } from 'lucide-react';
+import { Plus, Phone, List, Trash2, QrCode, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +14,7 @@ import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useUsageLimits } from '@/hooks/useUsageLimits';
 import UsageLimitAlert from '@/components/UsageLimitAlert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import EditSessionDialog from '@/components/sessions/EditSessionDialog';
 
 interface WhatsAppConnection {
   id: string;
@@ -65,6 +66,7 @@ const WhatsAppConnections = () => {
     workspace_id: '',
     default_column_id: ''
   });
+  const [editingSession, setEditingSession] = useState<WhatsAppConnection | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
@@ -701,6 +703,14 @@ const WhatsAppConnections = () => {
                       <Badge variant={isConnected ? 'default' : 'destructive'} className="text-xs">
                         {connection.status}
                       </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => setEditingSession(connection)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button 
@@ -790,6 +800,22 @@ const WhatsAppConnections = () => {
             );
           })}
         </div>
+      )}
+
+      {/* Modal de edición de sesión */}
+      {editingSession && (
+        <EditSessionDialog
+          open={!!editingSession}
+          onClose={() => setEditingSession(null)}
+          sessionType="whatsapp"
+          session={{
+            id: editingSession.id,
+            name: editingSession.name,
+            workspace_id: editingSession.workspace_id,
+            default_column_id: editingSession.default_column_id
+          }}
+          onSuccess={fetchConnections}
+        />
       )}
 
       <div className="flex items-center justify-center pt-8">
