@@ -123,6 +123,10 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [leadTags, setLeadTags] = useState<string[]>(lead.tags || []);
   const [savingTags, setSavingTags] = useState(false);
+  
+  // Ref para detectar click vs drag
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  
   const hasConversation = lead.conversations && lead.conversations.length > 0;
   const conversation = hasConversation ? lead.conversations[0] : null;
   const handleOpenConversation = async () => {
@@ -205,12 +209,34 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   return <>
     <Draggable draggableId={lead.id} index={index}>
       {(provided, snapshot) => <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`mb-2 transition-all duration-200 ${snapshot.isDragging ? 'scale-105 rotate-1 z-50 opacity-95' : 'animate-kanban-drop'}`}>
-          <Card className={`p-3 transition-all cursor-grab border-border/40 bg-card/80 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' : 'hover:bg-muted/30 hover:shadow-md'} ${lead.isVirtual ? 'border-l-4 border-l-amber-500/70' : ''}`} onClick={e => {
-          const target = e.target as HTMLElement;
-          if (!target.closest('button') && lead.phone) {
-            handleOpenConversation();
-          }
-        }}>
+          <Card 
+            className={`p-3 transition-all cursor-grab border-border/40 bg-card/80 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' : 'hover:bg-muted/30 hover:shadow-md'} ${lead.isVirtual ? 'border-l-4 border-l-amber-500/70' : ''}`} 
+            onMouseDown={(e) => {
+              dragStartPos.current = { x: e.clientX, y: e.clientY };
+            }}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              // Ignorar si es un botón
+              if (target.closest('button')) return;
+              
+              // Ignorar si estaba arrastrando
+              if (snapshot.isDragging) return;
+              
+              // Verificar si fue un click real (mouse no se movió mucho)
+              if (dragStartPos.current) {
+                const deltaX = Math.abs(e.clientX - dragStartPos.current.x);
+                const deltaY = Math.abs(e.clientY - dragStartPos.current.y);
+                if (deltaX > 5 || deltaY > 5) {
+                  // Fue un intento de drag, no abrir conversación
+                  return;
+                }
+              }
+              
+              if (lead.phone) {
+                handleOpenConversation();
+              }
+            }}
+          >
             <div className="flex items-start gap-3">
               {/* Avatar con icono de canal superpuesto */}
               <div className="relative shrink-0">
