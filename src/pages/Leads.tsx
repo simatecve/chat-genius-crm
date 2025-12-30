@@ -109,7 +109,9 @@ const Leads = () => {
     getColumnState,
     loadMore,
     refreshAll,
-    initialLoading: infiniteLoading
+    initialLoading: infiniteLoading,
+    moveLeadOptimistic,
+    isMoving
   } = useInfiniteLeads({
     userId: effectiveUserId,
     workspaceId: selectedWorkspace,
@@ -290,6 +292,12 @@ const Leads = () => {
 
   // Función debounced para recargar leads (evita múltiples recargas seguidas)
   const debouncedLoadLeads = useCallback(() => {
+    // Si hay un movimiento en progreso, ignorar el evento Realtime
+    if (isMoving()) {
+      console.log('[Leads] Skipping Realtime reload - move in progress');
+      return;
+    }
+    
     if (reloadTimeoutRef.current) {
       clearTimeout(reloadTimeoutRef.current);
     }
@@ -300,7 +308,7 @@ const Leads = () => {
       }
       setIsRefreshing(false);
     }, 500);
-  }, []);
+  }, [isMoving]);
 
   // Limpiar timeout al desmontar
   useEffect(() => {
@@ -904,14 +912,22 @@ const Leads = () => {
     }
 
     // Lead real - comportamiento normal
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+    
+    const sourceColumnId = lead.column_id;
     const previousLeads = [...leads];
 
     // ✅ ACTUALIZACIÓN OPTIMISTA INMEDIATA - UI responde al instante
-    setLeads(leads.map(lead => lead.id === leadId ? {
-      ...lead,
+    // Actualizar estado local
+    setLeads(leads.map(l => l.id === leadId ? {
+      ...l,
       column_id: targetColumnId,
-      position: leads.filter(l => l.column_id === targetColumnId).length
-    } : lead));
+      position: leads.filter(x => x.column_id === targetColumnId).length
+    } : l));
+    
+    // También actualizar el cache del hook de paginación
+    moveLeadOptimistic(leadId, sourceColumnId, targetColumnId);
 
     // Llamada a BD en background (no bloquea UI)
     try {

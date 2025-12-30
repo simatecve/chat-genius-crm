@@ -58,6 +58,7 @@ export const useInfiniteLeads = ({
   const [initialLoading, setInitialLoading] = useState(true);
   
   const isInitialized = useRef(false);
+  const isMovingLead = useRef(false);
 
   // Cargar leads de una columna específica
   const loadLeadsForColumn = useCallback(async (
@@ -347,6 +348,62 @@ export const useInfiniteLeads = ({
     isInitialized.current = false;
   }, [workspaceId]);
 
+  // Mover un lead optimisticamente entre columnas
+  const moveLeadOptimistic = useCallback((leadId: string, sourceColumnId: string, targetColumnId: string) => {
+    isMovingLead.current = true;
+    
+    setColumnLeadsState(prev => {
+      const newState = { ...prev };
+      
+      // Encontrar el lead en la columna origen
+      const sourceState = newState[sourceColumnId];
+      if (!sourceState) return prev;
+      
+      const leadIndex = sourceState.leads.findIndex(l => l.id === leadId);
+      if (leadIndex === -1) return prev;
+      
+      const lead = sourceState.leads[leadIndex];
+      const updatedLead = { ...lead, column_id: targetColumnId };
+      
+      // Remover de la columna origen
+      newState[sourceColumnId] = {
+        ...sourceState,
+        leads: sourceState.leads.filter(l => l.id !== leadId),
+        totalCount: Math.max(0, (sourceState.totalCount || 0) - 1)
+      };
+      
+      // Agregar a la columna destino
+      const targetState = newState[targetColumnId] || {
+        leads: [],
+        hasMore: false,
+        loading: false,
+        offset: 0,
+        totalCount: 0
+      };
+      
+      newState[targetColumnId] = {
+        ...targetState,
+        leads: [updatedLead, ...targetState.leads],
+        totalCount: (targetState.totalCount || 0) + 1
+      };
+      
+      return newState;
+    });
+    
+    // Resetear flag después de un breve delay para ignorar el evento Realtime que viene
+    setTimeout(() => {
+      isMovingLead.current = false;
+    }, 1000);
+  }, []);
+  
+  // Verificar si hay un movimiento en progreso (para uso externo)
+  const isMoving = useCallback(() => isMovingLead.current, []);
+  
+  // Pausar/reanudar actualizaciones Realtime durante movimientos
+  const setMovingState = useCallback((moving: boolean) => {
+    isMovingLead.current = moving;
+  }, []);
+
   return {
     // Estado
     columnLeadsState,
@@ -364,7 +421,10 @@ export const useInfiniteLeads = ({
     loadMoreOrphans,
     refreshColumn,
     refreshAll,
-    loadInitial
+    loadInitial,
+    moveLeadOptimistic,
+    isMoving,
+    setMovingState
   };
 };
 
