@@ -16,6 +16,7 @@ interface ChatModalProps {
     messages: Message[];
     onSendMessage: (messageText: string, attachment?: File) => Promise<void>;
     isSending: boolean;
+    onWhatsAppSessionChange?: (sessionName: string | null) => void;
 }
 
 export default function ChatModal({
@@ -24,7 +25,8 @@ export default function ChatModal({
     conversation,
     messages,
     onSendMessage,
-    isSending
+    isSending,
+    onWhatsAppSessionChange
 }: ChatModalProps) {
     const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
     const [selectedTwilioConnection, setSelectedTwilioConnection] = useState<string | null>(null);
@@ -32,18 +34,27 @@ export default function ChatModal({
     const { activeConnections, isSessionActive } = useWhatsAppConnections();
     const { connections: twilioConnections, isConnectionActive } = useTwilioConnections();
 
-    // Auto-seleccionar sesión cuando cambia la conversación
+    // Auto-seleccionar sesión cuando cambia la conversación y notificar al padre
     useEffect(() => {
-        if (conversation && conversation.channel_type === 'whatsapp' && conversation.whatsapp_number) {
-            if (isSessionActive(conversation.whatsapp_number)) {
-                setSelectedWhatsAppSession(conversation.whatsapp_number);
+        if (conversation && conversation.channel_type === 'whatsapp') {
+            let session: string | null = null;
+            
+            if (conversation.whatsapp_number && isSessionActive(conversation.whatsapp_number)) {
+                session = conversation.whatsapp_number;
             } else if (activeConnections.length > 0) {
-                setSelectedWhatsAppSession(activeConnections[0].name);
-            } else {
-                setSelectedWhatsAppSession(null);
+                session = activeConnections[0].name;
             }
+            
+            setSelectedWhatsAppSession(session);
+            onWhatsAppSessionChange?.(session);
         }
-    }, [conversation, activeConnections, isSessionActive]);
+    }, [conversation, activeConnections, isSessionActive, onWhatsAppSessionChange]);
+    
+    // Notificar al padre cuando cambia la sesión manualmente
+    const handleSessionChange = (session: string | null) => {
+        setSelectedWhatsAppSession(session);
+        onWhatsAppSessionChange?.(session);
+    };
 
     // Close modal on Escape key
     useEffect(() => {
@@ -140,7 +151,7 @@ export default function ChatModal({
                             onToggleInfoPanel={() => setShowInfoPanel(!showInfoPanel)}
                             whatsappConnections={activeConnections}
                             selectedSession={selectedWhatsAppSession}
-                            onSessionChange={setSelectedWhatsAppSession}
+                            onSessionChange={handleSessionChange}
                             twilioConnections={twilioConnections}
                             selectedTwilioConnection={selectedTwilioConnection}
                             onTwilioConnectionChange={setSelectedTwilioConnection}
