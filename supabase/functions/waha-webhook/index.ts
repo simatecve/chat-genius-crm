@@ -46,10 +46,18 @@ function normalizePhoneNumber(phone: string): string {
 // Detectar si un valor es un LID de Meta (no es un número de teléfono real)
 function isMetaLid(value: string): boolean {
   if (!value) return false;
-  // LIDs tienen formato: NNNN@lid o son números de 15+ dígitos sin código de país válido
+  
+  // Verificar sufijo @lid primero (antes de normalizar)
+  if (value.includes('@lid')) return true;
+  
+  // Limpiar para análisis
   const cleanValue = value.replace(/@.*$/, '');
-  return value.includes('@lid') || 
-         (cleanValue.length >= 15 && /^\d+$/.test(cleanValue) && !value.startsWith('+'));
+  
+  // Los LIDs de Meta típicamente tienen 14+ dígitos y son puramente numéricos
+  // Los números de teléfono reales tienen 8-14 dígitos
+  const isLongNumeric = cleanValue.length >= 14 && /^\d+$/.test(cleanValue);
+  
+  return isLongNumeric;
 }
 
 // Obtener user_id, phone_number y workspace_id desde el nombre de la sesión
@@ -666,21 +674,50 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     
     let rawPhoneNumber: string;
     
+    // PASO 1: Ignorar mensajes de grupos (@g.us) ANTES de cualquier procesamiento
+    if (remoteJid && remoteJid.includes('@g.us')) {
+      console.log(`Ignoring group message: ${remoteJid}`);
+      return;
+    }
+    
+    // PASO 2: Ignorar estados de WhatsApp (status@broadcast) INMEDIATAMENTE
+    if (remoteJid === 'status@broadcast') {
+      console.log('Ignoring WhatsApp status broadcast');
+      return;
+    }
+    
+    // PASO 3: Determinar el número correcto basado en el tipo de mensaje
     if (fromMe) {
       // Mensaje saliente: necesitamos el destinatario
-      // Si remoteJid es un LID, usar remoteJidAlt primero (contiene el número real)
-      if (remoteJid && isMetaLid(remoteJid) && remoteJidAlt && !isMetaLid(remoteJidAlt)) {
-        rawPhoneNumber = remoteJidAlt;
-        console.log(`[LID Fix] Using remoteJidAlt for outbound: ${remoteJidAlt}`);
+      if (remoteJid && isMetaLid(remoteJid)) {
+        // remoteJid es un LID, buscar número real
+        if (remoteJidAlt && !isMetaLid(remoteJidAlt)) {
+          rawPhoneNumber = remoteJidAlt;
+          console.log(`[LID Fix] Using remoteJidAlt for outbound: ${remoteJidAlt}`);
+        } else if (participantNumber && !isMetaLid(participantNumber)) {
+          rawPhoneNumber = participant;
+          console.log(`[LID Fix] Using participant for outbound: ${participant}`);
+        } else {
+          console.log(`[LID Detection] Cannot extract real phone for outbound LID: ${remoteJid}`);
+          return;
+        }
       } else {
         rawPhoneNumber = remoteJid || remoteJidAlt || messageData.to || messageData.from;
       }
     } else {
       // Mensaje entrante: necesitamos el remitente
-      // Si remoteJid es un LID, usar remoteJidAlt primero (contiene el número real)
-      if (remoteJid && isMetaLid(remoteJid) && remoteJidAlt && !isMetaLid(remoteJidAlt)) {
-        rawPhoneNumber = remoteJidAlt;
-        console.log(`[LID Fix] Using remoteJidAlt for inbound: ${remoteJidAlt}`);
+      if (remoteJid && isMetaLid(remoteJid)) {
+        // remoteJid es un LID, buscar número real
+        if (remoteJidAlt && !isMetaLid(remoteJidAlt)) {
+          rawPhoneNumber = remoteJidAlt;
+          console.log(`[LID Fix] Using remoteJidAlt for inbound: ${remoteJidAlt}`);
+        } else if (participantNumber && !isMetaLid(participantNumber)) {
+          rawPhoneNumber = participant;
+          console.log(`[LID Fix] Using participant for inbound: ${participant}`);
+        } else {
+          console.log(`[LID Detection] Cannot extract real phone for inbound LID: ${remoteJid}`);
+          return;
+        }
       } else {
         rawPhoneNumber = remoteJid || remoteJidAlt || messageData.from;
       }
@@ -688,30 +725,24 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     
     console.log(`[DEBUG] Initial rawPhoneNumber: ${rawPhoneNumber}`);
     
-    // Si aún es un LID, intentar con participant como último recurso
-    if (isMetaLid(rawPhoneNumber) && participantNumber && !isMetaLid(participantNumber)) {
-      console.log(`[LID Fix] Using participant number as fallback: ${participantNumber}`);
-      rawPhoneNumber = participantNumber;
-    }
-    
-    // Ignorar mensajes de grupos (@g.us)
-    if (rawPhoneNumber && rawPhoneNumber.includes('@g.us')) {
-      console.log(`Ignoring group message from: ${rawPhoneNumber}`);
+    // PASO 4: Validar que no sea status@broadcast después de asignar
+    if (!rawPhoneNumber || rawPhoneNumber.includes('status@broadcast')) {
+      console.log(`Ignoring status message: ${rawPhoneNumber}`);
       return;
     }
     
-    // Ignorar estados de WhatsApp (status@broadcast)
-    if (rawPhoneNumber && (rawPhoneNumber === 'status@broadcast' || rawPhoneNumber.includes('status@broadcast'))) {
-      console.log(`Ignoring WhatsApp status message from: ${rawPhoneNumber}`);
+    // PASO 5: Validar que no sea un LID ANTES de normalizar
+    if (isMetaLid(rawPhoneNumber)) {
+      console.log(`[LID Detection Early] Rejecting LID before normalization: ${rawPhoneNumber}`);
       return;
     }
     
     const phoneNumber = normalizePhoneNumber(rawPhoneNumber);
     const pushName = messageData._data?.pushName || null;
     
-    // Ignorar si el número normalizado sigue siendo un LID (no pudimos extraer número real)
+    // PASO 6: Validación final después de normalizar
     if (isMetaLid(phoneNumber)) {
-      console.log(`[LID Detection] Could not extract real phone number, ignoring message (LID: ${phoneNumber})`);
+      console.log(`[LID Detection] Normalized value is still LID, ignoring: ${phoneNumber}`);
       return;
     }
     
