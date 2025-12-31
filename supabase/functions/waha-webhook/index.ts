@@ -384,65 +384,47 @@ async function saveMessage(
   return data;
 }
 
-// Buscar o crear lead - AHORA FILTRA POR WORKSPACE
+// Buscar o crear lead - AISLADO POR CONVERSACIÓN (igual que Twilio)
+// Cada conversación de sesión WhatsApp diferente tendrá su propio lead
 async function getOrCreateLead(
   supabase: any,
   userId: string,
   phoneNumber: string,
   pushName: string | null,
   workspaceId: string | null,
-  defaultColumnId: string | null
+  defaultColumnId: string | null,
+  conversationId: string,
+  whatsappSessionName: string
 ) {
-  // Si tenemos workspace, buscar lead solo en columnas de ese workspace
-  if (workspaceId) {
-    // Primero obtener las columnas de este workspace
-    const { data: workspaceColumns } = await supabase
-      .from('lead_columns')
-      .select('id')
-      .eq('workspace_id', workspaceId);
-    
-    if (workspaceColumns && workspaceColumns.length > 0) {
-      const columnIds = workspaceColumns.map((c: any) => c.id);
-      
-      // Buscar lead en las columnas del workspace
-      const { data: existingLead, error: leadError } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('phone', phoneNumber)
-        .in('column_id', columnIds)
-        .maybeSingle();
-      
-      if (leadError && leadError.code !== 'PGRST116') {
-        console.error('Error searching lead in workspace:', leadError);
-      }
-      
-      if (existingLead) {
-        console.log('Lead already exists in workspace:', existingLead.id);
-        return { lead: existingLead, isNew: false };
-      }
-    }
-  } else {
-    // Sin workspace, buscar por usuario y teléfono (comportamiento legacy)
-    const { data: lead, error } = await supabase
+  // PASO 1: Verificar si la conversación YA tiene un lead vinculado
+  const { data: conversation, error: convError } = await supabase
+    .from('conversations')
+    .select('lead_id')
+    .eq('id', conversationId)
+    .single();
+
+  if (convError) {
+    console.error('Error checking conversation lead:', convError);
+  }
+
+  if (conversation?.lead_id) {
+    // Ya tiene lead, retornarlo
+    const { data: existingLead, error: leadError } = await supabase
       .from('leads')
       .select('*')
-      .eq('user_id', userId)
-      .eq('phone', phoneNumber)
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error searching lead:', error);
-      return { lead: null, isNew: false };
-    }
-
-    if (lead) {
-      console.log('Lead already exists:', lead.id);
-      return { lead, isNew: false };
+      .eq('id', conversation.lead_id)
+      .single();
+    
+    if (!leadError && existingLead) {
+      console.log(`Conversation ${conversationId} already has lead: ${existingLead.id}`);
+      return { lead: existingLead, isNew: false };
     }
   }
 
-  // Crear nuevo lead - usar defaultColumnId si se proporciona
+  // PASO 2: NO tiene lead - SIEMPRE crear uno nuevo para esta conversación/sesión específica
+  console.log(`Creating NEW lead for conversation ${conversationId} (session: ${whatsappSessionName})`);
+
+  // Determinar columna a usar
   let columnIdToUse = defaultColumnId;
   
   if (!columnIdToUse) {
@@ -504,14 +486,14 @@ async function getOrCreateLead(
   // Obtener siguiente posición
   const position = await getNextPosition(supabase, columnIdToUse);
 
-  // Crear nuevo lead
+  // Crear nuevo lead con nota identificando la sesión
   const newLead = {
     user_id: userId,
     column_id: columnIdToUse,
     name: pushName || phoneNumber,
     phone: phoneNumber,
     position: position,
-    notes: 'Lead creado automáticamente desde WhatsApp',
+    notes: `Lead desde WhatsApp: ${whatsappSessionName}`,
     bot_active: true,
     last_inbound_message_time: new Date().toISOString(),
   };
@@ -527,7 +509,7 @@ async function getOrCreateLead(
     return { lead: null, isNew: false };
   }
 
-  console.log('New lead created:', created.id, 'in column:', columnIdToUse);
+  console.log('New lead created:', created.id, 'in column:', columnIdToUse, 'for session:', whatsappSessionName);
   return { lead: created, isNew: true };
 }
 
@@ -866,7 +848,7 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
       // Crear o actualizar contacto
       await getOrCreateContact(supabase, userId, phoneNumber, pushName);
       
-      const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, pushName, workspaceId, defaultColumnId);
+      const { lead, isNew: isNewLead } = await getOrCreateLead(supabase, userId, phoneNumber, pushName, workspaceId, defaultColumnId, conversation.id, session);
       
       if (lead && !conversation.lead_id) {
         // Vincular conversación con lead si aún no está vinculada
