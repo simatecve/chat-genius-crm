@@ -7,6 +7,78 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Función para buscar sesión en WAHA con coincidencia parcial
+async function findWahaSession(
+  sessionName: string, 
+  wahaBaseUrl: string, 
+  wahaApiKey: string
+): Promise<{ found: boolean; wahaName: string | null; sessionData: any }> {
+  
+  // 1. Intentar nombre exacto
+  console.log(`Trying exact match for session: ${sessionName}`);
+  const exactUrl = `${wahaBaseUrl}/api/sessions/${encodeURIComponent(sessionName)}`;
+  const exactResponse = await fetch(exactUrl, {
+    method: 'GET',
+    headers: { 'X-Api-Key': wahaApiKey }
+  });
+  
+  if (exactResponse.ok) {
+    const data = await exactResponse.json();
+    console.log(`Exact match found for session: ${sessionName}`);
+    return { found: true, wahaName: sessionName, sessionData: data };
+  }
+  
+  console.log(`Exact match not found (status: ${exactResponse.status}), searching all sessions...`);
+  
+  // 2. Buscar en todas las sesiones con coincidencia parcial
+  const sessionsUrl = `${wahaBaseUrl}/api/sessions`;
+  const sessionsResponse = await fetch(sessionsUrl, {
+    method: 'GET',
+    headers: { 'X-Api-Key': wahaApiKey }
+  });
+  
+  if (!sessionsResponse.ok) {
+    console.error(`Failed to list WAHA sessions: ${sessionsResponse.status}`);
+    return { found: false, wahaName: null, sessionData: null };
+  }
+  
+  const sessions = await sessionsResponse.json();
+  console.log(`Found ${sessions.length} sessions in WAHA`);
+  
+  // Obtener el nombre base (sin sufijos como " PRINCIPAL", " META", etc.)
+  const baseName = sessionName.split(' ')[0];
+  console.log(`Looking for partial match with baseName: ${baseName}`);
+  
+  // Buscar coincidencia
+  const match = sessions.find((s: any) => 
+    s.name === baseName || 
+    s.name.startsWith(baseName) ||
+    sessionName.startsWith(s.name)
+  );
+  
+  if (match) {
+    console.log(`Found matching session: DB="${sessionName}" -> WAHA="${match.name}"`);
+    
+    // Obtener datos completos de la sesión encontrada
+    const detailUrl = `${wahaBaseUrl}/api/sessions/${encodeURIComponent(match.name)}`;
+    const detailResponse = await fetch(detailUrl, {
+      method: 'GET',
+      headers: { 'X-Api-Key': wahaApiKey }
+    });
+    
+    if (detailResponse.ok) {
+      const detailData = await detailResponse.json();
+      return { found: true, wahaName: match.name, sessionData: detailData };
+    }
+    
+    // Si no podemos obtener detalles, devolver los datos básicos del listado
+    return { found: true, wahaName: match.name, sessionData: match };
+  }
+  
+  console.log(`No matching session found for: ${sessionName}`);
+  return { found: false, wahaName: null, sessionData: null };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,22 +110,51 @@ serve(async (req) => {
       throw new Error('session_name is required');
     }
 
-    // Obtener estado de la sesión desde WAHA
-    const wahaResponse = await fetch(`${WAHA_BASE_URL}/api/sessions/${session_name}`, {
-      method: 'GET',
-      headers: {
-        'X-Api-Key': WAHA_API_KEY,
-      },
-    });
+    // Buscar sesión en WAHA con coincidencia parcial
+    const { found, wahaName, sessionData } = await findWahaSession(
+      session_name, 
+      WAHA_BASE_URL, 
+      WAHA_API_KEY
+    );
 
-    if (!wahaResponse.ok) {
-      const errorText = await wahaResponse.text();
-      console.error('WAHA status API error:', errorText);
-      throw new Error(`WAHA API error: ${wahaResponse.status} - ${errorText}`);
+    // Si no se encontró la sesión en WAHA
+    if (!found || !sessionData) {
+      console.log(`Session "${session_name}" not found in WAHA`);
+      
+      // Actualizar estado en la base de datos a disconnected
+      if (connection_id) {
+        const { error: updateError } = await supabase
+          .from('whatsapp_connections')
+          .update({
+            status: 'disconnected',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', connection_id);
+
+        if (updateError) {
+          console.error('Database update error:', updateError);
+        } else {
+          console.log(`Database updated: connection ${connection_id} set to "disconnected"`);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: 'disconnected',
+          waha_status: 'NOT_FOUND',
+          message: 'Session not found in WAHA. Please reconnect by scanning QR code.',
+          session: null,
+          phone_number: null
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
 
-    const sessionData = await wahaResponse.json();
-    console.log('Session status from WAHA:', sessionData);
+    console.log(`Session found in WAHA as "${wahaName}":`, sessionData);
 
     const wahaStatus = sessionData.status || 'UNKNOWN';
     const phoneNumber = sessionData.me?.id ? sessionData.me.id.split('@')[0] : null;
@@ -98,6 +199,7 @@ serve(async (req) => {
         success: true,
         status: normalizedStatus,
         waha_status: wahaStatus,
+        waha_session_name: wahaName,
         session: sessionData,
         phone_number: phoneNumber
       }),
