@@ -513,6 +513,7 @@ async function getOrCreateLead(
     position: position,
     notes: 'Lead creado automáticamente desde WhatsApp',
     bot_active: true,
+    last_inbound_message_time: new Date().toISOString(),
   };
 
   const { data: created, error: createError } = await supabase
