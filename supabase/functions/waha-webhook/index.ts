@@ -177,7 +177,7 @@ async function getNextPosition(supabase: any, columnId: string): Promise<number>
   return (data.position || 0) + 1;
 }
 
-// Buscar o crear conversación - AHORA FILTRA POR whatsapp_number
+// Buscar o crear conversación - AHORA FILTRA POR whatsapp_number con fallback legacy
 async function getOrCreateConversation(
   supabase: any,
   userId: string,
@@ -205,6 +205,43 @@ async function getOrCreateConversation(
   if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
     console.error('Error searching conversation:', error);
     return null;
+  }
+
+  // FALLBACK: Si no encontramos con whatsapp_number, buscar conversación legacy (sin whatsapp_number)
+  if (!conversation && sessionPhoneNumber) {
+    console.log('No conversation found with whatsapp_number, trying legacy search...');
+    
+    const { data: legacyConversation, error: legacyError } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('phone_number', phoneNumber)
+      .is('whatsapp_number', null)
+      .eq('channel_type', 'whatsapp')
+      .single();
+    
+    if (!legacyError && legacyConversation) {
+      console.log('Found legacy conversation without whatsapp_number:', legacyConversation.id);
+      
+      // Actualizar la conversación legacy con el whatsapp_number correcto
+      const { data: updated, error: updateError } = await supabase
+        .from('conversations')
+        .update({ 
+          whatsapp_number: sessionPhoneNumber,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', legacyConversation.id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating legacy conversation with whatsapp_number:', updateError);
+        return legacyConversation;
+      }
+      
+      console.log('Legacy conversation updated with whatsapp_number:', sessionPhoneNumber);
+      conversation = updated || legacyConversation;
+    }
   }
 
   if (!conversation) {
@@ -566,6 +603,18 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     // Extraer datos del mensaje
     const messageData = payload;
     const wahaMessageId = messageData.id;
+    const fromMe = messageData.fromMe;
+    
+    // LOG para debug - mostrar todos los campos relevantes del payload
+    console.log('[DEBUG] Message fields:', {
+      fromMe,
+      from: messageData.from,
+      to: messageData.to,
+      remoteJid: messageData._data?.key?.remoteJid,
+      remoteJidAlt: messageData._data?.key?.remoteJidAlt,
+      session,
+      pushName: messageData._data?.pushName
+    });
     
     // Verificar si el mensaje ya fue procesado (deduplicación) usando función RPC
     if (wahaMessageId) {
@@ -582,8 +631,25 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
       }
     }
 
-    // Usar remoteJidAlt si está disponible (contiene el número correcto), sino usar from
-    const rawPhoneNumber = messageData._data?.key?.remoteJidAlt || messageData.from;
+    // CORRECCIÓN: Determinar el número del destinatario/remitente correcto
+    // Para mensajes salientes (fromMe=true), el destinatario está en "to" o remoteJid
+    // Para mensajes entrantes (fromMe=false), el remitente está en "from"
+    let rawPhoneNumber: string;
+    
+    if (fromMe) {
+      // Mensaje saliente: necesitamos el destinatario (to, remoteJid)
+      rawPhoneNumber = messageData._data?.key?.remoteJid || 
+                       messageData._data?.key?.remoteJidAlt || 
+                       messageData.to ||
+                       messageData.from; // fallback
+    } else {
+      // Mensaje entrante: necesitamos el remitente (from, remoteJid)
+      rawPhoneNumber = messageData._data?.key?.remoteJid || 
+                       messageData._data?.key?.remoteJidAlt || 
+                       messageData.from;
+    }
+    
+    console.log(`[DEBUG] Raw phone number selected: ${rawPhoneNumber} (fromMe: ${fromMe})`);
     
     // Ignorar mensajes de grupos (@g.us)
     if (rawPhoneNumber && rawPhoneNumber.includes('@g.us')) {
@@ -594,10 +660,9 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     const phoneNumber = normalizePhoneNumber(rawPhoneNumber);
     const pushName = messageData._data?.pushName || null;
     
-    console.log(`Using phone number from remoteJidAlt: ${rawPhoneNumber} -> normalized: ${phoneNumber}`);
+    console.log(`Phone number: ${rawPhoneNumber} -> normalized: ${phoneNumber}`);
     let messageContent = messageData.body || '';
     const timestamp = messageData.timestamp;
-    const fromMe = messageData.fromMe;
     const hasMedia = messageData.hasMedia;
     let mediaUrl = null;
     let mediaType = 'text';
