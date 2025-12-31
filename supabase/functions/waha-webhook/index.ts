@@ -275,33 +275,33 @@ async function getOrCreateConversation(
       channel_type: 'whatsapp',
     };
 
-    // Usar UPSERT para evitar duplicados con el índice único
+    // Usar INSERT con manejo de error 23505 (unique_violation) para índices parciales
     const { data: created, error: createError } = await supabase
       .from('conversations')
-      .upsert(newConversation, {
-        onConflict: 'user_id,phone_number,whatsapp_number,channel_type',
-        ignoreDuplicates: false
-      })
+      .insert(newConversation)
       .select()
       .single();
 
     if (createError) {
-      console.error('Error creating/upserting conversation:', createError);
-      
-      // Fallback: buscar conversación existente si falla el upsert
-      const { data: existing } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('phone_number', phoneNumber)
-        .eq('whatsapp_number', sessionPhoneNumber)
-        .eq('channel_type', 'whatsapp')
-        .single();
-      
-      if (existing) {
-        console.log('Found existing conversation after upsert error:', existing.id);
-        return existing;
+      // Error 23505 = unique_violation - la conversación ya existe
+      if (createError.code === '23505') {
+        console.log('Unique constraint violation - conversation exists, fetching...');
+        const { data: existing } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('phone_number', phoneNumber)
+          .eq('whatsapp_number', sessionPhoneNumber)
+          .eq('channel_type', 'whatsapp')
+          .single();
+        
+        if (existing) {
+          console.log('Found existing conversation after constraint violation:', existing.id);
+          return existing;
+        }
       }
+      
+      console.error('Error creating conversation:', createError);
       return null;
     }
 
