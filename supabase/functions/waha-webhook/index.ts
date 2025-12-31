@@ -45,34 +45,83 @@ function normalizePhoneNumber(phone: string): string {
 
 // Obtener user_id, phone_number y workspace_id desde el nombre de la sesión
 async function getSessionData(supabase: any, sessionName: string): Promise<{ userId: string | null, sessionPhoneNumber: string | null, workspaceId: string | null, defaultColumnId: string | null }> {
-  const { data, error } = await supabase
+  console.log('Getting session data for:', sessionName);
+  
+  // Primero intentar coincidencia exacta
+  let { data, error } = await supabase
     .from('whatsapp_connections')
-    .select('user_id, phone_number, workspace_id, default_column_id')
+    .select('user_id, phone_number, workspace_id, default_column_id, name')
     .eq('name', sessionName)
-    .single();
+    .maybeSingle();
+
+  // Si no hay coincidencia exacta, buscar sesiones que comiencen con el nombre
+  if (!data) {
+    console.log('No exact match for session, trying LIKE search for:', sessionName);
+    const { data: likeData, error: likeError } = await supabase
+      .from('whatsapp_connections')
+      .select('user_id, phone_number, workspace_id, default_column_id, name')
+      .ilike('name', `${sessionName}%`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (!likeError && likeData) {
+      console.log('Found session by LIKE search:', likeData.name);
+      data = likeData;
+      error = null;
+    } else if (likeError) {
+      console.error('Error in LIKE search:', likeError);
+    }
+  } else {
+    console.log('Found session by exact match:', data.name);
+  }
 
   if (error) {
     console.error('Error getting session data:', error);
     return { userId: null, sessionPhoneNumber: null, workspaceId: null, defaultColumnId: null };
   }
 
+  if (!data) {
+    console.error('No session found for:', sessionName);
+    return { userId: null, sessionPhoneNumber: null, workspaceId: null, defaultColumnId: null };
+  }
+
+  console.log('Session data retrieved - user_id:', data.user_id, 'workspace_id:', data.workspace_id);
   return {
-    userId: data?.user_id || null,
-    sessionPhoneNumber: data?.phone_number || null,
-    workspaceId: data?.workspace_id || null,
-    defaultColumnId: data?.default_column_id || null
+    userId: data.user_id || null,
+    sessionPhoneNumber: data.phone_number || null,
+    workspaceId: data.workspace_id || null,
+    defaultColumnId: data.default_column_id || null
   };
 }
 
 // Obtener columna por defecto del usuario o de la conexión
 async function getDefaultColumn(supabase: any, userId: string, sessionName: string): Promise<string | null> {
-  // Primero intentar obtener la columna configurada en la conexión de WhatsApp
-  const { data: connection, error: connError } = await supabase
+  // Primero intentar obtener la columna configurada en la conexión de WhatsApp (coincidencia exacta)
+  let { data: connection, error: connError } = await supabase
     .from('whatsapp_connections')
-    .select('default_column_id')
+    .select('default_column_id, name')
     .eq('name', sessionName)
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
+
+  // Si no hay coincidencia exacta, buscar con LIKE
+  if (!connection) {
+    const { data: likeConn, error: likeConnError } = await supabase
+      .from('whatsapp_connections')
+      .select('default_column_id, name')
+      .eq('user_id', userId)
+      .ilike('name', `${sessionName}%`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (!likeConnError && likeConn) {
+      console.log('Found connection by LIKE for default column:', likeConn.name);
+      connection = likeConn;
+      connError = null;
+    }
+  }
 
   if (!connError && connection?.default_column_id) {
     console.log('Using default column from connection:', connection.default_column_id);
