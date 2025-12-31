@@ -644,33 +644,44 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     // Para mensajes salientes (fromMe=true), el destinatario está en "to" o remoteJid
     // Para mensajes entrantes (fromMe=false), el remitente está en "from"
     
-    // Extraer participant (número real cuando el remoteJid es un LID)
+    // Extraer JIDs y participant
+    const remoteJid = messageData._data?.key?.remoteJid;
+    const remoteJidAlt = messageData._data?.key?.remoteJidAlt;
     const participant = messageData._data?.key?.participant || 
                        messageData.participant ||
                        messageData._data?.participant ||
                        null;
     const participantNumber = participant ? normalizePhoneNumber(participant) : null;
     
+    console.log(`[DEBUG] JID extraction: remoteJid=${remoteJid}, remoteJidAlt=${remoteJidAlt}, participant=${participant}`);
+    
     let rawPhoneNumber: string;
     
     if (fromMe) {
-      // Mensaje saliente: necesitamos el destinatario (to, remoteJid)
-      rawPhoneNumber = messageData._data?.key?.remoteJid || 
-                       messageData._data?.key?.remoteJidAlt || 
-                       messageData.to ||
-                       messageData.from; // fallback
+      // Mensaje saliente: necesitamos el destinatario
+      // Si remoteJid es un LID, usar remoteJidAlt primero (contiene el número real)
+      if (remoteJid && isMetaLid(remoteJid) && remoteJidAlt && !isMetaLid(remoteJidAlt)) {
+        rawPhoneNumber = remoteJidAlt;
+        console.log(`[LID Fix] Using remoteJidAlt for outbound: ${remoteJidAlt}`);
+      } else {
+        rawPhoneNumber = remoteJid || remoteJidAlt || messageData.to || messageData.from;
+      }
     } else {
-      // Mensaje entrante: necesitamos el remitente (from, remoteJid)
-      rawPhoneNumber = messageData._data?.key?.remoteJid || 
-                       messageData._data?.key?.remoteJidAlt || 
-                       messageData.from;
+      // Mensaje entrante: necesitamos el remitente
+      // Si remoteJid es un LID, usar remoteJidAlt primero (contiene el número real)
+      if (remoteJid && isMetaLid(remoteJid) && remoteJidAlt && !isMetaLid(remoteJidAlt)) {
+        rawPhoneNumber = remoteJidAlt;
+        console.log(`[LID Fix] Using remoteJidAlt for inbound: ${remoteJidAlt}`);
+      } else {
+        rawPhoneNumber = remoteJid || remoteJidAlt || messageData.from;
+      }
     }
     
-    console.log(`[DEBUG] Raw phone number: ${rawPhoneNumber}, participant: ${participantNumber}, fromMe: ${fromMe}`);
+    console.log(`[DEBUG] Initial rawPhoneNumber: ${rawPhoneNumber}`);
     
-    // Si rawPhoneNumber es un LID de Meta, usar participant como número real
+    // Si aún es un LID, intentar con participant como último recurso
     if (isMetaLid(rawPhoneNumber) && participantNumber && !isMetaLid(participantNumber)) {
-      console.log(`[LID Detection] Replacing LID "${rawPhoneNumber}" with participant number "${participantNumber}"`);
+      console.log(`[LID Fix] Using participant number as fallback: ${participantNumber}`);
       rawPhoneNumber = participantNumber;
     }
     
