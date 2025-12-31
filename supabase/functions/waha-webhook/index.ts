@@ -43,6 +43,15 @@ function normalizePhoneNumber(phone: string): string {
     .trim();
 }
 
+// Detectar si un valor es un LID de Meta (no es un número de teléfono real)
+function isMetaLid(value: string): boolean {
+  if (!value) return false;
+  // LIDs tienen formato: NNNN@lid o son números de 15+ dígitos sin código de país válido
+  const cleanValue = value.replace(/@.*$/, '');
+  return value.includes('@lid') || 
+         (cleanValue.length >= 15 && /^\d+$/.test(cleanValue) && !value.startsWith('+'));
+}
+
 // Obtener user_id, phone_number y workspace_id desde el nombre de la sesión
 async function getSessionData(supabase: any, sessionName: string): Promise<{ userId: string | null, sessionPhoneNumber: string | null, workspaceId: string | null, defaultColumnId: string | null }> {
   console.log('Getting session data for:', sessionName);
@@ -634,6 +643,14 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     // CORRECCIÓN: Determinar el número del destinatario/remitente correcto
     // Para mensajes salientes (fromMe=true), el destinatario está en "to" o remoteJid
     // Para mensajes entrantes (fromMe=false), el remitente está en "from"
+    
+    // Extraer participant (número real cuando el remoteJid es un LID)
+    const participant = messageData._data?.key?.participant || 
+                       messageData.participant ||
+                       messageData._data?.participant ||
+                       null;
+    const participantNumber = participant ? normalizePhoneNumber(participant) : null;
+    
     let rawPhoneNumber: string;
     
     if (fromMe) {
@@ -649,7 +666,13 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
                        messageData.from;
     }
     
-    console.log(`[DEBUG] Raw phone number selected: ${rawPhoneNumber} (fromMe: ${fromMe})`);
+    console.log(`[DEBUG] Raw phone number: ${rawPhoneNumber}, participant: ${participantNumber}, fromMe: ${fromMe}`);
+    
+    // Si rawPhoneNumber es un LID de Meta, usar participant como número real
+    if (isMetaLid(rawPhoneNumber) && participantNumber && !isMetaLid(participantNumber)) {
+      console.log(`[LID Detection] Replacing LID "${rawPhoneNumber}" with participant number "${participantNumber}"`);
+      rawPhoneNumber = participantNumber;
+    }
     
     // Ignorar mensajes de grupos (@g.us)
     if (rawPhoneNumber && rawPhoneNumber.includes('@g.us')) {
@@ -657,8 +680,20 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
       return;
     }
     
+    // Ignorar estados de WhatsApp (status@broadcast)
+    if (rawPhoneNumber && (rawPhoneNumber === 'status@broadcast' || rawPhoneNumber.includes('status@broadcast'))) {
+      console.log(`Ignoring WhatsApp status message from: ${rawPhoneNumber}`);
+      return;
+    }
+    
     const phoneNumber = normalizePhoneNumber(rawPhoneNumber);
     const pushName = messageData._data?.pushName || null;
+    
+    // Ignorar si el número normalizado sigue siendo un LID (no pudimos extraer número real)
+    if (isMetaLid(phoneNumber)) {
+      console.log(`[LID Detection] Could not extract real phone number, ignoring message (LID: ${phoneNumber})`);
+      return;
+    }
     
     console.log(`Phone number: ${rawPhoneNumber} -> normalized: ${phoneNumber}`);
     let messageContent = messageData.body || '';
