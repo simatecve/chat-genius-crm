@@ -126,23 +126,61 @@ serve(async (req) => {
 
     const sessionName = resolvedSessionName;
 
+    // Función helper para detectar LIDs de Meta
+    function isMetaLid(value: string): boolean {
+      if (!value) return false;
+      const cleanValue = value.replace(/@.*$/, '');
+      return value.includes('@lid') || 
+             (cleanValue.length >= 15 && /^\d+$/.test(cleanValue) && !value.startsWith('+'));
+    }
+
+    // Si el número parece ser un LID, intentar obtener el número real de la conversación
+    let actualPhoneNumber = phoneNumber;
+    if (isMetaLid(phoneNumber) && conversationId) {
+      console.log(`[LID Detection] Phone number "${phoneNumber}" is a LID, searching for real number...`);
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('phone_number, whatsapp_number')
+        .eq('id', conversationId)
+        .single();
+      
+      // Buscar un número alternativo que NO sea un LID
+      if (conv) {
+        // Primero intentar con whatsapp_number si no es el número de sesión y no es LID
+        if (conv.whatsapp_number && !isMetaLid(conv.whatsapp_number)) {
+          // whatsapp_number suele ser el número de la sesión, no el del contacto
+          // Revisar si hay otro número disponible
+        }
+        // Si phone_number es diferente del LID actual, podría ser el real
+        if (conv.phone_number && conv.phone_number !== phoneNumber && !isMetaLid(conv.phone_number)) {
+          console.log(`[LID Fix] Using phone_number from conversation: ${conv.phone_number}`);
+          actualPhoneNumber = conv.phone_number;
+        }
+      }
+      
+      if (actualPhoneNumber === phoneNumber) {
+        console.log(`[LID Warning] Could not find real phone number, message may fail`);
+      }
+    }
+
     console.log('Sending message via WAHA:', {
       requestedSession: requestedSessionName,
       resolvedSession: sessionName,
-      phoneNumber,
+      originalPhoneNumber: phoneNumber,
+      actualPhoneNumber,
       messagePreview: message.substring(0, 50),
       humanizationDelay,
       enableTypingIndicator
     });
 
     // Formatear número de teléfono para WAHA
-    const formattedPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const formattedPhone = actualPhoneNumber.replace(/[^0-9]/g, '');
     
     let chatId: string;
-    if (phoneNumber.includes('@lid') || phoneNumber.includes('@newsletter')) {
-      chatId = phoneNumber;
-    } else if (phoneNumber.includes('@c.us')) {
-      chatId = phoneNumber;
+    if (actualPhoneNumber.includes('@lid') || actualPhoneNumber.includes('@newsletter')) {
+      chatId = actualPhoneNumber;
+    } else if (actualPhoneNumber.includes('@c.us')) {
+      chatId = actualPhoneNumber;
     } else {
       chatId = `${formattedPhone}@c.us`;
     }
