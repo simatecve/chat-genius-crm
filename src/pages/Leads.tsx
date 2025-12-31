@@ -129,6 +129,7 @@ const Leads = () => {
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<any>(null);
+  const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
 
   // Hook para mensajes del chat seleccionado
   const {
@@ -212,23 +213,31 @@ const Leads = () => {
         return;
       }
 
-      // Si es WhatsApp (WAHA) - default
-      const {
-        data: whatsappConnection
-      } = await supabase.from('whatsapp_connections').select('name').eq('user_id', effectiveUserId).eq('status', 'WORKING').limit(1).single();
-      if (!whatsappConnection) {
-        toast({
-          title: "Error",
-          description: "No se encontró una conexión activa de WhatsApp",
-          variant: "destructive"
-        });
-        return;
+      // Si es WhatsApp (WAHA) - usar la sesión seleccionada
+      let sessionName = selectedWhatsAppSession;
+      
+      // Si no hay sesión seleccionada, buscar una activa
+      if (!sessionName) {
+        const {
+          data: whatsappConnection
+        } = await supabase.from('whatsapp_connections').select('name').eq('user_id', effectiveUserId).eq('status', 'WORKING').limit(1).single();
+        
+        if (!whatsappConnection) {
+          toast({
+            title: "Error",
+            description: "No se encontró una sesión activa de WhatsApp para responder",
+            variant: "destructive"
+          });
+          return;
+        }
+        sessionName = whatsappConnection.name;
       }
+      
       await sendMessage({
         conversationId: selectedConversation.id,
         userId: effectiveUserId,
         message: messageText.trim(),
-        sessionName: whatsappConnection.name,
+        sessionName: sessionName,
         phoneNumber: phoneNumber,
         channelType: 'whatsapp'
       });
@@ -1318,11 +1327,20 @@ const Leads = () => {
       {/* Message Triggers Dialog */}
       <MessageTriggersDialog isOpen={showMessageTriggersDialog} onClose={closeMessageTriggersDialog} column={selectedColumnForTriggers} />
       {/* Modal de Chat */}
-      <ChatModal isOpen={isChatModalOpen} onClose={() => {
-      setIsChatModalOpen(false);
-      setSelectedConversation(null);
-      setSelectedConversationId(null);
-    }} conversation={selectedConversation} messages={messages} onSendMessage={handleSendMessage} isSending={isSending} />
+      <ChatModal 
+        isOpen={isChatModalOpen} 
+        onClose={() => {
+          setIsChatModalOpen(false);
+          setSelectedConversation(null);
+          setSelectedConversationId(null);
+          setSelectedWhatsAppSession(null);
+        }} 
+        conversation={selectedConversation} 
+        messages={messages} 
+        onSendMessage={handleSendMessage} 
+        isSending={isSending}
+        onWhatsAppSessionChange={setSelectedWhatsAppSession}
+      />
     </div>;
 };
 export default Leads;
