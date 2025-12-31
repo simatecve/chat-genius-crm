@@ -19,10 +19,17 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!WAHA_BASE_URL || !WAHA_API_KEY) {
+      console.error('Missing WAHA credentials - WAHA_BASE_URL:', !!WAHA_BASE_URL, 'WAHA_API_KEY:', !!WAHA_API_KEY);
       throw new Error('WAHA credentials not configured');
     }
 
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing Supabase credentials - SUPABASE_URL:', !!SUPABASE_URL, 'SUPABASE_SERVICE_ROLE_KEY:', !!SUPABASE_SERVICE_ROLE_KEY);
+      throw new Error('Supabase credentials not configured. Please add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY secrets.');
+    }
+
+    console.log('All credentials configured correctly');
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
     const payload = await req.json();
     console.log('Creating WAHA session with payload:', payload);

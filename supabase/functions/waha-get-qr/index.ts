@@ -16,8 +16,11 @@ serve(async (req) => {
     const WAHA_API_KEY = Deno.env.get('WAHA_API_KEY');
 
     if (!WAHA_BASE_URL || !WAHA_API_KEY) {
-      throw new Error('WAHA credentials not configured');
+      console.error('Missing WAHA credentials - WAHA_BASE_URL:', !!WAHA_BASE_URL, 'WAHA_API_KEY:', !!WAHA_API_KEY);
+      throw new Error('WAHA credentials not configured. Please add WAHA_BASE_URL and WAHA_API_KEY secrets.');
     }
+    
+    console.log('WAHA credentials configured, fetching QR...');
 
     const { session_name } = await req.json();
     console.log('Getting QR code for session:', session_name);
