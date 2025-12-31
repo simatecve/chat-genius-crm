@@ -2495,6 +2495,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_message_exists_by_waha_id: {
+        Args: { p_waha_id: string }
+        Returns: boolean
+      }
       get_account_owner_id: { Args: { user_id: string }; Returns: string }
       has_role: {
         Args: {

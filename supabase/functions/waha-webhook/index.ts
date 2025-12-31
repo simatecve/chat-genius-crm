@@ -208,11 +208,11 @@ async function getOrCreateConversation(
   }
 
   if (!conversation) {
-    // Crear nueva conversación CON whatsapp_number
+    // Crear nueva conversación CON whatsapp_number - usando UPSERT para evitar race conditions
     const newConversation = {
       user_id: userId,
       phone_number: phoneNumber,
-      whatsapp_number: sessionPhoneNumber, // NUEVO: guardar el número de la sesión
+      whatsapp_number: sessionPhoneNumber,
       pushname: pushName,
       last_message: messageContent,
       last_message_time: new Date(messageTimestamp * 1000).toISOString(),
@@ -227,7 +227,24 @@ async function getOrCreateConversation(
       .select()
       .single();
 
+    // Si hay error de duplicado (race condition), buscar la existente
     if (createError) {
+      if (createError.code === '23505') { // Unique violation
+        console.log('Race condition detected, fetching existing conversation...');
+        const { data: existing } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('phone_number', phoneNumber)
+          .eq('whatsapp_number', sessionPhoneNumber)
+          .eq('channel_type', 'whatsapp')
+          .single();
+        
+        if (existing) {
+          console.log('Found existing conversation after race condition:', existing.id);
+          return existing;
+        }
+      }
       console.error('Error creating conversation:', createError);
       return null;
     }
@@ -298,6 +315,11 @@ async function saveMessage(
     .single();
 
   if (error) {
+    // Si el mensaje ya existe (índice único waha_id), ignorar silenciosamente
+    if (error.code === '23505') {
+      console.log('Message already exists (duplicate waha_id), skipping...');
+      return null;
+    }
     console.error('Error saving message:', error);
     return null;
   }
@@ -545,17 +567,19 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
     const messageData = payload;
     const wahaMessageId = messageData.id;
     
-    // Verificar si el mensaje ya fue procesado (deduplicación)
-    const { data: existingMessage } = await supabase
-      .from('messages')
-      .select('id')
-      .eq('metadata->>waha_id', wahaMessageId)
-      .limit(1)
-      .maybeSingle();
-    
-    if (existingMessage) {
-      console.log(`Message ${wahaMessageId} already processed, skipping...`);
-      return;
+    // Verificar si el mensaje ya fue procesado (deduplicación) usando función RPC
+    if (wahaMessageId) {
+      const { data: exists, error: rpcError } = await supabase
+        .rpc('check_message_exists_by_waha_id', { p_waha_id: wahaMessageId });
+      
+      if (rpcError) {
+        console.error('Error checking message existence:', rpcError);
+      }
+      
+      if (exists) {
+        console.log(`Message ${wahaMessageId} already processed, skipping...`);
+        return;
+      }
     }
 
     // Usar remoteJidAlt si está disponible (contiene el número correcto), sino usar from
