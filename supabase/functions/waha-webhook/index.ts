@@ -267,31 +267,33 @@ async function getOrCreateConversation(
       channel_type: 'whatsapp',
     };
 
+    // Usar UPSERT para evitar duplicados con el índice único
     const { data: created, error: createError } = await supabase
       .from('conversations')
-      .insert(newConversation)
+      .upsert(newConversation, {
+        onConflict: 'user_id,phone_number,whatsapp_number,channel_type',
+        ignoreDuplicates: false
+      })
       .select()
       .single();
 
-    // Si hay error de duplicado (race condition), buscar la existente
     if (createError) {
-      if (createError.code === '23505') { // Unique violation
-        console.log('Race condition detected, fetching existing conversation...');
-        const { data: existing } = await supabase
-          .from('conversations')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('phone_number', phoneNumber)
-          .eq('whatsapp_number', sessionPhoneNumber)
-          .eq('channel_type', 'whatsapp')
-          .single();
-        
-        if (existing) {
-          console.log('Found existing conversation after race condition:', existing.id);
-          return existing;
-        }
+      console.error('Error creating/upserting conversation:', createError);
+      
+      // Fallback: buscar conversación existente si falla el upsert
+      const { data: existing } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('phone_number', phoneNumber)
+        .eq('whatsapp_number', sessionPhoneNumber)
+        .eq('channel_type', 'whatsapp')
+        .single();
+      
+      if (existing) {
+        console.log('Found existing conversation after upsert error:', existing.id);
+        return existing;
       }
-      console.error('Error creating conversation:', createError);
       return null;
     }
 
@@ -607,6 +609,13 @@ async function getOrCreateContact(
 // Procesar evento de mensaje
 async function processMessageEvent(supabase: any, payload: any, session: string, rawPayload?: any) {
   try {
+    // Ignorar evento message.any para evitar duplicados (solo procesamos 'message')
+    const eventType = rawPayload?.event || 'unknown';
+    if (eventType === 'message.any') {
+      console.log('Ignoring message.any event to prevent duplicate processing');
+      return;
+    }
+    
     console.log('Processing message event...');
 
     // Extraer datos del mensaje
