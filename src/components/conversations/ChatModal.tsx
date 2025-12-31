@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import ChatArea from './ChatArea';
 import { ContactInfoPanel } from './ContactInfoPanel';
@@ -33,22 +33,40 @@ export default function ChatModal({
     const [showInfoPanel, setShowInfoPanel] = useState(false);
     const { activeConnections, isSessionActive } = useWhatsAppConnections();
     const { connections: twilioConnections, isConnectionActive } = useTwilioConnections();
+    
+    // Ref para rastrear la conversación ya inicializada
+    const initializedConversationIdRef = useRef<string | null>(null);
 
-    // Auto-seleccionar sesión cuando cambia la conversación y notificar al padre
+    // Auto-seleccionar sesión SOLO cuando cambia la conversación (no en cada cambio de activeConnections)
     useEffect(() => {
         if (conversation && conversation.channel_type === 'whatsapp') {
-            let session: string | null = null;
-            
-            if (conversation.whatsapp_number && isSessionActive(conversation.whatsapp_number)) {
-                session = conversation.whatsapp_number;
-            } else if (activeConnections.length > 0) {
-                session = activeConnections[0].name;
+            // Solo inicializar si es una conversación diferente
+            if (initializedConversationIdRef.current !== conversation.id) {
+                initializedConversationIdRef.current = conversation.id;
+                
+                let session: string | null = null;
+                
+                // Prioridad 1: Sesión original de la conversación si está activa
+                if (conversation.whatsapp_number && isSessionActive(conversation.whatsapp_number)) {
+                    session = conversation.whatsapp_number;
+                } 
+                // Prioridad 2: Primera conexión activa
+                else if (activeConnections.length > 0) {
+                    session = activeConnections[0].name;
+                }
+                
+                setSelectedWhatsAppSession(session);
+                onWhatsAppSessionChange?.(session);
             }
-            
-            setSelectedWhatsAppSession(session);
-            onWhatsAppSessionChange?.(session);
         }
-    }, [conversation, activeConnections, isSessionActive, onWhatsAppSessionChange]);
+    }, [conversation?.id, activeConnections, isSessionActive, onWhatsAppSessionChange]);
+    
+    // Resetear el ref cuando se cierra el modal
+    useEffect(() => {
+        if (!isOpen) {
+            initializedConversationIdRef.current = null;
+        }
+    }, [isOpen]);
     
     // Notificar al padre cuando cambia la sesión manualmente
     const handleSessionChange = (session: string | null) => {
