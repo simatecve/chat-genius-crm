@@ -17,6 +17,67 @@ function getRandomDelay(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// Función para encontrar sesión WAHA real (maneja discrepancias de nombres)
+async function findWahaSession(sessionName: string, wahaBaseUrl: string, wahaApiKey: string): Promise<string | null> {
+  console.log(`[findWahaSession] Buscando sesión: "${sessionName}"`);
+  
+  // 1. Primero intentar con el nombre exacto
+  try {
+    const checkUrl = `${wahaBaseUrl}/api/sessions/${encodeURIComponent(sessionName)}`;
+    const checkResponse = await fetch(checkUrl, {
+      method: 'GET',
+      headers: { 'X-Api-Key': wahaApiKey }
+    });
+    
+    if (checkResponse.ok) {
+      const sessionData = await checkResponse.json();
+      if (sessionData && sessionData.status === 'WORKING') {
+        console.log(`[findWahaSession] Sesión exacta encontrada y activa: "${sessionName}"`);
+        return sessionName;
+      }
+    }
+  } catch (e) {
+    console.log(`[findWahaSession] Error verificando sesión exacta:`, e);
+  }
+  
+  // 2. Si no existe o no está activa, obtener todas las sesiones y buscar coincidencia parcial
+  try {
+    const sessionsUrl = `${wahaBaseUrl}/api/sessions`;
+    const sessionsResponse = await fetch(sessionsUrl, {
+      method: 'GET',
+      headers: { 'X-Api-Key': wahaApiKey }
+    });
+    
+    if (sessionsResponse.ok) {
+      const sessions = await sessionsResponse.json();
+      console.log(`[findWahaSession] Sesiones disponibles en WAHA:`, sessions.map((s: any) => s.name));
+      
+      // Extraer nombre base (ej: "eewil16 PRINCIPAL" -> "eewil16")
+      const baseName = sessionName.split(' ')[0].toLowerCase();
+      
+      // Buscar sesión que coincida parcialmente y esté activa
+      const matchingSession = sessions.find((s: any) => {
+        if (s.status !== 'WORKING') return false;
+        const sNameLower = s.name.toLowerCase();
+        return sNameLower === baseName || 
+               sNameLower.startsWith(baseName) ||
+               baseName.startsWith(sNameLower) ||
+               sessionName.toLowerCase().startsWith(sNameLower);
+      });
+      
+      if (matchingSession) {
+        console.log(`[findWahaSession] Sesión alternativa encontrada: DB="${sessionName}" -> WAHA="${matchingSession.name}"`);
+        return matchingSession.name;
+      }
+    }
+  } catch (e) {
+    console.log(`[findWahaSession] Error buscando sesiones alternativas:`, e);
+  }
+  
+  console.log(`[findWahaSession] No se encontró ninguna sesión activa para "${sessionName}"`);
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -35,19 +96,39 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     const { 
-      sessionName, 
+      sessionName: requestedSessionName, 
       phoneNumber, 
       message, 
       userId,
       conversationId,
       isBot,
-      // Nuevos parámetros de humanización
       humanizationDelay,
       enableTypingIndicator
     } = await req.json();
 
+    // Resolver nombre de sesión real en WAHA
+    const resolvedSessionName = await findWahaSession(requestedSessionName, WAHA_BASE_URL, WAHA_API_KEY);
+    
+    if (!resolvedSessionName) {
+      console.error(`[waha-send-message] No se encontró sesión activa para: "${requestedSessionName}"`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `La sesión de WhatsApp "${requestedSessionName}" no está disponible. Por favor reconecta escaneando el código QR.`,
+          errorCode: 'SESSION_NOT_FOUND'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const sessionName = resolvedSessionName;
+
     console.log('Sending message via WAHA:', {
-      sessionName,
+      requestedSession: requestedSessionName,
+      resolvedSession: sessionName,
       phoneNumber,
       messagePreview: message.substring(0, 50),
       humanizationDelay,
