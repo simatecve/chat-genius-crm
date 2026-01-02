@@ -43,10 +43,30 @@ export const useWhatsAppConnections = () => {
     return connections.find(conn => conn.name === name);
   };
 
+  // Buscar conexión por número de teléfono (whatsapp_number de la conversación)
+  const getConnectionByPhoneNumber = (phoneNumber: string | null) => {
+    if (!phoneNumber) return null;
+    return connections.find(conn => conn.phone_number === phoneNumber);
+  };
+
   const isSessionActive = (sessionName: string | null) => {
     if (!sessionName) return false;
     const connection = getConnectionByName(sessionName);
     return connection?.status === 'WORKING' || connection?.status === 'connected';
+  };
+
+  // Verificar si sesión está activa por número de teléfono
+  const isSessionActiveByPhone = (phoneNumber: string | null) => {
+    if (!phoneNumber) return false;
+    const connection = getConnectionByPhoneNumber(phoneNumber);
+    return connection?.status === 'WORKING' || connection?.status === 'connected';
+  };
+
+  // Obtener el nombre de la sesión a partir del número de teléfono
+  const getSessionNameByPhone = (phoneNumber: string | null): string | null => {
+    if (!phoneNumber) return null;
+    const connection = getConnectionByPhoneNumber(phoneNumber);
+    return connection?.name || null;
   };
 
   return {
@@ -55,5 +75,8 @@ export const useWhatsAppConnections = () => {
     isLoading,
     getConnectionByName,
     isSessionActive,
+    getConnectionByPhoneNumber,
+    isSessionActiveByPhone,
+    getSessionNameByPhone,
   };
 };
