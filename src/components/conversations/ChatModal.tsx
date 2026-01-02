@@ -31,7 +31,7 @@ export default function ChatModal({
     const [selectedWhatsAppSession, setSelectedWhatsAppSession] = useState<string | null>(null);
     const [selectedTwilioConnection, setSelectedTwilioConnection] = useState<string | null>(null);
     const [showInfoPanel, setShowInfoPanel] = useState(false);
-    const { activeConnections, isSessionActive } = useWhatsAppConnections();
+    const { activeConnections, isSessionActiveByPhone, getSessionNameByPhone } = useWhatsAppConnections();
     const { connections: twilioConnections, isConnectionActive } = useTwilioConnections();
     
     // Ref para rastrear la conversación ya inicializada
@@ -46,9 +46,10 @@ export default function ChatModal({
                 
                 let session: string | null = null;
                 
-                // Prioridad 1: Sesión original de la conversación si está activa
-                if (conversation.whatsapp_number && isSessionActive(conversation.whatsapp_number)) {
-                    session = conversation.whatsapp_number;
+                // Prioridad 1: Sesión original de la conversación si está activa (buscar por phone_number)
+                if (conversation.whatsapp_number && isSessionActiveByPhone(conversation.whatsapp_number)) {
+                    // Obtener el NOMBRE de la sesión para usar en envío
+                    session = getSessionNameByPhone(conversation.whatsapp_number);
                 } 
                 // Prioridad 2: Primera conexión activa
                 else if (activeConnections.length > 0) {
@@ -59,7 +60,7 @@ export default function ChatModal({
                 onWhatsAppSessionChange?.(session);
             }
         }
-    }, [conversation?.id, activeConnections, isSessionActive, onWhatsAppSessionChange]);
+    }, [conversation?.id, activeConnections, isSessionActiveByPhone, getSessionNameByPhone, onWhatsAppSessionChange]);
     
     // Resetear el ref cuando se cierra el modal
     useEffect(() => {
@@ -175,7 +176,7 @@ export default function ChatModal({
                             onTwilioConnectionChange={setSelectedTwilioConnection}
                             originalSessionStatus={
                                 conversation?.channel_type === 'whatsapp'
-                                    ? isSessionActive(conversation.whatsapp_number)
+                                    ? isSessionActiveByPhone(conversation.whatsapp_number)
                                         ? 'active'
                                         : 'disconnected'
                                     : conversation?.channel_type === 'twilio'

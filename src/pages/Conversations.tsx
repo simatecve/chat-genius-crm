@@ -54,7 +54,7 @@ const Conversations = () => {
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
   const { data: searchResults } = useSearchConversations(searchTerm);
   const { messages, sendMessage, sendMessageWithAttachment, isSending } = useMessages(selectedConversation?.id || null);
-  const { activeConnections, isSessionActive, connections: whatsappConnections } = useWhatsAppConnections();
+  const { activeConnections, isSessionActiveByPhone, getSessionNameByPhone, connections: whatsappConnections } = useWhatsAppConnections();
   const { connections: twilioConnections, activeConnections: activeTwilioConnections, isConnectionActive } = useTwilioConnections();
   const { connections: telegramConnections } = useTelegramConnections();
 
@@ -235,10 +235,12 @@ const Conversations = () => {
       markAsRead(conversation.id);
     }
     
-    // Auto-seleccionar sesión WhatsApp si está activa
+    // Auto-seleccionar sesión WhatsApp si está activa (buscar por phone_number, usar name para envío)
     if (conversation.channel_type === 'whatsapp' && conversation.whatsapp_number) {
-      if (isSessionActive(conversation.whatsapp_number)) {
-        setSelectedWhatsAppSession(conversation.whatsapp_number);
+      if (isSessionActiveByPhone(conversation.whatsapp_number)) {
+        // Obtener el NOMBRE de la sesión para usar en envío
+        const sessionName = getSessionNameByPhone(conversation.whatsapp_number);
+        setSelectedWhatsAppSession(sessionName);
       } else if (activeConnections.length > 0) {
         // Si la sesión original no está activa, pre-seleccionar la primera activa
         setSelectedWhatsAppSession(activeConnections[0].name);
@@ -463,7 +465,7 @@ const Conversations = () => {
             onTwilioConnectionChange={setSelectedTwilioConnection}
             originalSessionStatus={
               selectedConversation?.channel_type === 'whatsapp'
-                ? isSessionActive(selectedConversation.whatsapp_number)
+                ? isSessionActiveByPhone(selectedConversation.whatsapp_number)
                   ? 'active'
                   : 'disconnected'
                 : selectedConversation?.channel_type === 'twilio'
