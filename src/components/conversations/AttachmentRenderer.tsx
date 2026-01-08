@@ -24,7 +24,10 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   
   // Usar hook para cargar archivos con autenticación
-  const { blobUrl, isLoading: isLoadingMedia } = useAuthenticatedMedia(attachmentUrl, twilioConnectionId);
+  const { blobUrl, isLoading: isLoadingMedia, error: mediaError } = useAuthenticatedMedia(attachmentUrl, twilioConnectionId);
+  
+  // Detectar si es una URL protegida de Twilio
+  const isTwilioUrl = attachmentUrl.includes('api.twilio.com') || attachmentUrl.includes('media.twiliocdn.com');
 
   // Detectar tipo de archivo por extensión, URL o messageType
   const getFileType = (url: string, type?: string) => {
@@ -138,6 +141,34 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
     );
   }
 
+  // Mostrar error si falló la carga de archivo protegido
+  if (mediaError && isTwilioUrl) {
+    return (
+      <div className={cn(
+        "mb-2 flex items-center gap-3 p-3 rounded-lg",
+        isOutgoing ? "bg-[#005c4b]/20" : "bg-[#202c33]"
+      )}>
+        <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+          <FileText className="h-5 w-5 text-red-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={cn(
+            "text-sm font-medium",
+            isOutgoing ? "text-white" : "text-[#e9edef]"
+          )}>
+            Error al cargar archivo
+          </p>
+          <p className={cn(
+            "text-xs",
+            isOutgoing ? "text-white/70" : "text-[#8696a0]"
+          )}>
+            {mediaError}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Renderizado según tipo de archivo
   switch (fileType) {
     case 'image':
@@ -154,6 +185,14 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       );
 
     case 'video':
+      // Para URLs de Twilio, solo renderizar si tenemos blobUrl
+      if (isTwilioUrl && !blobUrl) {
+        return (
+          <div className="mb-2 flex items-center justify-center p-4">
+            <div className="animate-spin h-6 w-6 border-2 border-current border-t-transparent rounded-full" />
+          </div>
+        );
+      }
       return (
         <div className="mb-2 max-w-sm">
           <video 
@@ -251,17 +290,20 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
             </Button>
           </div>
 
-          <audio
-            ref={audioRef}
-            src={blobUrl || attachmentUrl}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onCanPlay={handleCanPlay}
-            onPlay={handlePlay}
-            onPause={handlePause}
-            onEnded={() => setIsPlaying(false)}
-            preload="metadata"
-          />
+          {/* Solo renderizar audio element si tenemos blobUrl para Twilio */}
+          {(!isTwilioUrl || blobUrl) && (
+            <audio
+              ref={audioRef}
+              src={blobUrl || attachmentUrl}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onCanPlay={handleCanPlay}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onEnded={() => setIsPlaying(false)}
+              preload="metadata"
+            />
+          )}
         </div>
       );
 
