@@ -10,25 +10,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WEBHOOK_URL = 'https://n8n2025.nocodeveloper.site/webhook/guardar_contacto';
-
-// Función helper para enviar datos al webhook externo
-async function sendToExternalWebhook(data: any) {
+// Función helper para enviar datos al webhook n8n configurable
+async function sendToN8nWebhook(webhookUrl: string, data: any) {
   try {
-    console.log('Sending to external webhook:', WEBHOOK_URL);
-    const response = await fetch(WEBHOOK_URL, {
+    console.log('[twilio-webhook] Sending to n8n webhook:', webhookUrl);
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     
     if (!response.ok) {
-      console.error('Webhook response not OK:', response.status);
+      console.error('[twilio-webhook] n8n webhook response not OK:', response.status);
     } else {
-      console.log('Webhook sent successfully');
+      console.log('[twilio-webhook] n8n webhook sent successfully');
     }
   } catch (error) {
-    console.error('Error sending to webhook:', error);
+    console.error('[twilio-webhook] Error sending to n8n webhook:', error);
   }
 }
 
@@ -41,20 +39,30 @@ function normalizePhoneNumber(phone: string): string {
     .trim();
 }
 
-// Obtener user_id desde el número de Twilio o connectionId
-async function getUserIdFromTwilioNumber(supabase: any, toNumber: string, connectionIdFromUrl: string | null): Promise<{ userId: string | null; connectionId: string | null }> {
+// Obtener user_id y datos de conexión desde el número de Twilio o connectionId
+async function getConnectionData(supabase: any, toNumber: string, connectionIdFromUrl: string | null): Promise<{ 
+  userId: string | null; 
+  connectionId: string | null; 
+  n8nWebhookUrl: string | null;
+  connectionName: string | null;
+}> {
   // Primero intentar con connectionId de la URL (más preciso)
   if (connectionIdFromUrl) {
     console.log(`[twilio-webhook] Looking up connection by ID: ${connectionIdFromUrl}`);
     const { data, error } = await supabase
       .from('twilio_connections')
-      .select('user_id, id')
+      .select('user_id, id, n8n_webhook_url, connection_name, phone_number')
       .eq('id', connectionIdFromUrl)
       .single();
 
     if (!error && data) {
-      console.log(`[twilio-webhook] Found connection by ID: user_id=${data.user_id}`);
-      return { userId: data.user_id, connectionId: data.id };
+      console.log(`[twilio-webhook] Found connection by ID: user_id=${data.user_id}, n8n_webhook=${data.n8n_webhook_url ? 'configured' : 'not set'}`);
+      return { 
+        userId: data.user_id, 
+        connectionId: data.id, 
+        n8nWebhookUrl: data.n8n_webhook_url,
+        connectionName: data.connection_name
+      };
     }
     console.warn(`[twilio-webhook] Connection ID ${connectionIdFromUrl} not found, falling back to phone number`);
   }
@@ -65,17 +73,22 @@ async function getUserIdFromTwilioNumber(supabase: any, toNumber: string, connec
   
   const { data, error } = await supabase
     .from('twilio_connections')
-    .select('user_id, id')
+    .select('user_id, id, n8n_webhook_url, connection_name, phone_number')
     .eq('phone_number', normalized)
     .single();
 
   if (error) {
-    console.error('[twilio-webhook] Error getting user_id from Twilio number:', error);
-    return { userId: null, connectionId: null };
+    console.error('[twilio-webhook] Error getting connection data:', error);
+    return { userId: null, connectionId: null, n8nWebhookUrl: null, connectionName: null };
   }
 
   console.log(`[twilio-webhook] Found connection by phone: user_id=${data?.user_id}, id=${data?.id}`);
-  return { userId: data?.user_id || null, connectionId: data?.id || null };
+  return { 
+    userId: data?.user_id || null, 
+    connectionId: data?.id || null,
+    n8nWebhookUrl: data?.n8n_webhook_url || null,
+    connectionName: data?.connection_name || null
+  };
 }
 
 // Obtener columna por defecto del usuario o de la conexión
@@ -467,14 +480,14 @@ serve(async (req) => {
     console.log(`Message from: ${phoneNumber}, to: ${twilioPhoneNumber}`);
     console.log(`Content: ${messageBody.substring(0, 50)}... | Media: ${mediaType} (${numMedia} files)`);
 
-    // Obtener user_id y connection_id desde el número de Twilio o connectionId de URL
-    const { userId, connectionId } = await getUserIdFromTwilioNumber(supabase, toNumber, connectionIdFromUrl);
+    // Obtener datos de conexión incluyendo n8n webhook
+    const { userId, connectionId, n8nWebhookUrl, connectionName } = await getConnectionData(supabase, toNumber, connectionIdFromUrl);
     if (!userId || !connectionId) {
       console.error('Could not get user_id or connection_id from Twilio number');
       return new Response('OK', { status: 200, headers: corsHeaders });
     }
 
-    console.log(`User ID: ${userId}, Connection ID: ${connectionId}`);
+    console.log(`User ID: ${userId}, Connection ID: ${connectionId}, n8n webhook: ${n8nWebhookUrl ? 'configured' : 'not set'}`);
 
     // Determinar contenido del mensaje para mostrar
     const displayContent = messageBody || (mediaUrl ? `📎 [${mediaType}]` : '');
@@ -508,32 +521,43 @@ serve(async (req) => {
     // Crear contacto
     await getOrCreateContact(supabase, userId, phoneNumber, profileName);
 
-    // Enviar al webhook externo N8N
-    const isNewConversation = !conversation.lead_id && conversation.unread_count === 1;
-    if (isNewConversation) {
-      const webhookPayload = {
-        type: 'incoming_message',
-        is_new_contact: isNewLead,
-        source: 'twilio_whatsapp',
+    // Enviar al webhook n8n si está configurado (TODOS los mensajes entrantes)
+    if (n8nWebhookUrl) {
+      const n8nPayload = {
+        event_type: 'incoming_message',
+        channel: 'twilio',
         timestamp: new Date().toISOString(),
-        twilio_data: twilioData,
+        session: {
+          id: connectionId,
+          name: connectionName,
+          phone_number: twilioPhoneNumber
+        },
+        conversation: {
+          id: conversation.id,
+          phone_number: phoneNumber,
+          pushname: profileName,
+          lead_id: conversation.lead_id || lead?.id
+        },
         message: {
           id: twilioMessageId,
           content: messageBody,
-          type: 'text',
+          type: mediaType,
+          media_url: mediaUrl,
+          mime_type: mimeType,
           direction: 'inbound',
         },
-        conversation: conversation,
-        lead: lead,
-        extracted_fields: {
-          phone_number_normalized: phoneNumber,
-          phone_number_raw: fromNumber,
-          profile_name: profileName,
-        },
+        lead: lead ? {
+          id: lead.id,
+          name: lead.name,
+          phone: lead.phone,
+          bot_active: lead.bot_active
+        } : null,
+        raw_twilio_data: twilioData,
       };
       
-      sendToExternalWebhook(webhookPayload).catch(err => 
-        console.error('Failed to send to webhook:', err)
+      // Enviar de forma asíncrona sin bloquear
+      sendToN8nWebhook(n8nWebhookUrl, n8nPayload).catch(err => 
+        console.error('[twilio-webhook] Failed to send to n8n:', err)
       );
     }
 

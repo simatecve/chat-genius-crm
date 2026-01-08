@@ -47,7 +47,8 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
   const [formData, setFormData] = useState({
     name: session.name,
     workspace_id: session.workspace_id || '',
-    default_column_id: session.default_column_id || ''
+    default_column_id: session.default_column_id || '',
+    n8n_webhook_url: ''
   });
   const [originalWorkspaceId, setOriginalWorkspaceId] = useState(session.workspace_id || '');
   
@@ -60,15 +61,33 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
       setFormData({
         name: session.name,
         workspace_id: session.workspace_id || '',
-        default_column_id: session.default_column_id || ''
+        default_column_id: session.default_column_id || '',
+        n8n_webhook_url: ''
       });
       setOriginalWorkspaceId(session.workspace_id || '');
       setMigrateConversations(false);
       fetchWorkspaces();
       fetchLeadColumns(session.workspace_id || undefined);
       fetchConversationCount();
+      fetchN8nWebhookUrl();
     }
   }, [open, session, effectiveUserId]);
+
+  const fetchN8nWebhookUrl = async () => {
+    if (!effectiveUserId) return;
+    // Solo WhatsApp y Twilio tienen n8n_webhook_url
+    if (sessionType === 'telegram') return;
+    
+    const tableName = getTableName();
+    const { data } = await supabase
+      .from(tableName)
+      .select('n8n_webhook_url')
+      .eq('id', session.id)
+      .single();
+    if (data && 'n8n_webhook_url' in data && data.n8n_webhook_url) {
+      setFormData(prev => ({ ...prev, n8n_webhook_url: data.n8n_webhook_url as string }));
+    }
+  };
 
   // Cargar columnas cuando cambia el workspace
   useEffect(() => {
@@ -204,6 +223,11 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
         workspace_id: formData.workspace_id || null,
         default_column_id: formData.default_column_id || null,
       };
+      
+      // Solo agregar n8n_webhook_url para WhatsApp y Twilio
+      if (sessionType !== 'telegram') {
+        updateData.n8n_webhook_url = formData.n8n_webhook_url || null;
+      }
 
       const { error: updateError } = await supabase
         .from(tableName)
@@ -368,6 +392,22 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
               </SelectContent>
             </Select>
           </div>
+
+          {/* Solo mostrar webhook n8n para WhatsApp y Twilio */}
+          {sessionType !== 'telegram' && (
+            <div className="space-y-2">
+              <Label htmlFor="n8n_webhook">Webhook n8n (opcional)</Label>
+              <Input
+                id="n8n_webhook"
+                value={formData.n8n_webhook_url}
+                onChange={(e) => setFormData({ ...formData, n8n_webhook_url: e.target.value })}
+                placeholder="https://tu-n8n.com/webhook/..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Los mensajes entrantes se enviarán a esta URL para procesamiento con IA externa.
+              </p>
+            </div>
+          )}
 
           {/* Mostrar checkbox de migración solo si cambió el workspace */}
           {workspaceChanged && conversationCount > 0 && (
