@@ -1810,6 +1810,7 @@ export type Database = {
           created_at: string | null
           default_column_id: string | null
           id: string
+          n8n_webhook_url: string | null
           phone_number: string
           status: string | null
           updated_at: string | null
@@ -1825,6 +1826,7 @@ export type Database = {
           created_at?: string | null
           default_column_id?: string | null
           id?: string
+          n8n_webhook_url?: string | null
           phone_number: string
           status?: string | null
           updated_at?: string | null
@@ -1840,6 +1842,7 @@ export type Database = {
           created_at?: string | null
           default_column_id?: string | null
           id?: string
+          n8n_webhook_url?: string | null
           phone_number?: string
           status?: string | null
           updated_at?: string | null
@@ -2406,6 +2409,7 @@ export type Database = {
           created_at: string | null
           default_column_id: string | null
           id: string
+          n8n_webhook_url: string | null
           name: string | null
           phone_number: string
           qr_code: string | null
@@ -2420,6 +2424,7 @@ export type Database = {
           created_at?: string | null
           default_column_id?: string | null
           id?: string
+          n8n_webhook_url?: string | null
           name?: string | null
           phone_number: string
           qr_code?: string | null
@@ -2434,6 +2439,7 @@ export type Database = {
           created_at?: string | null
           default_column_id?: string | null
           id?: string
+          n8n_webhook_url?: string | null
           name?: string | null
           phone_number?: string
           qr_code?: string | null

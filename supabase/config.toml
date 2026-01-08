@@ -87,5 +87,8 @@ verify_jwt = true
 [functions.web-chat-poll]
 verify_jwt = false
 
+[functions.n8n-response]
+verify_jwt = false
+
 [functions.twilio-get-file]
 verify_jwt = true

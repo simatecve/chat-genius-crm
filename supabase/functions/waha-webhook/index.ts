@@ -10,26 +10,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WEBHOOK_URL = 'https://n8n2025.nocodeveloper.site/webhook/guardar_contacto';
-
-// Función helper para enviar datos al webhook externo
-async function sendToExternalWebhook(data: any) {
+// Función helper para enviar datos al webhook n8n configurable
+async function sendToN8nWebhook(webhookUrl: string, data: any) {
   try {
-    console.log('Sending to external webhook:', WEBHOOK_URL);
-    const response = await fetch(WEBHOOK_URL, {
+    console.log('[waha-webhook] Sending to n8n webhook:', webhookUrl);
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     
     if (!response.ok) {
-      console.error('Webhook response not OK:', response.status);
+      console.error('[waha-webhook] n8n webhook response not OK:', response.status);
     } else {
-      console.log('Webhook sent successfully');
+      console.log('[waha-webhook] n8n webhook sent successfully');
     }
   } catch (error) {
-    console.error('Error sending to webhook:', error);
-    // No lanzamos el error para que no bloquee el procesamiento del mensaje
+    console.error('[waha-webhook] Error sending to n8n webhook:', error);
   }
 }
 
@@ -60,14 +57,21 @@ function isMetaLid(value: string): boolean {
   return isLongNumeric;
 }
 
-// Obtener user_id, phone_number y workspace_id desde el nombre de la sesión
-async function getSessionData(supabase: any, sessionName: string): Promise<{ userId: string | null, sessionPhoneNumber: string | null, workspaceId: string | null, defaultColumnId: string | null }> {
+// Obtener datos de sesión incluyendo n8n_webhook_url
+async function getSessionData(supabase: any, sessionName: string): Promise<{ 
+  userId: string | null; 
+  sessionPhoneNumber: string | null; 
+  workspaceId: string | null; 
+  defaultColumnId: string | null;
+  n8nWebhookUrl: string | null;
+  connectionId: string | null;
+}> {
   console.log('Getting session data for:', sessionName);
   
   // Primero intentar coincidencia exacta
   let { data, error } = await supabase
     .from('whatsapp_connections')
-    .select('user_id, phone_number, workspace_id, default_column_id, name')
+    .select('id, user_id, phone_number, workspace_id, default_column_id, name, n8n_webhook_url')
     .eq('name', sessionName)
     .maybeSingle();
 
@@ -76,7 +80,7 @@ async function getSessionData(supabase: any, sessionName: string): Promise<{ use
     console.log('No exact match for session, trying LIKE search for:', sessionName);
     const { data: likeData, error: likeError } = await supabase
       .from('whatsapp_connections')
-      .select('user_id, phone_number, workspace_id, default_column_id, name')
+      .select('id, user_id, phone_number, workspace_id, default_column_id, name, n8n_webhook_url')
       .ilike('name', `${sessionName}%`)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -95,20 +99,22 @@ async function getSessionData(supabase: any, sessionName: string): Promise<{ use
 
   if (error) {
     console.error('Error getting session data:', error);
-    return { userId: null, sessionPhoneNumber: null, workspaceId: null, defaultColumnId: null };
+    return { userId: null, sessionPhoneNumber: null, workspaceId: null, defaultColumnId: null, n8nWebhookUrl: null, connectionId: null };
   }
 
   if (!data) {
     console.error('No session found for:', sessionName);
-    return { userId: null, sessionPhoneNumber: null, workspaceId: null, defaultColumnId: null };
+    return { userId: null, sessionPhoneNumber: null, workspaceId: null, defaultColumnId: null, n8nWebhookUrl: null, connectionId: null };
   }
 
-  console.log('Session data retrieved - user_id:', data.user_id, 'workspace_id:', data.workspace_id);
+  console.log('Session data retrieved - user_id:', data.user_id, 'workspace_id:', data.workspace_id, 'n8n_webhook:', data.n8n_webhook_url ? 'configured' : 'not set');
   return {
     userId: data.user_id || null,
     sessionPhoneNumber: data.phone_number || null,
     workspaceId: data.workspace_id || null,
-    defaultColumnId: data.default_column_id || null
+    defaultColumnId: data.default_column_id || null,
+    n8nWebhookUrl: data.n8n_webhook_url || null,
+    connectionId: data.id || null
   };
 }
 
@@ -834,10 +840,9 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
         },
       };
       
-      // Enviar al webhook (no bloqueante)
-      sendToExternalWebhook(webhookPayload).catch(err => 
-        console.error('Failed to send to webhook:', err)
-      );
+      // Enviar al webhook n8n si está configurado
+      // TODO: Obtener n8nWebhookUrl del contexto y enviar aquí
+      console.log('[waha-webhook] Webhook payload ready, n8n integration pending context');
     }
 
     // Guardar mensaje
@@ -904,10 +909,9 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
           },
         };
         
-        // Enviar al webhook (no bloqueante)
-        sendToExternalWebhook(webhookPayload).catch(err => 
-          console.error('Failed to send lead to webhook:', err)
-        );
+        // Enviar al webhook n8n si está configurado
+        // TODO: Obtener n8nWebhookUrl del contexto y enviar aquí
+        console.log('[waha-webhook] Lead webhook payload ready, n8n integration pending context');
       }
 
       // Llamar al agente de IA si está habilitado en la conexión WhatsApp

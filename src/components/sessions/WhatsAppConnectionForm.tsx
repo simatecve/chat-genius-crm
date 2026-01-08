@@ -40,7 +40,8 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
     name: '',
     phone_number: '',
     workspace_id: '',
-    default_column_id: ''
+    default_column_id: '',
+    n8n_webhook_url: ''
   });
   
   const { toast } = useToast();
@@ -135,6 +136,7 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
           phone_number: cleanPhoneNumber,
           workspace_id: formData.workspace_id || null,
           default_column_id: formData.default_column_id || null,
+          n8n_webhook_url: formData.n8n_webhook_url || null,
         }
       });
 
@@ -349,6 +351,19 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="n8n_webhook">Webhook n8n (opcional)</Label>
+              <Input
+                id="n8n_webhook"
+                value={formData.n8n_webhook_url}
+                onChange={(e) => setFormData({ ...formData, n8n_webhook_url: e.target.value })}
+                placeholder="https://tu-n8n.com/webhook/..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Los mensajes entrantes se enviarán a esta URL para procesamiento con IA.
+              </p>
             </div>
 
             <div className="flex justify-end space-x-2 pt-4">
