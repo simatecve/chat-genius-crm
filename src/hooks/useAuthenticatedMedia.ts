@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -7,12 +7,21 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export const useAuthenticatedMedia = (url: string | null, twilioConnectionId?: string | null) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Determinar si es una URL protegida
+  const isProtectedUrl = useMemo(() => {
+    if (!url) return false;
+    return url.includes('/api/files/') || url.includes('api.twilio.com') || url.includes('media.twiliocdn.com');
+  }, [url]);
+
+  // isLoading es true si tenemos URL protegida y aún no tenemos blobUrl
+  const isLoading = isProtectedUrl && !blobUrl && !error;
 
   useEffect(() => {
     if (!url) {
       setBlobUrl(null);
+      setError(null);
       return;
     }
 
@@ -28,7 +37,6 @@ export const useAuthenticatedMedia = (url: string | null, twilioConnectionId?: s
     let isMounted = true;
 
     const loadAuthenticatedMedia = async () => {
-      setIsLoading(true);
       setError(null);
 
       try {
@@ -59,7 +67,12 @@ export const useAuthenticatedMedia = (url: string | null, twilioConnectionId?: s
         }
 
         if (!data) {
-          setBlobUrl(url);
+          // Solo para URLs no protegidas (fallback)
+          if (!isTwilioUrl && !isWahaUrl) {
+            setBlobUrl(url);
+          } else {
+            setError('No se pudo cargar el archivo');
+          }
           return;
         }
 
@@ -81,13 +94,13 @@ export const useAuthenticatedMedia = (url: string | null, twilioConnectionId?: s
       } catch (err) {
         console.error('Error loading authenticated media:', err);
         if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Error al cargar el archivo');
-          // Fallback: intentar cargar directamente
-          setBlobUrl(url);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
+          const errorMessage = err instanceof Error ? err.message : 'Error al cargar el archivo';
+          setError(errorMessage);
+          // NO hacer fallback a URL original para Twilio - causa popup de auth
+          // Solo hacer fallback para URLs no protegidas
+          if (!isTwilioUrl && !isWahaUrl) {
+            setBlobUrl(url);
+          }
         }
       }
     };
@@ -101,7 +114,7 @@ export const useAuthenticatedMedia = (url: string | null, twilioConnectionId?: s
         URL.revokeObjectURL(blobUrl);
       }
     };
-  }, [url]);
+  }, [url, twilioConnectionId]);
 
   return { blobUrl, isLoading, error };
 };
