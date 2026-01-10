@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -15,6 +15,7 @@ import TwilioConnectionForm from './TwilioConnectionForm';
 import WebChatConnectionForm from './WebChatConnectionForm';
 import EditSessionDialog from './EditSessionDialog';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 interface Channel {
   id: string;
   name: string;
@@ -61,6 +62,16 @@ const channels: Channel[] = [
   { id: 'email', name: 'Email', icon: '✉️', color: 'hsl(var(--muted))', enabled: false },
 ];
 
+type ChannelFilterType = 'all' | Session['type'];
+
+const filterOptions: { value: ChannelFilterType; label: string; icon: string }[] = [
+  { value: 'all', label: 'Todos los canales', icon: '📡' },
+  { value: 'whatsapp', label: 'WhatsApp QR', icon: '📱' },
+  { value: 'twilio', label: 'Twilio', icon: '📞' },
+  { value: 'telegram-bot', label: 'Telegram Bot', icon: '🤖' },
+  { value: 'webchat', label: 'Web Chat', icon: '💻' },
+];
+
 const SessionsManager = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,10 +82,16 @@ const SessionsManager = () => {
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [embudos, setEmbudos] = useState<LeadColumn[]>();
+  const [channelFilter, setChannelFilter] = useState<ChannelFilterType>('all');
   const { effectiveUserId, loading: userIdLoading } = useEffectiveUserId();
   const { toast } = useToast();
   const { getUsageByConnectionId, getUsagePercentage, getRemainingMessages, dailyLimit, isNearLimit } = useTwilioUsage();
   const { getStatsBySessionId, loading: statsLoading } = useSessionStats(effectiveUserId);
+
+  const filteredSessions = useMemo(() => {
+    if (channelFilter === 'all') return sessions;
+    return sessions.filter(session => session.type === channelFilter);
+  }, [sessions, channelFilter]);
 
   useEffect(() => {
     if (!userIdLoading && effectiveUserId) {
@@ -416,22 +433,39 @@ const SessionsManager = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center space-x-2">
           <Link2 className="h-5 w-5 text-primary" />
           <h2 className="text-2xl font-bold">Sesiones</h2>
           <span className="px-2 py-1 text-xs rounded-full bg-muted text-muted-foreground">
-            {sessions.length}
+            {filteredSessions.length}
           </span>
         </div>
-        <Button 
-          variant="default" 
-          size="sm"
-          onClick={() => setChannelSelectorOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Añadir Canal
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={channelFilter} onValueChange={(v) => setChannelFilter(v as ChannelFilterType)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por canal" />
+            </SelectTrigger>
+            <SelectContent>
+              {filterOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  <span className="flex items-center gap-2">
+                    <span>{option.icon}</span>
+                    <span>{option.label}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button 
+            variant="default" 
+            size="sm"
+            onClick={() => setChannelSelectorOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Añadir Canal
+          </Button>
+        </div>
       </div>
       
       <p className="text-muted-foreground text-sm">
@@ -455,13 +489,17 @@ const SessionsManager = () => {
             </Card>
           ))}
         </div>
-      ) : sessions.length === 0 ? (
+      ) : filteredSessions.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Smartphone className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No hay sesiones conectadas</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              {channelFilter === 'all' ? 'No hay sesiones conectadas' : `No hay sesiones de ${filterOptions.find(o => o.value === channelFilter)?.label}`}
+            </h3>
             <p className="text-muted-foreground mb-4">
-              Comienza añadiendo tu primer canal de comunicación
+              {channelFilter === 'all' 
+                ? 'Comienza añadiendo tu primer canal de comunicación'
+                : 'Prueba seleccionando otro filtro o añade una nueva sesión'}
             </p>
             <Button onClick={() => setChannelSelectorOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -471,7 +509,7 @@ const SessionsManager = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sessions.map(session => (
+          {filteredSessions.map(session => (
             <Card 
               key={session.id}
               className="hover:shadow-md transition-shadow border-l-4"
