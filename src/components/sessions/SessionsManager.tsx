@@ -365,6 +365,17 @@ const SessionsManager = () => {
           break;
 
         case 'twilio':
+          // Clean up related records before deletion
+          await supabase
+            .from('ai_response_buffer')
+            .delete()
+            .eq('twilio_connection_id', session.id);
+          
+          await supabase
+            .from('mass_campaigns')
+            .update({ twilio_connection_id: null })
+            .eq('twilio_connection_id', session.id);
+          
           const { error: twilioError } = await supabase
             .from('twilio_connections')
             .delete()
