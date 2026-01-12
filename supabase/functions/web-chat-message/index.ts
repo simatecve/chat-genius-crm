@@ -194,6 +194,147 @@ async function analyzeImageForPaymentReceipt(imageUrl: string): Promise<{ isRece
   }
 }
 
+// Get or create a lead for webchat conversation
+async function getOrCreateLead(
+  supabase: any, 
+  userId: string, 
+  conversationId: string, 
+  contactName: string, 
+  sessionId: string,
+  defaultColumnId: string | null
+): Promise<string | null> {
+  try {
+    // Check if conversation already has a lead
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('lead_id')
+      .eq('id', conversationId)
+      .single();
+    
+    if (conversation?.lead_id) {
+      console.log(`Conversation ${conversationId} already has lead ${conversation.lead_id}`);
+      return conversation.lead_id;
+    }
+
+    // Find column to use
+    let columnId = defaultColumnId;
+    
+    if (!columnId) {
+      // Try to find a webchat workspace default column
+      const { data: webchatWorkspace } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('user_id', userId)
+        .or('channel_type.eq.webchat,channel_type.eq.all')
+        .limit(1)
+        .single();
+      
+      if (webchatWorkspace) {
+        const { data: defaultColumn } = await supabase
+          .from('lead_columns')
+          .select('id')
+          .eq('workspace_id', webchatWorkspace.id)
+          .eq('is_default', true)
+          .single();
+        
+        if (defaultColumn) {
+          columnId = defaultColumn.id;
+        }
+      }
+      
+      // Fallback: get any default column for the user
+      if (!columnId) {
+        const { data: anyColumn } = await supabase
+          .from('lead_columns')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_default', true)
+          .limit(1)
+          .single();
+        
+        if (anyColumn) {
+          columnId = anyColumn.id;
+        }
+      }
+      
+      // Ultimate fallback: get any column for the user
+      if (!columnId) {
+        const { data: anyColumn } = await supabase
+          .from('lead_columns')
+          .select('id')
+          .eq('user_id', userId)
+          .limit(1)
+          .single();
+        
+        if (anyColumn) {
+          columnId = anyColumn.id;
+        }
+      }
+    }
+
+    if (!columnId) {
+      console.log('No column found for lead creation');
+      return null;
+    }
+
+    // Get max position in column
+    const { data: maxPositionData } = await supabase
+      .from('leads')
+      .select('position')
+      .eq('column_id', columnId)
+      .order('position', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const nextPosition = (maxPositionData?.position ?? -1) + 1;
+
+    // Create the lead
+    const now = new Date().toISOString();
+    const { data: newLead, error: leadError } = await supabase
+      .from('leads')
+      .insert({
+        user_id: userId,
+        column_id: columnId,
+        name: contactName || 'Visitante Web',
+        phone: sessionId, // Use sessionId as phone for webchat
+        position: nextPosition,
+        bot_active: true,
+        last_inbound_message_time: now
+      })
+      .select('id')
+      .single();
+
+    if (leadError) {
+      console.error('Error creating lead:', leadError);
+      return null;
+    }
+
+    console.log(`Created lead ${newLead.id} for webchat conversation ${conversationId}`);
+    return newLead.id;
+  } catch (error) {
+    console.error('Error in getOrCreateLead:', error);
+    return null;
+  }
+}
+
+// Link conversation to lead
+async function linkConversationToLead(supabase: any, conversationId: string, leadId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('conversations')
+      .update({ lead_id: leadId })
+      .eq('id', conversationId);
+    
+    if (error) {
+      console.error('Error linking conversation to lead:', error);
+    } else {
+      console.log(`Linked conversation ${conversationId} to lead ${leadId}`);
+    }
+  } catch (error) {
+    console.error('Error in linkConversationToLead:', error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -213,10 +354,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get webchat config
+    // Get webchat config including workspace and default column
     const { data: webchat, error: webchatError } = await supabase
       .from('web_chatbots')
-      .select('*')
+      .select('*, workspace_id, default_column_id')
       .eq('id', webchatId)
       .eq('is_active', true)
       .single();
@@ -230,7 +371,24 @@ serve(async (req) => {
     }
 
     // Find or create conversation for this session
-    let conversation = await getOrCreateConversation(supabase, webchat.user_id, sessionId, webchat.name);
+    let conversation = await getOrCreateConversation(supabase, webchat.user_id, sessionId, webchat.name, webchat.default_column_id);
+
+    // Create lead and link to conversation if not already linked
+    if (!conversation.lead_id && webchat.default_column_id) {
+      const leadId = await getOrCreateLead(
+        supabase, 
+        webchat.user_id, 
+        conversation.id, 
+        conversation.contact_name || 'Visitante Web',
+        sessionId,
+        webchat.default_column_id
+      );
+      
+      if (leadId) {
+        await linkConversationToLead(supabase, conversation.id, leadId);
+        conversation.lead_id = leadId;
+      }
+    }
 
     // Determine message type
     let messageType = 'text';
@@ -265,9 +423,21 @@ serve(async (req) => {
       .update({
         last_message: messageContent,
         last_message_time: new Date().toISOString(),
+        last_inbound_message_time: new Date().toISOString(),
         unread_count: (conversation.unread_count || 0) + 1
       })
       .eq('id', conversation.id);
+
+    // Update lead last_inbound_message_time if linked
+    if (conversation.lead_id) {
+      await supabase
+        .from('leads')
+        .update({ 
+          last_inbound_message_time: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversation.lead_id);
+    }
 
     console.log(`Webchat message saved for session ${sessionId}`);
 
@@ -429,7 +599,17 @@ serve(async (req) => {
                 "Para completar tu recarga, enviá este comprobante al cajero ↓",
                 cashierLink
               ];
-
+              
+              // Update payment receipt tracking
+              await supabase
+                .from('conversations')
+                .update({ 
+                  payment_receipt_sent: true,
+                  payment_receipt_detected_at: new Date().toISOString()
+                })
+                .eq('id', conversation.id);
+              
+              // Save all messages to DB
               for (const msg of messages) {
                 await supabase.from('messages').insert({
                   conversation_id: conversation.id,
@@ -439,17 +619,14 @@ serve(async (req) => {
                   message_type: 'text',
                   is_bot: true
                 });
-                await new Promise(r => setTimeout(r, 500));
               }
 
-              // Mark payment receipt detected
+              // Update conversation
               await supabase
                 .from('conversations')
                 .update({
                   last_message: messages[messages.length - 1],
-                  last_message_time: new Date().toISOString(),
-                  payment_receipt_sent: true,
-                  payment_receipt_detected_at: new Date().toISOString()
+                  last_message_time: new Date().toISOString()
                 })
                 .eq('id', conversation.id);
 
@@ -460,220 +637,110 @@ serve(async (req) => {
             }
           }
 
-          // Get conversation history
+          // Build conversation history
           const { data: historyMessages } = await supabase
             .from('messages')
-            .select('content, direction')
+            .select('content, direction, created_at')
             .eq('conversation_id', conversation.id)
             .order('created_at', { ascending: true })
             .limit(20);
 
-          const conversationHistory = (historyMessages || []).map(m => ({
-            role: m.direction === 'inbound' ? 'user' : 'assistant',
-            content: m.content
-          }));
-
-          // Build system prompt - AI Agent takes priority
-          let systemPrompt = '';
-          let model = 'google/gemini-2.5-flash';
-          let maxTokens = 500;
-
-          if (aiAgent) {
-            systemPrompt = aiAgent.system_prompt;
-            model = aiAgent.model || model;
-            maxTokens = aiAgent.max_tokens || maxTokens;
-            console.log(`Using AI Agent: ${aiAgent.name}`);
-          } else if (webchatAISettings) {
-            // Use webchat-specific settings with custom prompt
-            systemPrompt = webchatAISettings.system_prompt || DEFAULT_PROMPT;
-            model = webchatAISettings.model || model;
-            maxTokens = webchatAISettings.max_tokens || maxTokens;
-            
-            // Replace placeholders - use values from DB
-            systemPrompt = systemPrompt
-              .replace(/{CBU}/g, webchatAISettings.cbu || 'No configurado')
-              .replace(/{CAJERO}/g, webchatAISettings.cashier_numbers || 'No configurado')
-              .replace(/{CASINO_LINK}/g, webchatAISettings.casino_link || 'https://bet32.fun/');
-            
-            console.log('Using Webchat AI Settings with casino prompt');
-          }
-
-          console.log(`Calling AI with model: ${model}, prompt length: ${systemPrompt.length}`);
-
-          // Detect patterns for CBU/balance requests
-          const lowerMessage = (message || '').toLowerCase();
-          const wantsCBU = lowerMessage.includes('cbu') || 
-                          lowerMessage.includes('cargar') || 
-                          lowerMessage.includes('depositar') ||
-                          lowerMessage.includes('transferir') ||
-                          lowerMessage.includes('fichas');
-
-          // Detect "ya tengo" - user who already has an account
-          const hasExistingAccount = lowerMessage.includes('ya tengo');
-
-          if ((wantsCBU || hasExistingAccount) && webchatAISettings) {
-            // Send CBU info - adapt message based on context
-            const cbuMessages = hasExistingAccount
-              ? [
-                  "¡Genial! Para cargar fichas, transferí al siguiente CBU ↓",
-                  webchatAISettings.cbu || "CBU no configurado",
-                  "Cuando hagas la transferencia, enviame el comprobante acá 👍"
-                ]
-              : [
-                  "Para transferir te dejo el CBU ↓",
-                  webchatAISettings.cbu || "CBU no configurado"
-                ];
-
-            for (const msg of cbuMessages) {
-              await supabase.from('messages').insert({
-                conversation_id: conversation.id,
-                user_id: webchat.user_id,
-                content: msg,
-                direction: 'outbound',
-                message_type: 'text',
-                is_bot: true
-              });
-              await new Promise(r => setTimeout(r, 500));
-            }
-
-            await supabase
-              .from('conversations')
-              .update({
-                last_message: cbuMessages[cbuMessages.length - 1],
-                last_message_time: new Date().toISOString()
-              })
-              .eq('id', conversation.id);
-
-            return new Response(
-              JSON.stringify({ success: true, botReply: cbuMessages.join('\n') }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          // Call Google Gemini API directly
-          // Build contents array with system instruction and conversation
-          const contents = conversationHistory.map((m: any) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
+          const conversationHistory = (historyMessages || []).map((m: any) => ({
+            role: m.direction === 'inbound' ? 'user' : 'model',
             parts: [{ text: m.content }]
           }));
 
-          // Prepare tools for Gemini format
-          const geminiTools = webchatAISettings ? [{
-            function_declarations: casinoTools.map(t => ({
-              name: t.function.name,
-              description: t.function.description,
-              parameters: t.function.parameters
-            }))
-          }] : undefined;
+          // Prepare system prompt with settings
+          let systemPrompt = DEFAULT_PROMPT;
+          
+          // Use AI Agent's prompt if available, otherwise use webchat settings
+          if (aiAgent?.system_prompt) {
+            systemPrompt = aiAgent.system_prompt;
+          } else if (webchatAISettings) {
+            systemPrompt = systemPrompt
+              .replace('{CBU}', webchatAISettings.cbu || 'No configurado')
+              .replace('{CASINO_LINK}', webchatAISettings.casino_link || 'https://bet32.fun/');
+          }
 
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
+          // Add current message to history
+          const userMessage = {
+            role: 'user',
+            parts: [{ text: messageContent }]
+          };
+
+          // Make request with function calling
+          const requestBody: any = {
+            contents: [...conversationHistory, userMessage],
+            systemInstruction: {
+              parts: [{ text: systemPrompt }]
             },
-            body: JSON.stringify({
-              systemInstruction: {
-                parts: [{ text: systemPrompt }]
-              },
-              contents: contents,
-              generationConfig: {
-                maxOutputTokens: maxTokens
-              },
-              tools: geminiTools
-            }),
-          });
+            generationConfig: {
+              temperature: aiAgent?.temperature || 0.7,
+              maxOutputTokens: aiAgent?.max_tokens || 500
+            }
+          };
+
+          // Add tools for casino functions if webchatAISettings is enabled
+          if (webchatAISettings?.is_enabled && !casinoUserAlreadyCreated) {
+            requestBody.tools = casinoTools;
+          }
+
+          console.log(`Making AI request with ${conversationHistory.length} history messages`);
+
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody)
+            }
+          );
 
           if (response.ok) {
             const data = await response.json();
-            const candidate = data.candidates?.[0];
-            const parts = candidate?.content?.parts || [];
-            
-            // Check for function calls (Gemini format)
+            const parts = data.candidates?.[0]?.content?.parts || [];
+
+            // Check for function calls
             const functionCall = parts.find((p: any) => p.functionCall);
-            
-            if (functionCall) {
-              const toolCall = functionCall.functionCall;
-              if (toolCall.name === "crear_jugador") {
-                const args = toolCall.args;
-                
-                // Auto-generate username with date if too short
+            if (functionCall && webchatAISettings) {
+              const { name, args } = functionCall.functionCall;
+              
+              if (name === 'crear_jugador') {
+                // Generate username with date if not provided
                 let username = args.username;
-                if (username && username.length <= 6) {
+                if (!username.match(/\d{6}$/)) {
                   const now = new Date();
                   const dateStr = String(now.getDate()).padStart(2, '0') + 
                                  String(now.getMonth() + 1).padStart(2, '0') + 
                                  String(now.getFullYear()).slice(-2);
                   username = username + dateStr;
-                  console.log(`Auto-generated username: ${username}`);
                 }
                 
-                // ✅ VERIFICACIÓN GLOBAL: Comprobar si username ya existe en alguna conversación
-                const { data: existingUser } = await supabase
-                  .from('conversations')
-                  .select('casino_username')
-                  .eq('casino_username', username)
-                  .maybeSingle();
-                
-                if (existingUser) {
-                  console.log(`Username ${username} already exists globally, skipping creation`);
-                  
-                  const casinoLink = webchatAISettings?.casino_link || 'https://bet32.fun/';
-                  const existingUserMessages = [
-                    `El usuario ${username} ya está registrado 🎰`,
-                    `Si es tuyo, entrá acá → ${casinoLink}`,
-                    `Para cargar fichas, transferí al CBU ↓`,
-                    webchatAISettings?.cbu || "CBU no configurado",
-                    `Cuando hagas la transferencia, enviame el comprobante acá 👍`
-                  ];
-                  
-                  for (const msg of existingUserMessages) {
-                    await supabase.from('messages').insert({
-                      conversation_id: conversation.id,
-                      user_id: webchat.user_id,
-                      content: msg,
-                      direction: 'outbound',
-                      message_type: 'text',
-                      is_bot: true
-                    });
-                    await new Promise(r => setTimeout(r, 500));
-                  }
-                  
-                  await supabase.from('conversations').update({
-                    last_message: existingUserMessages[existingUserMessages.length - 1],
-                    last_message_time: new Date().toISOString()
-                  }).eq('id', conversation.id);
-                  
-                  return new Response(
-                    JSON.stringify({ success: true, botReply: existingUserMessages.join('\n') }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                  );
-                }
-                
-                const password = args.password || "Capibet1234";
+                const password = args.password || 'Capibet1234';
                 const contactName = conversation?.contact_name || "Usuario Web Chat";
+                
                 const result = await crearJugador(username, password, contactName, sessionId);
                 
                 if (result.success) {
-                  // Mark conversation as user created and save username for global duplicate check
+                  // Mark conversation as user created
                   await supabase
                     .from('conversations')
                     .update({ 
                       casino_user_created: true,
-                      casino_username: username  // ✅ Guardar para verificación futura
+                      casino_username: username 
                     })
                     .eq('id', conversation.id);
                   
-                  // Send messages for successful user creation (NO cashier link yet - only after payment proof)
-                  const casinoLink = webchatAISettings?.casino_link || 'https://bet32.fun/';
+                  // Send all success messages
                   const successMessages = [
                     `¡Listo! Usuario: ${username} - Contraseña: ${password}`,
-                    `Entrá acá → ${casinoLink}`,
+                    `Entrá acá → ${webchatAISettings.casino_link || 'https://bet32.fun/'}`,
                     `Para recargar fichas, transferí al CBU ↓`,
-                    webchatAISettings?.cbu || "CBU no configurado",
+                    webchatAISettings.cbu || "CBU no configurado",
                     `Cuando hagas la transferencia, enviame el comprobante acá 👍`
                   ];
                   
-                  console.log(`Sending ${successMessages.length} success messages for user creation`);
+                  console.log(`Sending ${successMessages.length} success messages`);
                   
                   for (const msg of successMessages) {
                     await supabase.from('messages').insert({
@@ -684,9 +751,11 @@ serve(async (req) => {
                       message_type: 'text',
                       is_bot: true
                     });
+                    // Small delay between messages
                     await new Promise(r => setTimeout(r, 500));
                   }
                   
+                  // Update conversation with last message
                   await supabase.from('conversations').update({
                     last_message: successMessages[successMessages.length - 1],
                     last_message_time: new Date().toISOString()
@@ -755,7 +824,13 @@ serve(async (req) => {
   }
 });
 
-async function getOrCreateConversation(supabase: any, userId: string, sessionId: string, chatbotName: string) {
+async function getOrCreateConversation(
+  supabase: any, 
+  userId: string, 
+  sessionId: string, 
+  chatbotName: string,
+  defaultColumnId: string | null
+) {
   // Try to find existing conversation by session ID (stored in phone_number field)
   const { data: existing } = await supabase
     .from('conversations')
@@ -770,6 +845,7 @@ async function getOrCreateConversation(supabase: any, userId: string, sessionId:
   }
 
   // Create new conversation
+  const now = new Date().toISOString();
   const { data: newConv, error } = await supabase
     .from('conversations')
     .insert({
@@ -778,7 +854,8 @@ async function getOrCreateConversation(supabase: any, userId: string, sessionId:
       channel_type: 'webchat',
       contact_name: `Visitante Web - ${chatbotName}`,
       status: 'active',
-      unread_count: 0
+      unread_count: 0,
+      last_inbound_message_time: now
     })
     .select()
     .single();

@@ -713,7 +713,7 @@ const SessionsManager = () => {
         <EditSessionDialog
           open={!!editingSession}
           onClose={() => setEditingSession(null)}
-          sessionType={editingSession.type === 'telegram-bot' ? 'telegram' : editingSession.type === 'webchat' ? 'whatsapp' : editingSession.type}
+          sessionType={editingSession.type === 'telegram-bot' ? 'telegram' : editingSession.type}
           session={{
             id: editingSession.id,
             name: editingSession.name,
