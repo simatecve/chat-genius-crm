@@ -23,7 +23,7 @@ interface LeadColumn {
   workspace_id: string | null;
 }
 
-type SessionType = 'whatsapp' | 'twilio' | 'telegram';
+type SessionType = 'whatsapp' | 'twilio' | 'telegram' | 'webchat';
 
 interface EditSessionDialogProps {
   open: boolean;
@@ -76,7 +76,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
   const fetchN8nWebhookUrl = async () => {
     if (!effectiveUserId) return;
     // Solo WhatsApp y Twilio tienen n8n_webhook_url
-    if (sessionType === 'telegram') return;
+    if (sessionType === 'telegram' || sessionType === 'webchat') return;
     
     const tableName = getTableName();
     const { data } = await supabase
@@ -98,11 +98,20 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
 
   const fetchWorkspaces = async () => {
     if (!effectiveUserId) return;
-    const { data } = await supabase
+    let query = supabase
       .from('workspaces')
-      .select('id, name')
-      .eq('user_id', effectiveUserId)
-      .order('position');
+      .select('id, name, channel_type')
+      .eq('user_id', effectiveUserId);
+    
+    // Filtrar por channel_type según el tipo de sesión
+    if (sessionType === 'webchat') {
+      query = query.or('channel_type.eq.webchat,channel_type.eq.all');
+    } else {
+      // Para WhatsApp, Twilio, Telegram - excluir webchat exclusivo
+      query = query.or('channel_type.is.null,channel_type.neq.webchat');
+    }
+    
+    const { data } = await query.order('position');
     if (data) setWorkspaces(data);
   };
 
@@ -130,27 +139,8 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
 
   const fetchConversationCount = async () => {
     if (!effectiveUserId) return;
-    
-    let tableName: 'whatsapp_connections' | 'twilio_connections' | 'telegram_bots';
-    let connectionField: string;
-    
-    switch (sessionType) {
-      case 'whatsapp':
-        tableName = 'whatsapp_connections';
-        connectionField = 'whatsapp_number';
-        break;
-      case 'twilio':
-        connectionField = 'twilio_connection_id';
-        break;
-      case 'telegram':
-        connectionField = 'telegram_bot_id';
-        break;
-      default:
-        return;
-    }
 
     // Contar conversaciones asociadas a esta sesión
-    let query;
     if (sessionType === 'whatsapp') {
       // Para WAHA, las conversaciones se relacionan por whatsapp_number (nombre de sesión)
       const { data: connectionData } = await supabase
@@ -179,16 +169,26 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
         .select('*', { count: 'exact', head: true })
         .eq('telegram_bot_id', session.id);
       setConversationCount(count || 0);
+    } else if (sessionType === 'webchat') {
+      // Para webchat, contar conversaciones con channel_type = 'webchat' del usuario
+      // No hay un campo específico de webchat_id en conversations, usamos channel_type
+      const { count } = await supabase
+        .from('conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', effectiveUserId)
+        .eq('channel_type', 'webchat');
+      setConversationCount(count || 0);
     }
   };
 
   const workspaceChanged = formData.workspace_id !== originalWorkspaceId;
 
-  const getTableName = (): 'whatsapp_connections' | 'twilio_connections' | 'telegram_bots' => {
+  const getTableName = (): 'whatsapp_connections' | 'twilio_connections' | 'telegram_bots' | 'web_chatbots' => {
     switch (sessionType) {
       case 'whatsapp': return 'whatsapp_connections';
       case 'twilio': return 'twilio_connections';
       case 'telegram': return 'telegram_bots';
+      case 'webchat': return 'web_chatbots';
     }
   };
 
@@ -197,6 +197,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
       case 'whatsapp': return 'name';
       case 'twilio': return 'connection_name';
       case 'telegram': return 'bot_name';
+      case 'webchat': return 'name';
     }
   };
 
@@ -225,7 +226,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
       };
       
       // Solo agregar n8n_webhook_url para WhatsApp y Twilio
-      if (sessionType !== 'telegram') {
+      if (sessionType !== 'telegram' && sessionType !== 'webchat') {
         updateData.n8n_webhook_url = formData.n8n_webhook_url || null;
       }
 
@@ -296,6 +297,12 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
         .from('conversations')
         .select('id, lead_id')
         .eq('telegram_bot_id', session.id);
+    } else if (sessionType === 'webchat') {
+      conversationQuery = supabase
+        .from('conversations')
+        .select('id, lead_id')
+        .eq('user_id', effectiveUserId)
+        .eq('channel_type', 'webchat');
     } else {
       return;
     }
@@ -328,6 +335,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
       case 'whatsapp': return 'WhatsApp';
       case 'twilio': return 'Twilio';
       case 'telegram': return 'Telegram';
+      case 'webchat': return 'Web Chat';
     }
   };
 
@@ -394,7 +402,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
           </div>
 
           {/* Solo mostrar webhook n8n para WhatsApp y Twilio */}
-          {sessionType !== 'telegram' && (
+          {sessionType !== 'telegram' && sessionType !== 'webchat' && (
             <div className="space-y-2">
               <Label htmlFor="n8n_webhook">Webhook n8n (opcional)</Label>
               <Input
