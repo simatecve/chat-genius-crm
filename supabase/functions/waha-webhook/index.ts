@@ -1050,34 +1050,13 @@ serve(async (req) => {
 
     const { event, session, payload: eventPayload } = payload;
 
-    // Procesar evento de cambio de estado de sesión
+    // Ignorar eventos de estado de sesión - solo el botón "Verificar" actualiza estados
+    // Esto evita que estados transitorios (STARTING, SCAN_QR_CODE) marquen sesiones como desconectadas
     if (event === 'session.status') {
-      const sessionName = session;
-      const status = eventPayload?.status;
-
-      if (!sessionName || !status) {
-        console.warn('Invalid session.status event:', payload);
-        return new Response(JSON.stringify({ received: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      console.log(`Session ${sessionName} changed to status: ${status}`);
-
-      // Actualizar estado en la base de datos
-      const { data, error } = await supabase
-        .from('whatsapp_connections')
-        .update({
-          status: status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('name', sessionName);
-
-      if (error) {
-        console.error('Error updating session status:', error);
-      } else {
-        console.log('Session status updated in database');
-      }
+      console.log(`Ignoring session.status event for ${session}: ${eventPayload?.status} (states only updated via Verify button)`);
+      return new Response(JSON.stringify({ received: true, ignored: 'session.status' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Procesar mensajes recibidos - capturar todos los eventos de tipo message
