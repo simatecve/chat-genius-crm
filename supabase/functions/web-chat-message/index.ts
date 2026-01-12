@@ -194,6 +194,115 @@ async function analyzeImageForPaymentReceipt(imageUrl: string): Promise<{ isRece
   }
 }
 
+// Ensure webchat workspace and default column exist for a user
+async function ensureWebchatWorkspaceAndColumn(
+  supabase: any,
+  userId: string
+): Promise<{ workspaceId: string; defaultColumnId: string } | null> {
+  try {
+    console.log(`[ensureWebchatWorkspaceAndColumn] Checking for webchat workspace for user ${userId}`);
+    
+    // Try to find existing webchat workspace
+    let { data: workspace } = await supabase
+      .from('workspaces')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('channel_type', 'webchat')
+      .limit(1)
+      .single();
+    
+    // If no webchat workspace, try to find 'all' type workspace
+    if (!workspace) {
+      const { data: allWorkspace } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('channel_type', 'all')
+        .limit(1)
+        .single();
+      
+      if (allWorkspace) {
+        workspace = allWorkspace;
+      }
+    }
+    
+    // If still no workspace, create a webchat workspace
+    if (!workspace) {
+      console.log(`[ensureWebchatWorkspaceAndColumn] Creating webchat workspace for user ${userId}`);
+      const { data: newWorkspace, error: wsError } = await supabase
+        .from('workspaces')
+        .insert({
+          user_id: userId,
+          name: 'Web Chat',
+          channel_type: 'webchat'
+        })
+        .select('id')
+        .single();
+      
+      if (wsError) {
+        console.error('[ensureWebchatWorkspaceAndColumn] Error creating workspace:', wsError);
+        return null;
+      }
+      workspace = newWorkspace;
+      console.log(`[ensureWebchatWorkspaceAndColumn] Created workspace ${workspace.id}`);
+    }
+    
+    // Now find or create default column in this workspace
+    let { data: defaultColumn } = await supabase
+      .from('lead_columns')
+      .select('id')
+      .eq('workspace_id', workspace.id)
+      .eq('is_default', true)
+      .limit(1)
+      .single();
+    
+    // If no default column, find any column in workspace
+    if (!defaultColumn) {
+      const { data: anyColumn } = await supabase
+        .from('lead_columns')
+        .select('id')
+        .eq('workspace_id', workspace.id)
+        .order('position', { ascending: true })
+        .limit(1)
+        .single();
+      
+      if (anyColumn) {
+        defaultColumn = anyColumn;
+      }
+    }
+    
+    // If still no column, create one
+    if (!defaultColumn) {
+      console.log(`[ensureWebchatWorkspaceAndColumn] Creating default column for workspace ${workspace.id}`);
+      const { data: newColumn, error: colError } = await supabase
+        .from('lead_columns')
+        .insert({
+          user_id: userId,
+          workspace_id: workspace.id,
+          name: 'Nuevos',
+          position: 0,
+          is_default: true,
+          color: '#3B82F6'
+        })
+        .select('id')
+        .single();
+      
+      if (colError) {
+        console.error('[ensureWebchatWorkspaceAndColumn] Error creating column:', colError);
+        return null;
+      }
+      defaultColumn = newColumn;
+      console.log(`[ensureWebchatWorkspaceAndColumn] Created column ${defaultColumn.id}`);
+    }
+    
+    console.log(`[ensureWebchatWorkspaceAndColumn] Using workspace ${workspace.id}, column ${defaultColumn.id}`);
+    return { workspaceId: workspace.id, defaultColumnId: defaultColumn.id };
+  } catch (error) {
+    console.error('[ensureWebchatWorkspaceAndColumn] Error:', error);
+    return null;
+  }
+}
+
 // Get or create a lead for webchat conversation
 async function getOrCreateLead(
   supabase: any, 
@@ -220,60 +329,15 @@ async function getOrCreateLead(
     let columnId = defaultColumnId;
     
     if (!columnId) {
-      // Try to find a webchat workspace default column
-      const { data: webchatWorkspace } = await supabase
-        .from('workspaces')
-        .select('id')
-        .eq('user_id', userId)
-        .or('channel_type.eq.webchat,channel_type.eq.all')
-        .limit(1)
-        .single();
-      
-      if (webchatWorkspace) {
-        const { data: defaultColumn } = await supabase
-          .from('lead_columns')
-          .select('id')
-          .eq('workspace_id', webchatWorkspace.id)
-          .eq('is_default', true)
-          .single();
-        
-        if (defaultColumn) {
-          columnId = defaultColumn.id;
-        }
-      }
-      
-      // Fallback: get any default column for the user
-      if (!columnId) {
-        const { data: anyColumn } = await supabase
-          .from('lead_columns')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('is_default', true)
-          .limit(1)
-          .single();
-        
-        if (anyColumn) {
-          columnId = anyColumn.id;
-        }
-      }
-      
-      // Ultimate fallback: get any column for the user
-      if (!columnId) {
-        const { data: anyColumn } = await supabase
-          .from('lead_columns')
-          .select('id')
-          .eq('user_id', userId)
-          .limit(1)
-          .single();
-        
-        if (anyColumn) {
-          columnId = anyColumn.id;
-        }
+      // Use ensureWebchatWorkspaceAndColumn to get/create workspace and column
+      const config = await ensureWebchatWorkspaceAndColumn(supabase, userId);
+      if (config) {
+        columnId = config.defaultColumnId;
       }
     }
 
     if (!columnId) {
-      console.log('No column found for lead creation');
+      console.log('[getOrCreateLead] No column found for lead creation');
       return null;
     }
 
@@ -305,14 +369,14 @@ async function getOrCreateLead(
       .single();
 
     if (leadError) {
-      console.error('Error creating lead:', leadError);
+      console.error('[getOrCreateLead] Error creating lead:', leadError);
       return null;
     }
 
-    console.log(`Created lead ${newLead.id} for webchat conversation ${conversationId}`);
+    console.log(`[getOrCreateLead] Created lead ${newLead.id} in column ${columnId} for webchat conversation ${conversationId}`);
     return newLead.id;
   } catch (error) {
-    console.error('Error in getOrCreateLead:', error);
+    console.error('[getOrCreateLead] Error:', error);
     return null;
   }
 }
@@ -326,12 +390,12 @@ async function linkConversationToLead(supabase: any, conversationId: string, lea
       .eq('id', conversationId);
     
     if (error) {
-      console.error('Error linking conversation to lead:', error);
+      console.error('[linkConversationToLead] Error:', error);
     } else {
-      console.log(`Linked conversation ${conversationId} to lead ${leadId}`);
+      console.log(`[linkConversationToLead] Linked conversation ${conversationId} to lead ${leadId}`);
     }
   } catch (error) {
-    console.error('Error in linkConversationToLead:', error);
+    console.error('[linkConversationToLead] Error:', error);
   }
 }
 
@@ -370,23 +434,52 @@ serve(async (req) => {
       );
     }
 
-    // Find or create conversation for this session
-    let conversation = await getOrCreateConversation(supabase, webchat.user_id, sessionId, webchat.name, webchat.default_column_id);
+    // Auto-configure workspace and column if not set on webchat
+    let effectiveDefaultColumnId = webchat.default_column_id;
+    let effectiveWorkspaceId = webchat.workspace_id;
+    
+    if (!effectiveDefaultColumnId || !effectiveWorkspaceId) {
+      console.log(`[web-chat-message] Webchat ${webchatId} missing workspace/column config, auto-configuring...`);
+      const config = await ensureWebchatWorkspaceAndColumn(supabase, webchat.user_id);
+      
+      if (config) {
+        effectiveDefaultColumnId = config.defaultColumnId;
+        effectiveWorkspaceId = config.workspaceId;
+        
+        // Update webchat with the new config for future use
+        await supabase
+          .from('web_chatbots')
+          .update({
+            workspace_id: config.workspaceId,
+            default_column_id: config.defaultColumnId
+          })
+          .eq('id', webchatId);
+        
+        console.log(`[web-chat-message] Auto-configured webchat ${webchatId} with workspace ${config.workspaceId}, column ${config.defaultColumnId}`);
+      }
+    }
 
-    // Create lead and link to conversation if not already linked
-    if (!conversation.lead_id && webchat.default_column_id) {
+    // Find or create conversation for this session
+    let conversation = await getOrCreateConversation(supabase, webchat.user_id, sessionId, webchat.name, effectiveDefaultColumnId);
+
+    // Create lead and link to conversation if not already linked - ALWAYS try to create lead
+    if (!conversation.lead_id) {
+      console.log(`[web-chat-message] Conversation ${conversation.id} has no lead, creating...`);
       const leadId = await getOrCreateLead(
         supabase, 
         webchat.user_id, 
         conversation.id, 
         conversation.contact_name || 'Visitante Web',
         sessionId,
-        webchat.default_column_id
+        effectiveDefaultColumnId
       );
       
       if (leadId) {
         await linkConversationToLead(supabase, conversation.id, leadId);
         conversation.lead_id = leadId;
+        console.log(`[web-chat-message] Lead ${leadId} created and linked to conversation ${conversation.id}`);
+      } else {
+        console.log(`[web-chat-message] Failed to create lead for conversation ${conversation.id}`);
       }
     }
 
