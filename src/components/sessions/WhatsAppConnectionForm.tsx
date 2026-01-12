@@ -206,7 +206,8 @@ const WhatsAppConnectionForm = ({ onClose }: WhatsAppConnectionFormProps) => {
       const { data, error } = await supabase.functions.invoke('waha-session-status', {
         body: { 
           session_name: currentSession,
-          connection_id: currentConnectionId 
+          connection_id: currentConnectionId,
+          update_db: true // Solo verificación manual actualiza BD
         }
       });
 

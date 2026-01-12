@@ -75,7 +75,8 @@ serve(async (req) => {
           webhooks: [
             {
               url: webhookUrl,
-              events: ['session.status', 'message', 'message.any'],
+              // Removido 'session.status' - solo el botón Verificar actualiza estados
+              events: ['message', 'message.any'],
               hmac: null,
               retries: null,
               customHeaders: null

@@ -315,7 +315,8 @@ const SessionsManager = () => {
       const { data, error } = await supabase.functions.invoke('waha-session-status', {
         body: { 
           session_name: session.name,
-          connection_id: session.id 
+          connection_id: session.id,
+          update_db: true // Solo el botón Verificar actualiza el estado en BD
         }
       });
 
