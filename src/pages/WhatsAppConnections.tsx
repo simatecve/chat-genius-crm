@@ -240,7 +240,8 @@ const WhatsAppConnections = () => {
         body: {
           session_name: currentSession,
           connection_id: connection?.id,
-          user_id: effectiveUserId
+          user_id: effectiveUserId,
+          update_db: true // Solo verificación manual actualiza BD
         }
       });
 
@@ -442,7 +443,8 @@ const WhatsAppConnections = () => {
         body: {
           session_name: sessionName,
           connection_id: connectionId,
-          user_id: effectiveUserId
+          user_id: effectiveUserId,
+          update_db: true // Solo verificación manual actualiza BD
         }
       });
 

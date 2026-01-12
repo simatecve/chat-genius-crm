@@ -103,8 +103,16 @@ serve(async (req) => {
     console.log('All credentials configured correctly');
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { session_name, connection_id } = await req.json();
-    console.log('Checking status for session:', session_name);
+    const { session_name, connection_id, update_db = false } = await req.json();
+    
+    // Log de auditoría para rastrear quién llama a esta función
+    console.log('waha-session-status audit:', {
+      session_name,
+      connection_id,
+      update_db,
+      hasAuth: !!req.headers.get('authorization'),
+      userAgent: req.headers.get('user-agent')?.substring(0, 100)
+    });
 
     if (!session_name) {
       throw new Error('session_name is required');
@@ -121,8 +129,8 @@ serve(async (req) => {
     if (!found || !sessionData) {
       console.log(`Session "${session_name}" not found in WAHA`);
       
-      // Actualizar estado en la base de datos a disconnected
-      if (connection_id) {
+      // Solo actualizar BD si update_db es true (verificación manual)
+      if (connection_id && update_db) {
         const { error: updateError } = await supabase
           .from('whatsapp_connections')
           .update({
@@ -134,8 +142,10 @@ serve(async (req) => {
         if (updateError) {
           console.error('Database update error:', updateError);
         } else {
-          console.log(`Database updated: connection ${connection_id} set to "disconnected"`);
+          console.log(`Database updated (manual verify): connection ${connection_id} set to "disconnected"`);
         }
+      } else {
+        console.log(`Skipping DB update: update_db=${update_db}, connection_id=${connection_id}`);
       }
 
       return new Response(
@@ -160,19 +170,24 @@ serve(async (req) => {
     const phoneNumber = sessionData.me?.id ? sessionData.me.id.split('@')[0] : null;
 
     // Normalizar el estado de WAHA a nuestros estados internos
+    // IMPORTANTE: STARTING es transitorio, NO marcar como disconnected
     let normalizedStatus = 'unknown';
     if (wahaStatus === 'WORKING') {
       normalizedStatus = 'connected';
     } else if (wahaStatus === 'SCAN_QR_CODE') {
       normalizedStatus = 'pending_qr';
-    } else if (['STARTING', 'STOPPED', 'FAILED'].includes(wahaStatus)) {
+    } else if (wahaStatus === 'STARTING') {
+      // STARTING es transitorio, mantener como connected para no afectar UI
+      normalizedStatus = 'connected';
+      console.log('STARTING status detected - treating as connected (transient state)');
+    } else if (['STOPPED', 'FAILED'].includes(wahaStatus)) {
       normalizedStatus = 'disconnected';
     }
 
     console.log(`WAHA status "${wahaStatus}" normalized to "${normalizedStatus}"`);
 
-    // Actualizar estado en la base de datos
-    if (connection_id) {
+    // Solo actualizar BD si update_db es true (verificación manual del usuario)
+    if (connection_id && update_db) {
       const updateData: any = {
         status: normalizedStatus,
         updated_at: new Date().toISOString(),
@@ -190,8 +205,10 @@ serve(async (req) => {
       if (updateError) {
         console.error('Database update error:', updateError);
       } else {
-        console.log(`Database updated: connection ${connection_id} set to "${normalizedStatus}"`);
+        console.log(`Database updated (manual verify): connection ${connection_id} set to "${normalizedStatus}"`);
       }
+    } else {
+      console.log(`Skipping DB update: update_db=${update_db}, connection_id=${connection_id}`);
     }
 
     return new Response(
