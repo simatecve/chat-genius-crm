@@ -129,6 +129,41 @@ class EmbudoServices {
     }
 
     /**
+     * Actualiza las posiciones de múltiples embudos en batch
+     */
+    async updateEmbudoPositions(updates: { id: string; position: number }[]): Promise<{ success: boolean; error?: string }> {
+        try {
+            // Usar Promise.all para actualizar todas las posiciones en paralelo
+            const updatePromises = updates.map(update =>
+                supabase
+                    .from('lead_columns')
+                    .update({ position: update.position })
+                    .eq('id', update.id)
+            );
+
+            const results = await Promise.all(updatePromises);
+            
+            // Verificar si hubo algún error
+            const errorResult = results.find(r => r.error);
+            if (errorResult?.error) {
+                console.error('Error al actualizar posiciones:', errorResult.error);
+                return {
+                    success: false,
+                    error: errorResult.error.message
+                };
+            }
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error al actualizar posiciones:', error);
+            return {
+                success: false,
+                error: 'Error de conexión al actualizar posiciones'
+            };
+        }
+    }
+
+    /**
      * Elimina una columna (embudo)
      */
     async deleteEmbudo(id: string): Promise<{ success: boolean; error?: string }> {

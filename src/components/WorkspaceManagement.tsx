@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Briefcase } from 'lucide-react';
+import { Plus, Edit, Trash2, Briefcase, GripVertical } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
+import { embudoServices } from '@/services/embudoServices';
 
 type Workspace = Tables<'workspaces'> & { channel_type?: string };
 type LeadColumn = Tables<'lead_columns'>;
@@ -301,7 +303,57 @@ const WorkspaceManagement = () => {
   };
 
   const getWorkspaceColumns = (workspaceId: string) => {
-    return columns.filter(col => col.workspace_id === workspaceId);
+    return columns
+      .filter(col => col.workspace_id === workspaceId)
+      .sort((a, b) => a.position - b.position);
+  };
+
+  const handleDragEnd = async (result: DropResult, workspaceId: string) => {
+    const { destination, source } = result;
+
+    // Si no hay destino o no se movió, salir
+    if (!destination) return;
+    if (destination.index === source.index) return;
+
+    // Obtener las columnas del workspace actual
+    const workspaceColumns = getWorkspaceColumns(workspaceId);
+    
+    // Reordenar el array localmente
+    const reorderedColumns = Array.from(workspaceColumns);
+    const [movedColumn] = reorderedColumns.splice(source.index, 1);
+    reorderedColumns.splice(destination.index, 0, movedColumn);
+
+    // Actualizar posiciones
+    const updates = reorderedColumns.map((col, index) => ({
+      id: col.id,
+      position: index
+    }));
+
+    // Actualización optimista del estado local
+    const updatedColumns = columns.map(col => {
+      const update = updates.find(u => u.id === col.id);
+      return update ? { ...col, position: update.position } : col;
+    });
+    setColumns(updatedColumns);
+
+    // Persistir en la base de datos
+    const result2 = await embudoServices.updateEmbudoPositions(updates);
+    
+    if (!result2.success) {
+      // Revertir si hay error
+      await loadColumns();
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el orden de los embudos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    toast({
+      title: "Orden actualizado",
+      description: "Los embudos se han reordenado correctamente"
+    });
   };
 
   if (loading) {
@@ -380,59 +432,83 @@ const WorkspaceManagement = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {getWorkspaceColumns(workspace.id).map((column, index) => (
-                    <Card 
-                      key={column.id} 
-                      className="border-2 cursor-pointer hover:border-primary transition-colors"
-                      style={{ borderColor: column.color || '#3b82f6' }}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <div className="flex flex-col">
-                              <span className="text-muted-foreground text-xs">●</span>
-                              <span className="text-muted-foreground text-xs">●</span>
-                              <span className="text-muted-foreground text-xs">●</span>
-                            </div>
-                            <div>
-                              <p className="text-lg font-bold">{index + 1}</p>
-                              <p className="text-sm font-medium">{column.name}</p>
-                            </div>
-                          </div>
-                          <div className="flex space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => openEditColumnDialog(column)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleDeleteColumn(column.id)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  <Card 
-                    className="border-2 border-dashed border-border/50 cursor-pointer hover:border-primary transition-colors"
-                    onClick={() => openCreateColumnDialog(workspace.id)}
-                  >
-                    <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[100px]">
-                      <Plus className="h-8 w-8 text-orange-500 mb-2" />
-                      <p className="text-sm font-medium text-muted-foreground">Agregar Embudo</p>
-                    </CardContent>
-                  </Card>
-                </div>
+                <DragDropContext onDragEnd={(result) => handleDragEnd(result, workspace.id)}>
+                  <Droppable droppableId={`workspace-${workspace.id}`} direction="horizontal">
+                    {(provided, snapshot) => (
+                      <div 
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex flex-wrap gap-4 ${snapshot.isDraggingOver ? 'bg-primary/5 rounded-lg p-2' : ''}`}
+                      >
+                        {getWorkspaceColumns(workspace.id).map((column, index) => (
+                          <Draggable key={column.id} draggableId={column.id} index={index}>
+                            {(provided, snapshot) => (
+                              <Card 
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                className={`border-2 w-[200px] transition-all ${
+                                  snapshot.isDragging 
+                                    ? 'shadow-xl scale-105 rotate-2' 
+                                    : 'hover:border-primary'
+                                }`}
+                                style={{ 
+                                  borderColor: column.color || '#3b82f6',
+                                  ...provided.draggableProps.style 
+                                }}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center space-x-2">
+                                      <div 
+                                        {...provided.dragHandleProps}
+                                        className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+                                      >
+                                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                      </div>
+                                      <div>
+                                        <p className="text-lg font-bold">{index + 1}</p>
+                                        <p className="text-sm font-medium">{column.name}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex space-x-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => openEditColumnDialog(column)}
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => handleDeleteColumn(column.id)}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        
+                        <Card 
+                          className="border-2 border-dashed border-border/50 cursor-pointer hover:border-primary transition-colors w-[200px]"
+                          onClick={() => openCreateColumnDialog(workspace.id)}
+                        >
+                          <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[100px]">
+                            <Plus className="h-8 w-8 text-orange-500 mb-2" />
+                            <p className="text-sm font-medium text-muted-foreground">Agregar Embudo</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
               </CardContent>
             </Card>
           ))}
