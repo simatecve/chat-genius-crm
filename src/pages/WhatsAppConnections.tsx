@@ -247,7 +247,7 @@ const WhatsAppConnections = () => {
 
       if (error) throw error;
       
-      if (data?.status === 'WORKING') {
+      if (data?.status === 'connected') {
         setQrModalOpen(false);
         setQrImage(null);
         setCurrentSession('');
@@ -452,12 +452,8 @@ const WhatsAppConnections = () => {
 
       await fetchConnections();
 
-      let displayStatus = 'disconnected';
-      if (data.status === 'WORKING') {
-        displayStatus = 'connected';
-      } else if (data.status === 'SCAN_QR_CODE' || data.status === 'STARTING') {
-        displayStatus = 'pending';
-      }
+      // El edge function ya devuelve estados normalizados: connected, disconnected, pending_qr
+      const displayStatus = data.status || 'disconnected';
 
       toast({
         title: "Estado actualizado",
