@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
-import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare, Loader2 } from 'lucide-react';
+import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare, Loader2, Phone } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -276,11 +276,25 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           
           <div className="flex-1">
             <h2 className="font-medium">
-              {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
+              {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.phone_number) : conversation.phone_number)}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number}
+              {isCajero ? maskPhoneNumber(conversation.phone_number) : conversation.phone_number}
             </p>
+            {/* Mostrar sesión Twilio si aplica */}
+            {conversation.channel_type === 'twilio' && (() => {
+              const currentTwilioConnection = twilioConnections.find(
+                conn => conn.id === conversation.twilio_connection_id
+              );
+              return currentTwilioConnection ? (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Phone className="h-3 w-3 text-red-500" />
+                  <span className="text-xs text-red-500">
+                    {currentTwilioConnection.connection_name} • {currentTwilioConnection.phone_number}
+                  </span>
+                </div>
+              ) : null;
+            })()}
           </div>
           
           <div className="flex items-center gap-2">
