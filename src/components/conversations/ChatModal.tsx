@@ -61,6 +61,30 @@ export default function ChatModal({
             }
         }
     }, [conversation?.id, activeConnections, isSessionActiveByPhone, getSessionNameByPhone, onWhatsAppSessionChange]);
+
+    // Auto-seleccionar conexión Twilio cuando cambia la conversación
+    useEffect(() => {
+        if (conversation && conversation.channel_type === 'twilio') {
+            // Solo inicializar si es una conversación diferente
+            if (initializedConversationIdRef.current !== conversation.id) {
+                initializedConversationIdRef.current = conversation.id;
+                
+                let connectionId: string | null = null;
+                
+                // Prioridad 1: Conexión original de la conversación si está activa
+                if (conversation.twilio_connection_id && isConnectionActive(conversation.twilio_connection_id)) {
+                    connectionId = conversation.twilio_connection_id;
+                } 
+                // Prioridad 2: Primera conexión activa (fallback)
+                else if (twilioConnections.length > 0) {
+                    const activeConn = twilioConnections.find(c => c.status === 'active');
+                    connectionId = activeConn?.id || null;
+                }
+                
+                setSelectedTwilioConnection(connectionId);
+            }
+        }
+    }, [conversation?.id, twilioConnections, isConnectionActive]);
     
     // Resetear el ref cuando se cierra el modal
     useEffect(() => {
