@@ -161,23 +161,19 @@ const Leads = () => {
         return;
       }
 
-      // Si es Twilio
+      // Si es Twilio - usar la conexión original de la conversación
       if (channelType === 'twilio') {
-        let twilioConnectionId = selectedConversation.twilio_connection_id;
+        const twilioConnectionId = selectedConversation.twilio_connection_id;
+        
         if (!twilioConnectionId) {
-          const {
-            data: twilioConnection
-          } = await supabase.from('twilio_connections').select('id').eq('user_id', effectiveUserId).eq('status', 'active').limit(1).single();
-          if (!twilioConnection) {
-            toast({
-              title: "Error",
-              description: "No se encontró una conexión activa de Twilio",
-              variant: "destructive"
-            });
-            return;
-          }
-          twilioConnectionId = twilioConnection.id;
+          toast({
+            title: "Error",
+            description: "Esta conversación no tiene una conexión Twilio asignada. La sesión original puede haber sido eliminada.",
+            variant: "destructive"
+          });
+          return;
         }
+        
         await sendMessage({
           conversationId: selectedConversation.id,
           userId: effectiveUserId,
