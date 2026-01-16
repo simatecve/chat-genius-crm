@@ -618,8 +618,19 @@ const Leads = () => {
       .or('channel_type.neq.webchat,channel_type.is.null');
     
     // Aplicar filtro por conexiones si el workspace tiene channel_type específico
-    if (wsChannelType === 'twilio' && connectionIds.length > 0) {
-      orphanQuery = orphanQuery.in('twilio_connection_id', connectionIds);
+    if (wsChannelType === 'twilio') {
+      if (connectionIds.length > 0) {
+        // Incluir conexiones activas del workspace O conexiones eliminadas (NULL)
+        // para mantener visibles las conversaciones de sesiones eliminadas
+        orphanQuery = orphanQuery.or(
+          `twilio_connection_id.in.(${connectionIds.join(',')}),twilio_connection_id.is.null`
+        );
+        orphanQuery = orphanQuery.eq('channel_type', 'twilio');
+      } else {
+        // Si no hay conexiones activas, solo mostrar las de conexiones eliminadas
+        orphanQuery = orphanQuery.is('twilio_connection_id', null)
+          .eq('channel_type', 'twilio');
+      }
     } else if (wsChannelType === 'telegram' && connectionIds.length > 0) {
       orphanQuery = orphanQuery.in('telegram_bot_id', connectionIds);
     } else if (wsChannelType === 'whatsapp') {
