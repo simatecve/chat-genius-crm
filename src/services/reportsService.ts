@@ -37,6 +37,99 @@ export interface HourlyStats {
   received: number;
 }
 
+export interface SessionCounts {
+  whatsapp: number;
+  twilio: number;
+  telegram: number;
+  webchat: number;
+}
+
+// Get all session counts for all channel types (for badges)
+export const getAllSessionCounts = async (userId: string): Promise<SessionCounts> => {
+  const [whatsappResult, twilioResult, telegramResult, webchatResult] = await Promise.all([
+    // WhatsApp WAHA connections count
+    supabase
+      .from('whatsapp_connections')
+      .select('id', { count: 'exact', head: true }),
+    
+    // Twilio connections count
+    supabase
+      .from('twilio_connections')
+      .select('id', { count: 'exact', head: true }),
+    
+    // Telegram bots count
+    supabase
+      .from('telegram_bots')
+      .select('id', { count: 'exact', head: true }),
+    
+    // Web chatbots count
+    supabase
+      .from('web_chatbots')
+      .select('id', { count: 'exact', head: true })
+  ]);
+
+  return {
+    whatsapp: whatsappResult.count || 0,
+    twilio: twilioResult.count || 0,
+    telegram: telegramResult.count || 0,
+    webchat: webchatResult.count || 0
+  };
+};
+
+// Helper function to get conversation IDs for a session
+const getConversationIdsForSession = async (
+  sessionId: string,
+  channelType: ChannelType
+): Promise<string[]> => {
+  if (channelType === 'whatsapp') {
+    // Get phone number from connection
+    const { data: waConn } = await supabase
+      .from('whatsapp_connections')
+      .select('phone_number')
+      .eq('id', sessionId)
+      .single();
+    
+    if (waConn?.phone_number) {
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('whatsapp_number', waConn.phone_number)
+        .eq('channel_type', 'whatsapp');
+
+      return conversations?.map(c => c.id) || [];
+    }
+    return [];
+  }
+
+  if (channelType === 'webchat') {
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('channel_type', 'webchat');
+    
+    return conversations?.map(c => c.id) || [];
+  }
+
+  // Twilio and Telegram
+  let conversationFilter: Record<string, string> = {};
+
+  switch (channelType) {
+    case 'twilio':
+      conversationFilter = { twilio_connection_id: sessionId };
+      break;
+    case 'telegram':
+      conversationFilter = { telegram_bot_id: sessionId };
+      break;
+  }
+
+  const { data: conversations } = await supabase
+    .from('conversations')
+    .select('id')
+    .match(conversationFilter);
+
+  return conversations?.map(c => c.id) || [];
+};
+
 // Get sessions by channel type
 export const getSessionsByChannelType = async (
   userId: string,
@@ -45,21 +138,17 @@ export const getSessionsByChannelType = async (
   switch (channelType) {
     case 'whatsapp': {
       const { data, error } = await supabase
-        .from('conversations')
-        .select('whatsapp_number')
-        .eq('channel_type', 'whatsapp')
-        .not('whatsapp_number', 'is', null)
-        .order('last_message_time', { ascending: false });
+        .from('whatsapp_connections')
+        .select('id, name, phone_number, status')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get unique whatsapp numbers
-      const uniqueNumbers = [...new Set(data?.map(c => c.whatsapp_number).filter(Boolean))];
-      return uniqueNumbers.map(num => ({
-        id: num as string,
-        name: `WhatsApp ${num}`,
-        phoneNumber: num as string,
-        status: 'active',
+      return (data || []).map(conn => ({
+        id: conn.id,
+        name: conn.name || `WhatsApp ${conn.phone_number || ''}`,
+        phoneNumber: conn.phone_number || undefined,
+        status: conn.status || 'active',
         channelType: 'whatsapp'
       }));
     }
@@ -97,18 +186,16 @@ export const getSessionsByChannelType = async (
     }
     case 'webchat': {
       const { data, error } = await supabase
-        .from('landing_chat_conversations')
-        .select('id, visitor_name, status')
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .from('web_chatbots')
+        .select('id, name, is_active')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // For webchat, we group by unique conversation
-      return (data || []).map(conv => ({
-        id: conv.id,
-        name: conv.visitor_name || 'Visitante',
-        status: conv.status || 'active',
+      return (data || []).map(chatbot => ({
+        id: chatbot.id,
+        name: chatbot.name,
+        status: chatbot.is_active ? 'active' : 'inactive',
         channelType: 'webchat'
       }));
     }
@@ -133,56 +220,56 @@ export const getSessionStats = async (
   prevStartDate.setDate(prevStartDate.getDate() - daysDiff);
   const prevEndDate = new Date(dateRange.startDate);
 
-  let conversationFilter: Record<string, string> = {};
+  let conversationIds: string[] = [];
 
-  switch (channelType) {
-    case 'whatsapp':
-      conversationFilter = { whatsapp_number: sessionId };
-      break;
-    case 'twilio':
-      conversationFilter = { twilio_connection_id: sessionId };
-      break;
-    case 'telegram':
-      conversationFilter = { telegram_bot_id: sessionId };
-      break;
+  // For WhatsApp, we need to get the phone number from the connection first
+  if (channelType === 'whatsapp') {
+    const { data: waConn } = await supabase
+      .from('whatsapp_connections')
+      .select('phone_number')
+      .eq('id', sessionId)
+      .single();
+    
+    if (waConn?.phone_number) {
+      const { data: conversations, error: convError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('whatsapp_number', waConn.phone_number)
+        .eq('channel_type', 'whatsapp');
+
+      if (convError) throw convError;
+      conversationIds = conversations?.map(c => c.id) || [];
+    }
+  } else if (channelType === 'webchat') {
+    // Webchat - get conversations for this web chatbot
+    const { data: conversations, error: convError } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('channel_type', 'webchat');
+    
+    if (convError) throw convError;
+    conversationIds = conversations?.map(c => c.id) || [];
+  } else {
+    // Twilio and Telegram
+    let conversationFilter: Record<string, string> = {};
+
+    switch (channelType) {
+      case 'twilio':
+        conversationFilter = { twilio_connection_id: sessionId };
+        break;
+      case 'telegram':
+        conversationFilter = { telegram_bot_id: sessionId };
+        break;
+    }
+
+    const { data: conversations, error: convError } = await supabase
+      .from('conversations')
+      .select('id')
+      .match(conversationFilter);
+
+    if (convError) throw convError;
+    conversationIds = conversations?.map(c => c.id) || [];
   }
-
-  if (channelType === 'webchat') {
-    // Webchat uses separate tables
-    const { data: messages, error } = await supabase
-      .from('landing_chat_messages')
-      .select('direction, created_at')
-      .eq('conversation_id', sessionId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
-
-    if (error) throw error;
-
-    const sent = messages?.filter(m => m.direction === 'outbound').length || 0;
-    const received = messages?.filter(m => m.direction === 'inbound').length || 0;
-    const lastMessage = messages?.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )[0];
-
-    return {
-      totalSent: sent,
-      totalReceived: received,
-      totalConversations: 1,
-      lastMessageAt: lastMessage?.created_at || null,
-      sentChange: 0,
-      receivedChange: 0
-    };
-  }
-
-  // Get conversations for this session
-  const { data: conversations, error: convError } = await supabase
-    .from('conversations')
-    .select('id')
-    .match(conversationFilter);
-
-  if (convError) throw convError;
-
-  const conversationIds = conversations?.map(c => c.id) || [];
 
   if (conversationIds.length === 0) {
     return {
@@ -246,43 +333,7 @@ export const getMessagesByDate = async (
   const startDate = dateRange.startDate.toISOString();
   const endDate = dateRange.endDate.toISOString();
 
-  let conversationFilter: Record<string, string> = {};
-
-  switch (channelType) {
-    case 'whatsapp':
-      conversationFilter = { whatsapp_number: sessionId };
-      break;
-    case 'twilio':
-      conversationFilter = { twilio_connection_id: sessionId };
-      break;
-    case 'telegram':
-      conversationFilter = { telegram_bot_id: sessionId };
-      break;
-  }
-
-  if (channelType === 'webchat') {
-    const { data: messages, error } = await supabase
-      .from('landing_chat_messages')
-      .select('direction, created_at')
-      .eq('conversation_id', sessionId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-
-    return aggregateMessagesByDate(messages || []);
-  }
-
-  // Get conversations for this session
-  const { data: conversations, error: convError } = await supabase
-    .from('conversations')
-    .select('id')
-    .match(conversationFilter);
-
-  if (convError) throw convError;
-
-  const conversationIds = conversations?.map(c => c.id) || [];
+  const conversationIds = await getConversationIdsForSession(sessionId, channelType);
 
   if (conversationIds.length === 0) {
     return [];
@@ -311,42 +362,7 @@ export const getHourlyStats = async (
   const startDate = dateRange.startDate.toISOString();
   const endDate = dateRange.endDate.toISOString();
 
-  let conversationFilter: Record<string, string> = {};
-
-  switch (channelType) {
-    case 'whatsapp':
-      conversationFilter = { whatsapp_number: sessionId };
-      break;
-    case 'twilio':
-      conversationFilter = { twilio_connection_id: sessionId };
-      break;
-    case 'telegram':
-      conversationFilter = { telegram_bot_id: sessionId };
-      break;
-  }
-
-  if (channelType === 'webchat') {
-    const { data: messages, error } = await supabase
-      .from('landing_chat_messages')
-      .select('direction, created_at')
-      .eq('conversation_id', sessionId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
-
-    if (error) throw error;
-
-    return aggregateMessagesByHour(messages || []);
-  }
-
-  // Get conversations for this session
-  const { data: conversations, error: convError } = await supabase
-    .from('conversations')
-    .select('id')
-    .match(conversationFilter);
-
-  if (convError) throw convError;
-
-  const conversationIds = conversations?.map(c => c.id) || [];
+  const conversationIds = await getConversationIdsForSession(sessionId, channelType);
 
   if (conversationIds.length === 0) {
     return [];
