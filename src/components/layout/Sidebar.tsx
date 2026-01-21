@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare, Globe } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare, Globe, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
@@ -56,6 +56,7 @@ export const Sidebar = () => {
     '/listas-contactos': 'puede_ver_contactos',
     '/asistente-ia': 'puede_ver_configuracion',
     '/ventas': 'puede_ver_ventas',
+    '/reportes': 'puede_ver_dashboard',
     '/configuracion': 'puede_ver_configuracion',
   };
 
@@ -66,6 +67,11 @@ export const Sidebar = () => {
       label: 'Panel Principal',
       icon: LayoutDashboard,
       href: '/',
+      permission: 'puede_ver_dashboard'
+    }, {
+      label: 'Reportes',
+      icon: BarChart3,
+      href: '/reportes',
       permission: 'puede_ver_dashboard'
     }]
   }, {

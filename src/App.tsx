@@ -41,6 +41,7 @@ const AdminStatistics = lazy(() => import("./pages/admin/AdminStatistics"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
 const AdminConversations = lazy(() => import("./pages/admin/AdminConversations"));
 const AuditPanel = lazy(() => import("./pages/admin/AuditPanel"));
+const Reports = lazy(() => import("./pages/Reports"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -181,6 +182,11 @@ const App = () => (
               <Route path="/uso-plan" element={
                 <ProtectedRoute>
                   <UsagePlan />
+                </ProtectedRoute>
+              } />
+              <Route path="/reportes" element={
+                <ProtectedRoute>
+                  <Reports />
                 </ProtectedRoute>
               } />
               {/* Admin Routes */}
