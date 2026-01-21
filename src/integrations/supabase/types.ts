@@ -666,6 +666,7 @@ export type Database = {
           channel_type: string | null
           contact_name: string | null
           created_at: string | null
+          facebook_connection_id: string | null
           id: string
           last_inbound_message_time: string | null
           last_message: string | null
@@ -689,6 +690,7 @@ export type Database = {
           channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
+          facebook_connection_id?: string | null
           id?: string
           last_inbound_message_time?: string | null
           last_message?: string | null
@@ -712,6 +714,7 @@ export type Database = {
           channel_type?: string | null
           contact_name?: string | null
           created_at?: string | null
+          facebook_connection_id?: string | null
           id?: string
           last_inbound_message_time?: string | null
           last_message?: string | null
@@ -780,6 +783,57 @@ export type Database = {
           id?: string
           nombre?: string
           organizacion_id?: string | null
+        }
+        Relationships: []
+      }
+      facebook_connections: {
+        Row: {
+          ai_enabled: boolean | null
+          created_at: string | null
+          default_column_id: string | null
+          id: string
+          instagram_account_id: string | null
+          instagram_username: string | null
+          n8n_webhook_url: string | null
+          page_access_token: string
+          page_id: string
+          page_name: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          ai_enabled?: boolean | null
+          created_at?: string | null
+          default_column_id?: string | null
+          id?: string
+          instagram_account_id?: string | null
+          instagram_username?: string | null
+          n8n_webhook_url?: string | null
+          page_access_token: string
+          page_id: string
+          page_name: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          ai_enabled?: boolean | null
+          created_at?: string | null
+          default_column_id?: string | null
+          id?: string
+          instagram_account_id?: string | null
+          instagram_username?: string | null
+          n8n_webhook_url?: string | null
+          page_access_token?: string
+          page_id?: string
+          page_name?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          workspace_id?: string | null
         }
         Relationships: []
       }
