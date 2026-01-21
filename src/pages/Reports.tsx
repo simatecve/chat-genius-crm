@@ -7,13 +7,14 @@ import { DateRangeSelector } from '@/components/reports/DateRangeSelector';
 import { StatsCards } from '@/components/reports/StatsCards';
 import { MessagesByDayChart } from '@/components/reports/MessagesByDayChart';
 import { HourlyDistributionChart } from '@/components/reports/HourlyDistributionChart';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 const Reports: React.FC = () => {
   const {
     channelType,
     selectedSessionId,
+    isAllSessions,
     dateRange,
     sessions,
     stats,
@@ -30,6 +31,21 @@ const Reports: React.FC = () => {
     updateDateRange,
     setPresetRange
   } = useReports();
+
+  // Get label for current view
+  const getViewLabel = () => {
+    if (isAllSessions) {
+      const channelLabels: Record<string, string> = {
+        whatsapp: 'WhatsApp WAHA',
+        twilio: 'Twilio',
+        telegram: 'Telegram',
+        webchat: 'WebChat'
+      };
+      return `Todas las sesiones de ${channelLabels[channelType]}`;
+    }
+    const session = sessions.find(s => s.id === selectedSessionId);
+    return session?.name || 'Sesión seleccionada';
+  };
 
   return (
     <div className="space-y-6">
@@ -86,24 +102,22 @@ const Reports: React.FC = () => {
         />
       </div>
 
-      {/* Stats Cards - Show channel totals when no session selected */}
-      {selectedSessionId ? (
-        <StatsCards stats={stats} isLoading={statsLoading} />
-      ) : (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            Selecciona una sesión para ver estadísticas detalladas
-          </CardContent>
-        </Card>
-      )}
+      {/* Current View Indicator */}
+      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+        <span className="text-sm text-muted-foreground">Mostrando datos de:</span>
+        <Badge variant={isAllSessions ? 'default' : 'secondary'} className="text-sm">
+          {getViewLabel()}
+        </Badge>
+      </div>
 
-      {/* Charts */}
-      {selectedSessionId && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <MessagesByDayChart data={dailyStats} isLoading={dailyLoading} />
-          <HourlyDistributionChart data={hourlyStats} isLoading={hourlyLoading} />
-        </div>
-      )}
+      {/* Stats Cards - Always visible */}
+      <StatsCards stats={stats} isLoading={statsLoading} />
+
+      {/* Charts - Always visible */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <MessagesByDayChart data={dailyStats} isLoading={dailyLoading} />
+        <HourlyDistributionChart data={hourlyStats} isLoading={hourlyLoading} />
+      </div>
     </div>
   );
 };

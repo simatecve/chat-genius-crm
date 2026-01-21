@@ -3,25 +3,30 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from './useAuth';
 import {
   ChannelType,
-  SessionInfo,
   DateRange,
   getSessionsByChannelType,
   getSessionStats,
   getMessagesByDate,
   getHourlyStats,
-  getAllSessionCounts
+  getAllSessionCounts,
+  getChannelTypeStats,
+  getMessagesByDateForChannel,
+  getHourlyStatsForChannel
 } from '@/services/reportsService';
 
 export const useReports = () => {
   const { user } = useAuth();
   const [channelType, setChannelType] = useState<ChannelType>('twilio');
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>('all');
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
     return { startDate, endDate };
   });
+
+  // Check if we're viewing all sessions or a specific one
+  const isAllSessions = selectedSessionId === 'all' || selectedSessionId === null;
 
   // Fetch all session counts for all channel types
   const {
@@ -46,47 +51,83 @@ export const useReports = () => {
     staleTime: 1000 * 60 * 5
   });
 
-  // Auto-select first session when sessions change
-  const effectiveSessionId = useMemo(() => {
-    if (selectedSessionId && sessions.some(s => s.id === selectedSessionId)) {
-      return selectedSessionId;
-    }
-    return sessions[0]?.id || null;
-  }, [selectedSessionId, sessions]);
-
-  // Fetch stats for selected session
+  // =====================
+  // CHANNEL-LEVEL STATS (when "all" is selected)
+  // =====================
   const {
-    data: stats,
-    isLoading: statsLoading,
+    data: channelStats,
+    isLoading: channelStatsLoading
+  } = useQuery({
+    queryKey: ['report-channel-stats', user?.id, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getChannelTypeStats(user?.id || '', channelType, dateRange),
+    enabled: !!user?.id && isAllSessions,
+    staleTime: 1000 * 60 * 2
+  });
+
+  const {
+    data: channelDailyStats = [],
+    isLoading: channelDailyLoading
+  } = useQuery({
+    queryKey: ['report-channel-daily', user?.id, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getMessagesByDateForChannel(user?.id || '', channelType, dateRange),
+    enabled: !!user?.id && isAllSessions,
+    staleTime: 1000 * 60 * 2
+  });
+
+  const {
+    data: channelHourlyStats = [],
+    isLoading: channelHourlyLoading
+  } = useQuery({
+    queryKey: ['report-channel-hourly', user?.id, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getHourlyStatsForChannel(user?.id || '', channelType, dateRange),
+    enabled: !!user?.id && isAllSessions,
+    staleTime: 1000 * 60 * 2
+  });
+
+  // =====================
+  // SESSION-SPECIFIC STATS (when a specific session is selected)
+  // =====================
+  const {
+    data: sessionStats,
+    isLoading: sessionStatsLoading,
     error: statsError
   } = useQuery({
-    queryKey: ['report-stats', user?.id, effectiveSessionId, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
-    queryFn: () => getSessionStats(user?.id || '', effectiveSessionId!, channelType, dateRange),
-    enabled: !!user?.id && !!effectiveSessionId,
+    queryKey: ['report-stats', user?.id, selectedSessionId, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getSessionStats(user?.id || '', selectedSessionId!, channelType, dateRange),
+    enabled: !!user?.id && !isAllSessions && !!selectedSessionId,
     staleTime: 1000 * 60 * 2
   });
 
-  // Fetch daily message stats
   const {
-    data: dailyStats = [],
-    isLoading: dailyLoading
+    data: sessionDailyStats = [],
+    isLoading: sessionDailyLoading
   } = useQuery({
-    queryKey: ['report-daily', user?.id, effectiveSessionId, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
-    queryFn: () => getMessagesByDate(user?.id || '', effectiveSessionId!, channelType, dateRange),
-    enabled: !!user?.id && !!effectiveSessionId,
+    queryKey: ['report-daily', user?.id, selectedSessionId, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getMessagesByDate(user?.id || '', selectedSessionId!, channelType, dateRange),
+    enabled: !!user?.id && !isAllSessions && !!selectedSessionId,
     staleTime: 1000 * 60 * 2
   });
 
-  // Fetch hourly stats
   const {
-    data: hourlyStats = [],
-    isLoading: hourlyLoading
+    data: sessionHourlyStats = [],
+    isLoading: sessionHourlyLoading
   } = useQuery({
-    queryKey: ['report-hourly', user?.id, effectiveSessionId, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
-    queryFn: () => getHourlyStats(user?.id || '', effectiveSessionId!, channelType, dateRange),
-    enabled: !!user?.id && !!effectiveSessionId,
+    queryKey: ['report-hourly', user?.id, selectedSessionId, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getHourlyStats(user?.id || '', selectedSessionId!, channelType, dateRange),
+    enabled: !!user?.id && !isAllSessions && !!selectedSessionId,
     staleTime: 1000 * 60 * 2
   });
+
+  // =====================
+  // MERGED DATA (return appropriate data based on selection)
+  // =====================
+  const stats = isAllSessions ? channelStats : sessionStats;
+  const dailyStats = isAllSessions ? channelDailyStats : sessionDailyStats;
+  const hourlyStats = isAllSessions ? channelHourlyStats : sessionHourlyStats;
+  
+  const statsLoading = isAllSessions ? channelStatsLoading : sessionStatsLoading;
+  const dailyLoading = isAllSessions ? channelDailyLoading : sessionDailyLoading;
+  const hourlyLoading = isAllSessions ? channelHourlyLoading : sessionHourlyLoading;
 
   const selectSession = (sessionId: string) => {
     setSelectedSessionId(sessionId);
@@ -94,7 +135,7 @@ export const useReports = () => {
 
   const selectChannelType = (type: ChannelType) => {
     setChannelType(type);
-    setSelectedSessionId(null); // Reset session when changing channel
+    setSelectedSessionId('all'); // Reset to "all" when changing channel
   };
 
   const updateDateRange = (range: DateRange) => {
@@ -127,7 +168,8 @@ export const useReports = () => {
   return {
     // State
     channelType,
-    selectedSessionId: effectiveSessionId,
+    selectedSessionId,
+    isAllSessions,
     dateRange,
     sessions,
     stats,

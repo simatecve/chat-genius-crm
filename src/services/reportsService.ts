@@ -130,6 +130,42 @@ const getConversationIdsForSession = async (
   return conversations?.map(c => c.id) || [];
 };
 
+// Get ALL conversation IDs for a channel type (aggregate)
+const getConversationIdsByChannelType = async (
+  channelType: ChannelType
+): Promise<string[]> => {
+  let conversations;
+
+  switch (channelType) {
+    case 'whatsapp':
+      conversations = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('channel_type', 'whatsapp');
+      break;
+    case 'twilio':
+      conversations = await supabase
+        .from('conversations')
+        .select('id')
+        .not('twilio_connection_id', 'is', null);
+      break;
+    case 'telegram':
+      conversations = await supabase
+        .from('conversations')
+        .select('id')
+        .not('telegram_bot_id', 'is', null);
+      break;
+    case 'webchat':
+      conversations = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('channel_type', 'webchat');
+      break;
+  }
+
+  return conversations?.data?.map(c => c.id) || [];
+};
+
 // Get sessions by channel type
 export const getSessionsByChannelType = async (
   userId: string,
@@ -363,6 +399,133 @@ export const getHourlyStats = async (
   const endDate = dateRange.endDate.toISOString();
 
   const conversationIds = await getConversationIdsForSession(sessionId, channelType);
+
+  if (conversationIds.length === 0) {
+    return [];
+  }
+
+  const { data: messages, error: msgError } = await supabase
+    .from('messages')
+    .select('direction, created_at')
+    .in('conversation_id', conversationIds)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
+
+  if (msgError) throw msgError;
+
+  return aggregateMessagesByHour(messages || []);
+};
+
+// =====================
+// CHANNEL-LEVEL STATS (Aggregate all sessions)
+// =====================
+
+// Get stats for ALL sessions of a channel type
+export const getChannelTypeStats = async (
+  userId: string,
+  channelType: ChannelType,
+  dateRange: DateRange
+): Promise<SessionStats> => {
+  const startDate = dateRange.startDate.toISOString();
+  const endDate = dateRange.endDate.toISOString();
+
+  // Calculate previous period for comparison
+  const daysDiff = Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const prevStartDate = new Date(dateRange.startDate);
+  prevStartDate.setDate(prevStartDate.getDate() - daysDiff);
+  const prevEndDate = new Date(dateRange.startDate);
+
+  const conversationIds = await getConversationIdsByChannelType(channelType);
+
+  if (conversationIds.length === 0) {
+    return {
+      totalSent: 0,
+      totalReceived: 0,
+      totalConversations: 0,
+      lastMessageAt: null,
+      sentChange: 0,
+      receivedChange: 0
+    };
+  }
+
+  // Get current period messages
+  const { data: currentMessages, error: msgError } = await supabase
+    .from('messages')
+    .select('direction, created_at')
+    .in('conversation_id', conversationIds)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
+
+  if (msgError) throw msgError;
+
+  // Get previous period messages for comparison
+  const { data: prevMessages } = await supabase
+    .from('messages')
+    .select('direction')
+    .in('conversation_id', conversationIds)
+    .gte('created_at', prevStartDate.toISOString())
+    .lt('created_at', prevEndDate.toISOString());
+
+  const currentSent = currentMessages?.filter(m => m.direction === 'outbound').length || 0;
+  const currentReceived = currentMessages?.filter(m => m.direction === 'inbound').length || 0;
+  const prevSent = prevMessages?.filter(m => m.direction === 'outbound').length || 0;
+  const prevReceived = prevMessages?.filter(m => m.direction === 'inbound').length || 0;
+
+  const lastMessage = currentMessages?.sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )[0];
+
+  const sentChange = prevSent > 0 ? Math.round(((currentSent - prevSent) / prevSent) * 100) : 0;
+  const receivedChange = prevReceived > 0 ? Math.round(((currentReceived - prevReceived) / prevReceived) * 100) : 0;
+
+  return {
+    totalSent: currentSent,
+    totalReceived: currentReceived,
+    totalConversations: conversationIds.length,
+    lastMessageAt: lastMessage?.created_at || null,
+    sentChange,
+    receivedChange
+  };
+};
+
+// Get messages by date for ALL sessions of a channel type
+export const getMessagesByDateForChannel = async (
+  userId: string,
+  channelType: ChannelType,
+  dateRange: DateRange
+): Promise<DailyMessageStats[]> => {
+  const startDate = dateRange.startDate.toISOString();
+  const endDate = dateRange.endDate.toISOString();
+
+  const conversationIds = await getConversationIdsByChannelType(channelType);
+
+  if (conversationIds.length === 0) {
+    return [];
+  }
+
+  const { data: messages, error: msgError } = await supabase
+    .from('messages')
+    .select('direction, created_at')
+    .in('conversation_id', conversationIds)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate)
+    .order('created_at', { ascending: true });
+
+  if (msgError) throw msgError;
+
+  return aggregateMessagesByDate(messages || []);
+};
+
+// Get hourly stats for ALL sessions of a channel type
+export const getHourlyStatsForChannel = async (
+  userId: string,
+  channelType: ChannelType,
+  dateRange: DateRange
+): Promise<HourlyStats[]> => {
+  const startDate = dateRange.startDate.toISOString();
+  const endDate = dateRange.endDate.toISOString();
+
+  const conversationIds = await getConversationIdsByChannelType(channelType);
 
   if (conversationIds.length === 0) {
     return [];
