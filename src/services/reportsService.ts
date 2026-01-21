@@ -420,6 +420,34 @@ export const getHourlyStats = async (
 // CHANNEL-LEVEL STATS (Aggregate all sessions)
 // =====================
 
+// Helper function to fetch messages in batches to avoid URL length limits
+const fetchMessagesInBatches = async (
+  conversationIds: string[],
+  startDate: string,
+  endDate: string
+): Promise<{ direction: string; created_at: string }[]> => {
+  const BATCH_SIZE = 50; // Keep batches small to avoid URL length issues
+  const allMessages: { direction: string; created_at: string }[] = [];
+
+  for (let i = 0; i < conversationIds.length; i += BATCH_SIZE) {
+    const batchIds = conversationIds.slice(i, i + BATCH_SIZE);
+    
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('direction, created_at')
+      .in('conversation_id', batchIds)
+      .gte('created_at', startDate)
+      .lte('created_at', endDate);
+
+    if (error) throw error;
+    if (messages) {
+      allMessages.push(...(messages as { direction: string; created_at: string }[]));
+    }
+  }
+
+  return allMessages;
+};
+
 // Get stats for ALL sessions of a channel type
 export const getChannelTypeStats = async (
   userId: string,
@@ -448,30 +476,20 @@ export const getChannelTypeStats = async (
     };
   }
 
-  // Get current period messages
-  const { data: currentMessages, error: msgError } = await supabase
-    .from('messages')
-    .select('direction, created_at')
-    .in('conversation_id', conversationIds)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate);
+  // Fetch messages in batches
+  const currentMessages = await fetchMessagesInBatches(conversationIds, startDate, endDate);
+  const prevMessages = await fetchMessagesInBatches(
+    conversationIds, 
+    prevStartDate.toISOString(), 
+    prevEndDate.toISOString()
+  );
 
-  if (msgError) throw msgError;
+  const currentSent = currentMessages.filter(m => m.direction === 'outbound').length;
+  const currentReceived = currentMessages.filter(m => m.direction === 'inbound').length;
+  const prevSent = prevMessages.filter(m => m.direction === 'outbound').length;
+  const prevReceived = prevMessages.filter(m => m.direction === 'inbound').length;
 
-  // Get previous period messages for comparison
-  const { data: prevMessages } = await supabase
-    .from('messages')
-    .select('direction')
-    .in('conversation_id', conversationIds)
-    .gte('created_at', prevStartDate.toISOString())
-    .lt('created_at', prevEndDate.toISOString());
-
-  const currentSent = currentMessages?.filter(m => m.direction === 'outbound').length || 0;
-  const currentReceived = currentMessages?.filter(m => m.direction === 'inbound').length || 0;
-  const prevSent = prevMessages?.filter(m => m.direction === 'outbound').length || 0;
-  const prevReceived = prevMessages?.filter(m => m.direction === 'inbound').length || 0;
-
-  const lastMessage = currentMessages?.sort((a, b) => 
+  const lastMessage = currentMessages.sort((a, b) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )[0];
 
@@ -503,17 +521,10 @@ export const getMessagesByDateForChannel = async (
     return [];
   }
 
-  const { data: messages, error: msgError } = await supabase
-    .from('messages')
-    .select('direction, created_at')
-    .in('conversation_id', conversationIds)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate)
-    .order('created_at', { ascending: true });
+  // Fetch messages in batches to avoid URL length issues
+  const messages = await fetchMessagesInBatches(conversationIds, startDate, endDate);
 
-  if (msgError) throw msgError;
-
-  return aggregateMessagesByDate(messages || []);
+  return aggregateMessagesByDate(messages);
 };
 
 // Get hourly stats for ALL sessions of a channel type
@@ -531,16 +542,10 @@ export const getHourlyStatsForChannel = async (
     return [];
   }
 
-  const { data: messages, error: msgError } = await supabase
-    .from('messages')
-    .select('direction, created_at')
-    .in('conversation_id', conversationIds)
-    .gte('created_at', startDate)
-    .lte('created_at', endDate);
+  // Fetch messages in batches to avoid URL length issues
+  const messages = await fetchMessagesInBatches(conversationIds, startDate, endDate);
 
-  if (msgError) throw msgError;
-
-  return aggregateMessagesByHour(messages || []);
+  return aggregateMessagesByHour(messages);
 };
 
 // Helper function to aggregate messages by date
