@@ -23,7 +23,7 @@ interface LeadColumn {
   workspace_id: string | null;
 }
 
-type SessionType = 'whatsapp' | 'twilio' | 'telegram' | 'webchat';
+type SessionType = 'whatsapp' | 'twilio' | 'telegram' | 'webchat' | 'facebook' | 'instagram';
 
 interface EditSessionDialogProps {
   open: boolean;
@@ -75,7 +75,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
 
   const fetchN8nWebhookUrl = async () => {
     if (!effectiveUserId) return;
-    // Solo WhatsApp y Twilio tienen n8n_webhook_url
+    // Solo WhatsApp, Twilio y Facebook tienen n8n_webhook_url
     if (sessionType === 'telegram' || sessionType === 'webchat') return;
     
     const tableName = getTableName();
@@ -183,12 +183,14 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
 
   const workspaceChanged = formData.workspace_id !== originalWorkspaceId;
 
-  const getTableName = (): 'whatsapp_connections' | 'twilio_connections' | 'telegram_bots' | 'web_chatbots' => {
+  const getTableName = (): 'whatsapp_connections' | 'twilio_connections' | 'telegram_bots' | 'web_chatbots' | 'facebook_connections' => {
     switch (sessionType) {
       case 'whatsapp': return 'whatsapp_connections';
       case 'twilio': return 'twilio_connections';
       case 'telegram': return 'telegram_bots';
       case 'webchat': return 'web_chatbots';
+      case 'facebook':
+      case 'instagram': return 'facebook_connections';
     }
   };
 
@@ -198,6 +200,8 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
       case 'twilio': return 'connection_name';
       case 'telegram': return 'bot_name';
       case 'webchat': return 'name';
+      case 'facebook':
+      case 'instagram': return 'page_name';
     }
   };
 
@@ -225,7 +229,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
         default_column_id: formData.default_column_id || null,
       };
       
-      // Solo agregar n8n_webhook_url para WhatsApp y Twilio
+      // Solo agregar n8n_webhook_url para WhatsApp, Twilio y Facebook/Instagram
       if (sessionType !== 'telegram' && sessionType !== 'webchat') {
         updateData.n8n_webhook_url = formData.n8n_webhook_url || null;
       }
@@ -336,6 +340,8 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
       case 'twilio': return 'Twilio';
       case 'telegram': return 'Telegram';
       case 'webchat': return 'Web Chat';
+      case 'facebook': return 'Facebook';
+      case 'instagram': return 'Instagram';
     }
   };
 

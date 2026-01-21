@@ -13,6 +13,7 @@ import TelegramConnectionForm from './TelegramConnectionForm';
 import TelegramBotConnectionForm from './TelegramBotConnectionForm';
 import TwilioConnectionForm from './TwilioConnectionForm';
 import WebChatConnectionForm from './WebChatConnectionForm';
+import { FacebookConnectionForm } from './FacebookConnectionForm';
 import EditSessionDialog from './EditSessionDialog';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,7 +28,7 @@ interface Channel {
 interface Session {
   id: string;
   name: string;
-  type: 'whatsapp' | 'telegram' | 'telegram-bot' | 'twilio' | 'webchat';
+  type: 'whatsapp' | 'telegram' | 'telegram-bot' | 'twilio' | 'webchat' | 'facebook' | 'instagram';
   identifier: string;
   status: string;
   created_at: string;
@@ -55,8 +56,7 @@ const channels: Channel[] = [
   { id: 'telegram', name: 'Telegram', icon: '✈️', color: 'hsl(var(--telegram-blue))', enabled: true },
   { id: 'telegram-bot', name: 'Telegram Bot', icon: '🤖', color: 'hsl(var(--telegram-blue))', enabled: true },
   { id: 'whatsapp-api', name: 'WhatsApp API', icon: '📱', color: 'hsl(var(--muted))', enabled: false },
-  { id: 'instagram', name: 'Instagram', icon: '📷', color: 'hsl(var(--muted))', enabled: false },
-  { id: 'messenger', name: 'Messenger', icon: '💬', color: 'hsl(var(--muted))', enabled: false },
+  { id: 'facebook', name: 'Facebook/Instagram', icon: '📘', color: 'hsl(var(--primary))', enabled: true },
   { id: 'web-chat', name: 'Web Chatbot', icon: '💻', color: 'hsl(var(--primary))', enabled: true },
   { id: 'google-calendar', name: 'Google Calendar', icon: '📅', color: 'hsl(var(--muted))', enabled: false },
   { id: 'email', name: 'Email', icon: '✉️', color: 'hsl(var(--muted))', enabled: false },
@@ -70,6 +70,8 @@ const filterOptions: { value: ChannelFilterType; label: string; icon: string }[]
   { value: 'twilio', label: 'Twilio', icon: '📞' },
   { value: 'telegram-bot', label: 'Telegram Bot', icon: '🤖' },
   { value: 'webchat', label: 'Web Chat', icon: '💻' },
+  { value: 'facebook', label: 'Facebook', icon: '📘' },
+  { value: 'instagram', label: 'Instagram', icon: '📷' },
 ];
 
 const SessionsManager = () => {
@@ -228,6 +230,29 @@ const SessionsManager = () => {
         });
       }
 
+      // Fetch Facebook connections
+      const { data: facebookData } = await supabase
+        .from('facebook_connections')
+        .select('*')
+        .eq('user_id', effectiveUserId)
+        .order('created_at', { ascending: false });
+
+      // Add Facebook/Instagram sessions
+      if (facebookData) {
+        facebookData.forEach(conn => {
+          allSessions.push({
+            id: conn.id,
+            name: conn.page_name,
+            type: conn.instagram_account_id ? 'instagram' : 'facebook',
+            identifier: conn.instagram_username || conn.page_id,
+            status: conn.status || 'active',
+            created_at: conn.created_at || new Date().toISOString(),
+            workspace_id: conn.workspace_id,
+            default_column_id: conn.default_column_id
+          });
+        });
+      }
+
       // Sort by creation date
       allSessions.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -269,34 +294,27 @@ const SessionsManager = () => {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'whatsapp':
-        return '📱';
-      case 'telegram':
-        return '✈️';
-      case 'telegram-bot':
-        return '🤖';
-      case 'twilio':
-        return '📞';
-      case 'webchat':
-        return '💻';
-      default:
-        return '📡';
+      case 'whatsapp': return '📱';
+      case 'telegram': return '✈️';
+      case 'telegram-bot': return '🤖';
+      case 'twilio': return '📞';
+      case 'webchat': return '💻';
+      case 'facebook': return '📘';
+      case 'instagram': return '📷';
+      default: return '📡';
     }
   };
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'whatsapp':
-        return 'hsl(var(--whatsapp-green))';
+      case 'whatsapp': return 'hsl(var(--whatsapp-green))';
       case 'telegram':
-      case 'telegram-bot':
-        return 'hsl(var(--telegram-blue))';
-      case 'twilio':
-        return 'hsl(var(--twilio-red))';
-      case 'webchat':
-        return 'hsl(var(--primary))';
-      default:
-        return 'hsl(var(--muted))';
+      case 'telegram-bot': return 'hsl(var(--telegram-blue))';
+      case 'twilio': return 'hsl(var(--twilio-red))';
+      case 'webchat': return 'hsl(var(--primary))';
+      case 'facebook':
+      case 'instagram': return 'hsl(var(--primary))';
+      default: return 'hsl(var(--muted))';
     }
   };
 
@@ -407,6 +425,15 @@ const SessionsManager = () => {
             .delete()
             .eq('id', session.id);
           if (webchatError) throw webchatError;
+          break;
+
+        case 'facebook':
+        case 'instagram':
+          const { error: fbError } = await supabase
+            .from('facebook_connections')
+            .delete()
+            .eq('id', session.id);
+          if (fbError) throw fbError;
           break;
 
         default:
@@ -701,12 +728,27 @@ const SessionsManager = () => {
       {selectedChannel === 'telegram-bot' && (
         <TelegramBotConnectionForm onClose={handleCloseForm} />
       )}
-
       {selectedChannel === 'twilio-whatsapp' && (
         <TwilioConnectionForm onClose={handleCloseForm} />
       )}
       {selectedChannel === 'web-chat' && (
         <WebChatConnectionForm onClose={handleCloseForm} />
+      )}
+      {selectedChannel === 'facebook' && effectiveUserId && (
+        <Dialog open={true} onOpenChange={() => setSelectedChannel(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Conectar Facebook/Instagram</DialogTitle>
+            </DialogHeader>
+            <FacebookConnectionForm
+              userId={effectiveUserId}
+              workspaces={workspaces}
+              embudos={embudos || []}
+              onClose={() => setSelectedChannel(null)}
+              onSuccess={handleCloseForm}
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Edit Session Dialog */}
