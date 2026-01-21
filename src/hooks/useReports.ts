@@ -8,7 +8,8 @@ import {
   getSessionsByChannelType,
   getSessionStats,
   getMessagesByDate,
-  getHourlyStats
+  getHourlyStats,
+  getAllSessionCounts
 } from '@/services/reportsService';
 
 export const useReports = () => {
@@ -20,6 +21,17 @@ export const useReports = () => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
     return { startDate, endDate };
+  });
+
+  // Fetch all session counts for all channel types
+  const {
+    data: sessionCounts = { whatsapp: 0, twilio: 0, telegram: 0, webchat: 0 },
+    isLoading: countsLoading
+  } = useQuery({
+    queryKey: ['report-session-counts', user?.id],
+    queryFn: () => getAllSessionCounts(user?.id || ''),
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5
   });
 
   // Fetch sessions for selected channel type
@@ -121,6 +133,7 @@ export const useReports = () => {
     stats,
     dailyStats,
     hourlyStats,
+    sessionCounts,
 
     // Loading states
     isLoading: sessionsLoading || statsLoading || dailyLoading || hourlyLoading,
@@ -128,6 +141,7 @@ export const useReports = () => {
     statsLoading,
     dailyLoading,
     hourlyLoading,
+    countsLoading,
 
     // Errors
     error: sessionsError || statsError,
