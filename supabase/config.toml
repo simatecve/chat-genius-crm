@@ -92,3 +92,12 @@ verify_jwt = false
 
 [functions.twilio-get-file]
 verify_jwt = true
+
+[functions.facebook-instagram-webhook]
+verify_jwt = false
+
+[functions.facebook-oauth-callback]
+verify_jwt = false
+
+[functions.facebook-send-message]
+verify_jwt = false
