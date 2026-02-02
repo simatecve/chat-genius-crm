@@ -16,13 +16,13 @@ export class ConversationService {
    */
   static async getConversations(userId: string): Promise<ConversationWithLastMessage[]> {
     try {
-      // NO cargar mensajes aquí - solo metadatos de conversación para mejor rendimiento
+      // Seleccionar columnas necesarias (excluyendo mensajes) para reducir egress
       const { data, error } = await supabase
         .from('conversations')
-        .select('*')
+        .select('id, user_id, pushname, phone_number, whatsapp_number, last_message, last_message_time, unread_count, status, channel_type, telegram_bot_id, twilio_connection_id, facebook_connection_id, lead_id, created_at, updated_at, contact_name, casino_user_created, casino_username, last_inbound_message_time, payment_receipt_detected_at, payment_receipt_sent')
         .eq('user_id', userId)
         .order('last_message_time', { ascending: false })
-        .limit(100); // Limitar a 100 conversaciones para velocidad
+        .limit(100);
 
       if (error) {
         console.error('Error fetching conversations:', error);
@@ -64,10 +64,10 @@ export class ConversationService {
    */
   static async searchConversations(userId: string, searchTerm: string): Promise<ConversationWithLastMessage[]> {
     try {
-      // NO cargar mensajes - solo metadatos
+      // Seleccionar columnas necesarias (excluyendo mensajes) para reducir egress
       const { data, error } = await supabase
         .from('conversations')
-        .select('*')
+        .select('id, user_id, pushname, phone_number, whatsapp_number, last_message, last_message_time, unread_count, status, channel_type, telegram_bot_id, twilio_connection_id, facebook_connection_id, lead_id, created_at, updated_at, contact_name, casino_user_created, casino_username, last_inbound_message_time, payment_receipt_detected_at, payment_receipt_sent')
         .eq('user_id', userId)
         .or(`pushname.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`)
         .order('last_message_time', { ascending: false })
@@ -92,9 +92,10 @@ export class ConversationService {
     try {
       console.log('[ConversationService] Fetching messages for conversationId:', conversationId);
       
+      // Seleccionar solo columnas necesarias para reducir egress
       const { data, error } = await supabase
         .from('messages')
-        .select('*')
+        .select('id, conversation_id, user_id, content, message, direction, message_type, is_bot, status, created_at, attachment_url, file_url, metadata, responded_by')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
@@ -403,18 +404,15 @@ export class ConversationService {
    */
   static async getUnreadCount(userId: string): Promise<number> {
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('unread_count')
-        .eq('user_id', userId)
-        .gt('unread_count', 0);
+      // Usar RPC para calcular en la base de datos y reducir egress
+      const { data, error } = await supabase.rpc('get_unread_count', { user_uuid: userId });
 
       if (error) {
         console.error('Error getting unread count:', error);
         throw error;
       }
 
-      return (data || []).reduce((total, conv) => total + (conv.unread_count || 0), 0);
+      return data || 0;
     } catch (error) {
       console.error('Error in getUnreadCount:', error);
       throw error;

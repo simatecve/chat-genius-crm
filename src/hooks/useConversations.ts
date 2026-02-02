@@ -16,22 +16,22 @@ export const useConversations = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Query para obtener todas las conversaciones - optimizado
+  // Query para obtener todas las conversaciones - optimizado para reducir egress
   const conversationsQuery = useQuery({
     queryKey: ['conversations', effectiveUserId],
     queryFn: () => ConversationService.getConversations(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 5000, // 5 segundos - respuesta más rápida a cambios
-    refetchInterval: 30000, // Refetch cada 30 segundos - el realtime maneja actualizaciones
+    staleTime: 30000, // 30 segundos - Realtime maneja actualizaciones instantáneas
+    refetchInterval: 60000, // 60 segundos - reducido para menos polling
   });
 
-  // Query para obtener el conteo de no leídos - optimizado
+  // Query para obtener el conteo de no leídos - usa RPC eficiente
   const unreadCountQuery = useQuery({
     queryKey: ['unreadCount', effectiveUserId],
     queryFn: () => ConversationService.getUnreadCount(effectiveUserId || ''),
     enabled: !!effectiveUserId,
-    staleTime: 5000, // 5 segundos
-    refetchInterval: 30000, // 30 segundos
+    staleTime: 60000, // 60 segundos - menos crítico
+    refetchInterval: 60000, // 60 segundos
   });
 
   // Mutation para marcar como leído
@@ -86,9 +86,9 @@ export const useConversations = () => {
         } else {
           // Para INSERT o DELETE, invalidar para refetch completo
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          // Actualizar unread count solo en INSERT/DELETE
+          queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
         }
-        
-        queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
       }
     );
 
@@ -104,9 +104,13 @@ export const useConversations = () => {
         },
         (payload) => {
           console.log('New message received globally:', payload);
-          // Cuando llega un mensaje nuevo, invalidar para reordenar
+          // Actualizar unread count directamente en cache en lugar de invalidar
+          queryClient.setQueryData<number>(
+            ['unreadCount', effectiveUserId],
+            (old = 0) => old + 1
+          );
+          // Solo invalidar conversaciones para reordenar - no unreadCount
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
-          queryClient.invalidateQueries({ queryKey: ['unreadCount'] });
         }
       )
       .subscribe();
