@@ -75,12 +75,19 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const { etiquetas, getTagColor } = useTags();
   const [contactTags, setContactTags] = useState<Record<string, string[]>>({});
 
-  // Cargar etiquetas de contactos
+  // Cargar etiquetas de contactos - lazy loading con debounce
+  // Solo cargar cuando hay conversaciones visibles, no en cada cambio
   useEffect(() => {
     const loadContactTags = async () => {
       if (conversations.length === 0) return;
       
-      const phoneNumbers = conversations.map(c => c.phone_number).filter(Boolean);
+      // Solo cargar tags para las primeras 20 conversaciones visibles
+      const visibleConversations = conversations.slice(0, 20);
+      const phoneNumbers = visibleConversations
+        .map(c => c.phone_number)
+        .filter(Boolean)
+        .filter(phone => !contactTags[phone]); // Solo números que no tenemos cached
+      
       if (phoneNumbers.length === 0) return;
 
       const { data: contacts } = await supabase
@@ -89,18 +96,22 @@ const ConversationList: React.FC<ConversationListProps> = ({
         .in('phone_number', phoneNumbers);
 
       if (contacts) {
-        const tagsMap: Record<string, string[]> = {};
-        contacts.forEach(c => {
-          if (c.tags && c.tags.length > 0) {
-            tagsMap[c.phone_number] = c.tags;
-          }
+        setContactTags(prev => {
+          const updated = { ...prev };
+          contacts.forEach(c => {
+            if (c.tags && c.tags.length > 0) {
+              updated[c.phone_number] = c.tags;
+            }
+          });
+          return updated;
         });
-        setContactTags(tagsMap);
       }
     };
 
-    loadContactTags();
-  }, [conversations]);
+    // Debounce para evitar llamadas excesivas
+    const timeoutId = setTimeout(loadContactTags, 300);
+    return () => clearTimeout(timeoutId);
+  }, [conversations.length]); // Solo ejecutar cuando cambia la cantidad, no la referencia
 
   // Función para enmascarar números de teléfono
   const maskPhoneNumber = (phone: string | null) => {

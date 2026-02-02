@@ -2560,6 +2560,7 @@ export type Database = {
         Returns: boolean
       }
       get_account_owner_id: { Args: { user_id: string }; Returns: string }
+      get_unread_count: { Args: { user_uuid: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

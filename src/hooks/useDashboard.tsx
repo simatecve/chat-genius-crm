@@ -35,7 +35,8 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     queryKey: ['active-conversations', user?.id],
     queryFn: () => user ? dashboardService.getActiveConversations(user.id) : null,
     enabled: !!user,
-    refetchInterval: 30 * 1000,
+    staleTime: 60000, // 60 segundos - reducir egress
+    refetchInterval: 60 * 1000, // 60 segundos
   });
 
   const {
