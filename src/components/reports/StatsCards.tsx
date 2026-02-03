@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, MessageCircle, Users, Clock } from 'lucide-react';
+import { Send, MessageCircle, Users, Clock, UserPlus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { SessionStats } from '@/services/reportsService';
 import { cn } from '@/lib/utils';
@@ -34,6 +34,13 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, isLoading }) => {
       color: 'text-purple-500'
     },
     {
+      title: 'Conversaciones Nuevas',
+      value: stats?.newConversationsInPeriod || 0,
+      change: stats?.newConversationsChange || 0,
+      icon: UserPlus,
+      color: 'text-cyan-500'
+    },
+    {
       title: 'Último Mensaje',
       value: stats?.lastMessageAt 
         ? formatDistanceToNow(new Date(stats.lastMessageAt), { addSuffix: true, locale: es })
@@ -46,8 +53,8 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, isLoading }) => {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map(i => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6">
               <div className="h-4 bg-muted rounded w-24 mb-2" />
@@ -60,7 +67,7 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ stats, isLoading }) => {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {cards.map((card, index) => {
         const Icon = card.icon;
         return (
