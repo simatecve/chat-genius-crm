@@ -11,7 +11,9 @@ import {
   getAllSessionCounts,
   getChannelTypeStats,
   getMessagesByDateForChannel,
-  getHourlyStatsForChannel
+  getHourlyStatsForChannel,
+  getNewConversationsByDate,
+  getNewConversationsByDateForChannel
 } from '@/services/reportsService';
 
 export const useReports = () => {
@@ -85,6 +87,19 @@ export const useReports = () => {
   });
 
   // =====================
+  // NEW CONVERSATIONS BY DAY (Channel Level)
+  // =====================
+  const {
+    data: channelNewConversationsDaily = [],
+    isLoading: channelNewConvsLoading
+  } = useQuery({
+    queryKey: ['report-channel-new-convs', user?.id, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getNewConversationsByDateForChannel(user?.id || '', channelType, dateRange),
+    enabled: !!user?.id && isAllSessions,
+    staleTime: 1000 * 60 * 2
+  });
+
+  // =====================
   // SESSION-SPECIFIC STATS (when a specific session is selected)
   // =====================
   const {
@@ -118,16 +133,29 @@ export const useReports = () => {
     staleTime: 1000 * 60 * 2
   });
 
+  // NEW CONVERSATIONS BY DAY (Session Level)
+  const {
+    data: sessionNewConversationsDaily = [],
+    isLoading: sessionNewConvsLoading
+  } = useQuery({
+    queryKey: ['report-session-new-convs', user?.id, selectedSessionId, channelType, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getNewConversationsByDate(user?.id || '', selectedSessionId!, channelType, dateRange),
+    enabled: !!user?.id && !isAllSessions && !!selectedSessionId,
+    staleTime: 1000 * 60 * 2
+  });
+
   // =====================
   // MERGED DATA (return appropriate data based on selection)
   // =====================
   const stats = isAllSessions ? channelStats : sessionStats;
   const dailyStats = isAllSessions ? channelDailyStats : sessionDailyStats;
   const hourlyStats = isAllSessions ? channelHourlyStats : sessionHourlyStats;
+  const newConversationsDaily = isAllSessions ? channelNewConversationsDaily : sessionNewConversationsDaily;
   
   const statsLoading = isAllSessions ? channelStatsLoading : sessionStatsLoading;
   const dailyLoading = isAllSessions ? channelDailyLoading : sessionDailyLoading;
   const hourlyLoading = isAllSessions ? channelHourlyLoading : sessionHourlyLoading;
+  const newConvsLoading = isAllSessions ? channelNewConvsLoading : sessionNewConvsLoading;
 
   const selectSession = (sessionId: string) => {
     setSelectedSessionId(sessionId);
@@ -175,14 +203,16 @@ export const useReports = () => {
     stats,
     dailyStats,
     hourlyStats,
+    newConversationsDaily,
     sessionCounts,
 
     // Loading states
-    isLoading: sessionsLoading || statsLoading || dailyLoading || hourlyLoading,
+    isLoading: sessionsLoading || statsLoading || dailyLoading || hourlyLoading || newConvsLoading,
     sessionsLoading,
     statsLoading,
     dailyLoading,
     hourlyLoading,
+    newConvsLoading,
     countsLoading,
 
     // Errors

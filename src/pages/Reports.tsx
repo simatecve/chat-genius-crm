@@ -7,6 +7,7 @@ import { DateRangeSelector } from '@/components/reports/DateRangeSelector';
 import { StatsCards } from '@/components/reports/StatsCards';
 import { MessagesByDayChart } from '@/components/reports/MessagesByDayChart';
 import { HourlyDistributionChart } from '@/components/reports/HourlyDistributionChart';
+import { NewConversationsChart } from '@/components/reports/NewConversationsChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -20,11 +21,13 @@ const Reports: React.FC = () => {
     stats,
     dailyStats,
     hourlyStats,
+    newConversationsDaily,
     sessionCounts,
     sessionsLoading,
     statsLoading,
     dailyLoading,
     hourlyLoading,
+    newConvsLoading,
     countsLoading,
     selectSession,
     selectChannelType,
@@ -116,6 +119,10 @@ const Reports: React.FC = () => {
       {/* Charts - Always visible */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <MessagesByDayChart data={dailyStats} isLoading={dailyLoading} />
+        <NewConversationsChart data={newConversationsDaily} isLoading={newConvsLoading} />
+      </div>
+      
+      <div className="grid grid-cols-1">
         <HourlyDistributionChart data={hourlyStats} isLoading={hourlyLoading} />
       </div>
     </div>

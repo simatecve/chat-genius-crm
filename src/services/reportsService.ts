@@ -22,6 +22,13 @@ export interface SessionStats {
   lastMessageAt: string | null;
   sentChange: number;
   receivedChange: number;
+  newConversationsInPeriod: number;
+  newConversationsChange: number;
+}
+
+export interface DailyNewConversationsStats {
+  date: string;
+  count: number;
 }
 
 export interface DailyMessageStats {
@@ -314,7 +321,9 @@ export const getSessionStats = async (
       totalConversations: 0,
       lastMessageAt: null,
       sentChange: 0,
-      receivedChange: 0
+      receivedChange: 0,
+      newConversationsInPeriod: 0,
+      newConversationsChange: 0
     };
   }
 
@@ -349,13 +358,34 @@ export const getSessionStats = async (
   const sentChange = prevSent > 0 ? Math.round(((currentSent - prevSent) / prevSent) * 100) : 0;
   const receivedChange = prevReceived > 0 ? Math.round(((currentReceived - prevReceived) / prevReceived) * 100) : 0;
 
+  // Get new conversations in period - fetch conversations with created_at in date range
+  const { count: currentNewConvs } = await supabase
+    .from('conversations')
+    .select('id', { count: 'exact', head: true })
+    .in('id', conversationIds)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
+
+  const { count: prevNewConvs } = await supabase
+    .from('conversations')
+    .select('id', { count: 'exact', head: true })
+    .in('id', conversationIds)
+    .gte('created_at', prevStartDate.toISOString())
+    .lt('created_at', prevEndDate.toISOString());
+
+  const newConversationsChange = (prevNewConvs ?? 0) > 0 
+    ? Math.round((((currentNewConvs ?? 0) - (prevNewConvs ?? 0)) / (prevNewConvs ?? 1)) * 100) 
+    : 0;
+
   return {
     totalSent: currentSent,
     totalReceived: currentReceived,
     totalConversations: conversationIds.length,
     lastMessageAt: lastMessage?.created_at || null,
     sentChange,
-    receivedChange
+    receivedChange,
+    newConversationsInPeriod: currentNewConvs ?? 0,
+    newConversationsChange
   };
 };
 
@@ -472,7 +502,9 @@ export const getChannelTypeStats = async (
       totalConversations: 0,
       lastMessageAt: null,
       sentChange: 0,
-      receivedChange: 0
+      receivedChange: 0,
+      newConversationsInPeriod: 0,
+      newConversationsChange: 0
     };
   }
 
@@ -496,13 +528,34 @@ export const getChannelTypeStats = async (
   const sentChange = prevSent > 0 ? Math.round(((currentSent - prevSent) / prevSent) * 100) : 0;
   const receivedChange = prevReceived > 0 ? Math.round(((currentReceived - prevReceived) / prevReceived) * 100) : 0;
 
+  // Get new conversations in period
+  const { count: currentNewConvs } = await supabase
+    .from('conversations')
+    .select('id', { count: 'exact', head: true })
+    .in('id', conversationIds)
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
+
+  const { count: prevNewConvs } = await supabase
+    .from('conversations')
+    .select('id', { count: 'exact', head: true })
+    .in('id', conversationIds)
+    .gte('created_at', prevStartDate.toISOString())
+    .lt('created_at', prevEndDate.toISOString());
+
+  const newConversationsChange = (prevNewConvs ?? 0) > 0 
+    ? Math.round((((currentNewConvs ?? 0) - (prevNewConvs ?? 0)) / (prevNewConvs ?? 1)) * 100) 
+    : 0;
+
   return {
     totalSent: currentSent,
     totalReceived: currentReceived,
     totalConversations: conversationIds.length,
     lastMessageAt: lastMessage?.created_at || null,
     sentChange,
-    receivedChange
+    receivedChange,
+    newConversationsInPeriod: currentNewConvs ?? 0,
+    newConversationsChange
   };
 };
 
@@ -606,4 +659,91 @@ const aggregateMessagesByHour = (
       received: stats.received
     }))
     .sort((a, b) => a.hour - b.hour);
+};
+
+// =====================
+// NEW CONVERSATIONS BY DAY FUNCTIONS
+// =====================
+
+// Helper function to fetch conversations in batches
+const fetchConversationsInBatches = async (
+  conversationIds: string[],
+  startDate: string,
+  endDate: string
+): Promise<{ id: string; created_at: string }[]> => {
+  const BATCH_SIZE = 50;
+  const allConversations: { id: string; created_at: string }[] = [];
+
+  for (let i = 0; i < conversationIds.length; i += BATCH_SIZE) {
+    const batchIds = conversationIds.slice(i, i + BATCH_SIZE);
+    
+    const { data: conversations, error } = await supabase
+      .from('conversations')
+      .select('id, created_at')
+      .in('id', batchIds)
+      .gte('created_at', startDate)
+      .lte('created_at', endDate);
+
+    if (error) throw error;
+    if (conversations) {
+      allConversations.push(...conversations);
+    }
+  }
+
+  return allConversations;
+};
+
+// Helper function to aggregate conversations by date
+const aggregateConversationsByDate = (
+  conversations: { id: string; created_at: string }[]
+): DailyNewConversationsStats[] => {
+  const dateMap = new Map<string, number>();
+
+  conversations.forEach(conv => {
+    const date = new Date(conv.created_at).toISOString().split('T')[0];
+    dateMap.set(date, (dateMap.get(date) || 0) + 1);
+  });
+
+  return Array.from(dateMap.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+};
+
+// Get new conversations by date for a specific session
+export const getNewConversationsByDate = async (
+  userId: string,
+  sessionId: string,
+  channelType: ChannelType,
+  dateRange: DateRange
+): Promise<DailyNewConversationsStats[]> => {
+  const startDate = dateRange.startDate.toISOString();
+  const endDate = dateRange.endDate.toISOString();
+
+  const conversationIds = await getConversationIdsForSession(sessionId, channelType);
+
+  if (conversationIds.length === 0) {
+    return [];
+  }
+
+  const conversations = await fetchConversationsInBatches(conversationIds, startDate, endDate);
+  return aggregateConversationsByDate(conversations);
+};
+
+// Get new conversations by date for ALL sessions of a channel type
+export const getNewConversationsByDateForChannel = async (
+  userId: string,
+  channelType: ChannelType,
+  dateRange: DateRange
+): Promise<DailyNewConversationsStats[]> => {
+  const startDate = dateRange.startDate.toISOString();
+  const endDate = dateRange.endDate.toISOString();
+
+  const conversationIds = await getConversationIdsByChannelType(channelType);
+
+  if (conversationIds.length === 0) {
+    return [];
+  }
+
+  const conversations = await fetchConversationsInBatches(conversationIds, startDate, endDate);
+  return aggregateConversationsByDate(conversations);
 };
