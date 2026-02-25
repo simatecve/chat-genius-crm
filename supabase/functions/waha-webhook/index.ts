@@ -37,6 +37,7 @@ function normalizePhoneNumber(phone: string): string {
     .replace(/@lid$/, '')
     .replace(/@c\.us$/, '')
     .replace(/@s\.whatsapp\.net$/, '')
+    .replace(/:\d+$/, '') // Remove device suffix like :1, :6, etc.
     .trim();
 }
 
