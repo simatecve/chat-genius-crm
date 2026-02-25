@@ -332,7 +332,7 @@ export const useInfiniteLeads = ({
       hasMore: state?.hasMore || (isDefaultColumn && orphanHasMore),
       loading: state?.loading || (isDefaultColumn && orphanLoading),
       totalCount: (state?.totalCount || 0) + (isDefaultColumn ? orphanLeads.length : 0),
-      loadedCount: (state?.leads.length || 0) + (isDefaultColumn ? orphanLeads.length : 0)
+      loadedCount: (state?.leads?.length || 0) + (isDefaultColumn ? orphanLeads.length : 0)
     };
   }, [columnLeadsState, defaultColumnId, orphanHasMore, orphanLoading, orphanLeads.length]);
 
