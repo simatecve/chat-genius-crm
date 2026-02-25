@@ -272,6 +272,9 @@ const ConversationItem = memo<ConversationItemProps>(({
 }) => {
   // Determinar el ícono según el tipo de canal
   const channelIcon = useMemo(() => {
+    if (conversation.channel_type === 'whatsapp') {
+      return <Phone className="h-4 w-4 text-green-500" />;
+    }
     if (conversation.channel_type === 'telegram') {
       return <MessageCircle className="h-4 w-4 text-telegram-blue" />;
     }
