@@ -1,169 +1,120 @@
 
-# Plan: Agregar Estadísticas de Conversaciones Nuevas por Día
 
-## Resumen
+# Plan: Fix WAHA LID Resolution for Missing Messages
 
-Agregaremos una nueva métrica y visualización al módulo de reportes que mostrará el número de **conversaciones nuevas creadas por día** para todos los canales (WhatsApp, Twilio, Telegram, WebChat).
+## Problem Identified
 
----
-
-## Cambios a Realizar
-
-### 1. Extender el Servicio de Reportes (`src/services/reportsService.ts`)
-
-**Nuevo tipo de datos:**
-```typescript
-export interface DailyNewConversationsStats {
-  date: string;
-  count: number;
-}
-```
-
-**Actualizar SessionStats para incluir conversaciones nuevas:**
-```typescript
-export interface SessionStats {
-  // ... campos existentes
-  newConversationsToday: number;      // Nuevas conversaciones hoy
-  newConversationsChange: number;     // Cambio % vs período anterior
-}
-```
-
-**Nuevas funciones a crear:**
-| Función | Descripción |
-|---------|-------------|
-| `getNewConversationsByDate()` | Obtiene conversaciones nuevas por día para una sesión específica |
-| `getNewConversationsByDateForChannel()` | Obtiene conversaciones nuevas por día agregado por canal |
-
-**Lógica de conteo:**
-- Consulta a la tabla `conversations` filtrando por `created_at` dentro del rango de fechas
-- Agrupa por fecha para obtener el conteo diario
-- Filtra por canal/sesión según corresponda
-
----
-
-### 2. Actualizar el Hook de Reportes (`src/hooks/useReports.ts`)
-
-**Nuevos queries a agregar:**
-- `newConversationsDaily` - Para conversaciones nuevas por día
-- Incluir en el estado de loading correspondiente
-
-**Nuevos valores a retornar:**
-- `newConversationsStats` - Array con datos diarios
-- `newConversationsLoading` - Estado de carga
-
----
-
-### 3. Actualizar Tarjetas de Estadísticas (`src/components/reports/StatsCards.tsx`)
-
-**Nueva tarjeta a agregar:**
-
-| Campo | Valor |
-|-------|-------|
-| Título | "Conversaciones Nuevas" |
-| Icono | `UserPlus` (de lucide-react) |
-| Color | `text-cyan-500` |
-| Valor | Total de conversaciones nuevas en el período |
-| Cambio | % cambio vs período anterior |
-
-**Modificar grid:** Cambiar de 4 columnas a 5 para acomodar la nueva tarjeta.
-
----
-
-### 4. Crear Nuevo Gráfico de Conversaciones Nuevas por Día
-
-**Nuevo archivo:** `src/components/reports/NewConversationsChart.tsx`
-
-**Características:**
-- Gráfico de barras (BarChart) con estilo consistente
-- Muestra número de conversaciones nuevas por día
-- Colores en tema cyan para diferenciarlo de los mensajes
-- Tooltip con fecha y cantidad
-- Título: "Conversaciones Nuevas por Día"
-
----
-
-### 5. Integrar en Página de Reportes (`src/pages/Reports.tsx`)
-
-**Cambios:**
-- Importar `NewConversationsChart`
-- Agregar query para `newConversationsStats` desde el hook
-- Mostrar el nuevo gráfico en el grid de charts (reorganizar a 3 columnas si necesario, o agregar debajo)
-
----
-
-## Diagrama de Flujo de Datos
+Messages are arriving to the webhook but being **rejected** because Meta is now using LIDs (Linked IDs) instead of regular phone numbers. Looking at the logs:
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                         Reports.tsx                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐  │
-│  │ StatsCards   │  │ MessagesByDay│  │ NewConversationsChart │  │
-│  │ (+1 nueva)   │  │    Chart     │  │       (NUEVO)         │  │
-│  └──────────────┘  └──────────────┘  └───────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              ▲
-                              │
-                    ┌─────────┴─────────┐
-                    │   useReports.ts   │
-                    │ + newConversations│
-                    │   Stats           │
-                    └─────────┬─────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              │      reportsService.ts        │
-              │ + getNewConversationsByDate() │
-              │ + getNewConversationsByDate   │
-              │   ForChannel()                │
-              └───────────────┬───────────────┘
-                              │
-                    ┌─────────▼─────────┐
-                    │   Supabase DB     │
-                    │  conversations    │
-                    │  (created_at)     │
-                    └───────────────────┘
+[DEBUG] JID extraction: remoteJid=undefined, remoteJidAlt=undefined, participant=null
+[LID Detection Early] Rejecting LID before normalization: 40381852995718@lid
+[DEBUG] Initial rawPhoneNumber: 40381852995718@lid
 ```
 
----
+The message `from` field is `40381852995718@lid` (a LID), and `remoteJid`/`remoteJidAlt` are both `undefined`. The code has no fallback, so it assigns the LID as `rawPhoneNumber` and then rejects it at line 724.
 
-## Archivos a Modificar/Crear
+**However**, the real phone number IS present in the payload at `_data.Info.SenderAlt`:
+```json
+"SenderAlt": "5491176250197@s.whatsapp.net"
+```
 
-| Archivo | Acción | Cambios |
-|---------|--------|---------|
-| `src/services/reportsService.ts` | Modificar | Agregar tipos y funciones para conversaciones nuevas |
-| `src/hooks/useReports.ts` | Modificar | Agregar queries para conversaciones nuevas diarias |
-| `src/components/reports/StatsCards.tsx` | Modificar | Agregar tarjeta de conversaciones nuevas, cambiar grid a 5 cols |
-| `src/components/reports/NewConversationsChart.tsx` | Crear | Nuevo gráfico de barras para conversaciones nuevas por día |
-| `src/pages/Reports.tsx` | Modificar | Integrar nuevo gráfico en el layout |
+This field is currently **not being checked** by the JID extraction logic.
 
----
+## Root Cause
 
-## Detalles Técnicos
+The WAHA GOWS engine (version 2026.2.3) changed how it structures JIDs. The `_data.key` object no longer contains `remoteJid`/`remoteJidAlt` for LID-based chats. Instead, the real phone number is in `_data.Info.SenderAlt` (for inbound) and `_data.Info.RecipientAlt` (for outbound).
 
-### Query de Supabase para Conversaciones Nuevas
+## Solution
+
+Modify `supabase/functions/waha-webhook/index.ts` to add `SenderAlt` and `RecipientAlt` as additional fallback sources when extracting phone numbers.
+
+### Changes to `processMessageEvent` function
+
+**1. Expand JID extraction (around line 653-661):**
+
+Add extraction of `SenderAlt` and `RecipientAlt` from `_data.Info`:
 
 ```typescript
-// Por sesión específica
-const { data } = await supabase
-  .from('conversations')
-  .select('id, created_at')
-  .eq('channel_type', channelType)  // o filtro por session
-  .gte('created_at', startDate)
-  .lte('created_at', endDate);
+const remoteJid = messageData._data?.key?.remoteJid;
+const remoteJidAlt = messageData._data?.key?.remoteJidAlt;
+const participant = messageData._data?.key?.participant || 
+                   messageData.participant ||
+                   messageData._data?.participant ||
+                   null;
+const participantNumber = participant ? normalizePhoneNumber(participant) : null;
 
-// Agrupar en JavaScript por fecha
+// NEW: Extract SenderAlt and RecipientAlt from _data.Info
+const senderAlt = messageData._data?.Info?.SenderAlt || null;
+const recipientAlt = messageData._data?.Info?.RecipientAlt || null;
 ```
 
-### Consideraciones de Performance
+**2. Update inbound LID resolution (around line 697-712):**
 
-1. **Reutilizar IDs de conversación:** Ya se obtienen en otras funciones, evitar queries duplicados
-2. **Batching:** Aplicar misma lógica de batches si es necesario
-3. **staleTime:** Usar mismo valor de 2 minutos para consistencia
+Add `senderAlt` as a fallback for inbound messages when all other JIDs are LIDs:
 
----
+```typescript
+// Inbound: check senderAlt before giving up
+} else if (senderAlt && !isMetaLid(senderAlt)) {
+  rawPhoneNumber = senderAlt;
+  console.log(`[LID Fix] Using SenderAlt for inbound: ${senderAlt}`);
+}
+```
 
-## Resultado Esperado
+**3. Update outbound LID resolution (around line 680-695):**
 
-- Nueva tarjeta mostrando "Conversaciones Nuevas: X" con indicador de cambio %
-- Nuevo gráfico de barras mostrando tendencia diaria de conversaciones nuevas
-- Funciona para todos los canales: WhatsApp, Twilio, Telegram, WebChat
-- Soporta tanto vista "Todas las sesiones" como sesiones individuales
+Add `recipientAlt` as a fallback for outbound messages:
+
+```typescript
+// Outbound: check recipientAlt before giving up
+} else if (recipientAlt && !isMetaLid(recipientAlt)) {
+  rawPhoneNumber = recipientAlt;
+  console.log(`[LID Fix] Using RecipientAlt for outbound: ${recipientAlt}`);
+}
+```
+
+**4. Update the fallback assignments (lines 694, 711):**
+
+Add `senderAlt`/`recipientAlt` to the fallback chain for non-LID cases too:
+
+```typescript
+// Outbound fallback
+rawPhoneNumber = remoteJid || remoteJidAlt || recipientAlt || messageData.to || messageData.from;
+
+// Inbound fallback
+rawPhoneNumber = remoteJid || remoteJidAlt || senderAlt || messageData.from;
+```
+
+**5. Last-resort LID resolution before rejection (line 723-727):**
+
+Instead of immediately rejecting a LID, try `messageData.from` alternatives:
+
+```typescript
+if (isMetaLid(rawPhoneNumber)) {
+  // Last resort: try SenderAlt/RecipientAlt or from/to fields
+  const lastResort = fromMe 
+    ? (recipientAlt || messageData.to)
+    : (senderAlt || messageData._data?.Info?.SenderAlt);
+  
+  if (lastResort && !isMetaLid(lastResort)) {
+    rawPhoneNumber = lastResort;
+    console.log(`[LID Fix] Last resort resolution: ${rawPhoneNumber}`);
+  } else {
+    console.log(`[LID Detection Early] Rejecting LID, no alternatives: ${rawPhoneNumber}`);
+    return;
+  }
+}
+```
+
+## File to Modify
+
+| File | Changes |
+|------|---------|
+| `supabase/functions/waha-webhook/index.ts` | Add SenderAlt/RecipientAlt extraction and fallback chain |
+
+## Expected Result
+
+- Messages from LID-based contacts will be correctly resolved to real phone numbers using `SenderAlt`/`RecipientAlt`
+- All sessions (ewil22, ewil45, ewil46, etc.) that are currently `connected` will start receiving messages in the CRM
+- No changes to existing non-LID message processing
+
