@@ -659,6 +659,11 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
                        null;
     const participantNumber = participant ? normalizePhoneNumber(participant) : null;
     
+    // Extract SenderAlt and RecipientAlt from _data.Info (WAHA GOWS LID resolution)
+    const senderAlt = messageData._data?.Info?.SenderAlt || messageData._data?.Info?.Sender || null;
+    const recipientAlt = messageData._data?.Info?.RecipientAlt || null;
+    console.log(`[DEBUG] Alt JIDs: senderAlt=${senderAlt}, recipientAlt=${recipientAlt}`);
+    
     console.log(`[DEBUG] JID extraction: remoteJid=${remoteJid}, remoteJidAlt=${remoteJidAlt}, participant=${participant}`);
     
     let rawPhoneNumber: string;
@@ -686,12 +691,15 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
         } else if (participantNumber && !isMetaLid(participantNumber)) {
           rawPhoneNumber = participant;
           console.log(`[LID Fix] Using participant for outbound: ${participant}`);
+        } else if (recipientAlt && !isMetaLid(recipientAlt)) {
+          rawPhoneNumber = recipientAlt;
+          console.log(`[LID Fix] Using RecipientAlt for outbound: ${recipientAlt}`);
         } else {
           console.log(`[LID Detection] Cannot extract real phone for outbound LID: ${remoteJid}`);
           return;
         }
       } else {
-        rawPhoneNumber = remoteJid || remoteJidAlt || messageData.to || messageData.from;
+        rawPhoneNumber = remoteJid || remoteJidAlt || recipientAlt || messageData.to || messageData.from;
       }
     } else {
       // Mensaje entrante: necesitamos el remitente
@@ -703,12 +711,15 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
         } else if (participantNumber && !isMetaLid(participantNumber)) {
           rawPhoneNumber = participant;
           console.log(`[LID Fix] Using participant for inbound: ${participant}`);
+        } else if (senderAlt && !isMetaLid(senderAlt)) {
+          rawPhoneNumber = senderAlt;
+          console.log(`[LID Fix] Using SenderAlt for inbound: ${senderAlt}`);
         } else {
           console.log(`[LID Detection] Cannot extract real phone for inbound LID: ${remoteJid}`);
           return;
         }
       } else {
-        rawPhoneNumber = remoteJid || remoteJidAlt || messageData.from;
+        rawPhoneNumber = remoteJid || remoteJidAlt || senderAlt || messageData.from;
       }
     }
     
@@ -720,10 +731,19 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
       return;
     }
     
-    // PASO 5: Validar que no sea un LID ANTES de normalizar
+    // PASO 5: Validar que no sea un LID ANTES de normalizar - con last resort fallback
     if (isMetaLid(rawPhoneNumber)) {
-      console.log(`[LID Detection Early] Rejecting LID before normalization: ${rawPhoneNumber}`);
-      return;
+      const lastResort = fromMe 
+        ? (recipientAlt || messageData.to)
+        : (senderAlt || messageData._data?.Info?.Sender);
+      
+      if (lastResort && !isMetaLid(lastResort)) {
+        rawPhoneNumber = lastResort;
+        console.log(`[LID Fix] Last resort resolution: ${rawPhoneNumber}`);
+      } else {
+        console.log(`[LID Detection Early] Rejecting LID, no alternatives found: ${rawPhoneNumber}`);
+        return;
+      }
     }
     
     const phoneNumber = normalizePhoneNumber(rawPhoneNumber);
