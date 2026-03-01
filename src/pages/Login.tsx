@@ -146,7 +146,7 @@ const Login = () => {
           {/* Version Info */}
           <div className="mt-8 pt-6 border-t border-border">
             <p className="text-xs text-muted-foreground text-center">
-              Versión 2.3 (20-12)
+              Versión 2.35 01-03-26
             </p>
           </div>
         </div>
