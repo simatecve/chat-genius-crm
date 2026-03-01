@@ -484,7 +484,7 @@ serve(async (req) => {
     const { userId, connectionId, n8nWebhookUrl, connectionName } = await getConnectionData(supabase, toNumber, connectionIdFromUrl);
     if (!userId || !connectionId) {
       console.error('Could not get user_id or connection_id from Twilio number');
-      return new Response('OK', { status: 200, headers: corsHeaders });
+      return new Response(null, { status: 200, headers: corsHeaders });
     }
 
     console.log(`User ID: ${userId}, Connection ID: ${connectionId}, n8n webhook: ${n8nWebhookUrl ? 'configured' : 'not set'}`);
@@ -505,7 +505,7 @@ serve(async (req) => {
 
     if (!conversation) {
       console.error('Failed to create/get conversation');
-      return new Response('OK', { status: 200, headers: corsHeaders });
+      return new Response(null, { status: 200, headers: corsHeaders });
     }
 
     // Guardar mensaje CON MEDIA
@@ -646,16 +646,10 @@ serve(async (req) => {
       }
     }
 
-    return new Response('OK', {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
 
   } catch (error) {
     console.error('Error in twilio-webhook:', error);
-    return new Response('OK', { 
-      status: 200, 
-      headers: corsHeaders 
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 });
