@@ -55,7 +55,7 @@ export const useProfile = () => {
         setProfile(data);
       } catch (err: any) {
         console.error('Error fetching profile:', err);
-        if (err.name === 'AbortError') {
+        if (err.message === 'TIMEOUT') {
           setError('Timeout al cargar el perfil. Intenta recargar la página.');
         } else {
           setError(err.message || 'Error al cargar el perfil');
