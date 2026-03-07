@@ -21,15 +21,13 @@ export const useProfile = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { effectiveUserId, isImpersonating, loading: userIdLoading } = useEffectiveUserId();
+  const { effectiveUserId, isImpersonating } = useEffectiveUserId();
   const { user } = useAuth();
 
   useEffect(() => {
     const fetchProfile = async () => {
-      // Use user.id directly for profile loading, not effectiveUserId
-      // effectiveUserId is for data sharing, but profile should always be the logged-in user's
-      if (!user?.id || userIdLoading) {
-        setLoading(userIdLoading);
+      if (!user?.id) {
+        setLoading(false);
         return;
       }
 
@@ -37,11 +35,18 @@ export const useProfile = () => {
         setLoading(true);
         setError(null);
 
+        // Add timeout to avoid infinite loading
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id) // Always load the logged-in user's profile
-          .single();
+          .eq('id', user.id)
+          .single()
+          .abortSignal(controller.signal);
+
+        clearTimeout(timeout);
 
         if (error) {
           throw error;
@@ -50,14 +55,18 @@ export const useProfile = () => {
         setProfile(data);
       } catch (err: any) {
         console.error('Error fetching profile:', err);
-        setError(err.message || 'Error al cargar el perfil');
+        if (err.name === 'AbortError') {
+          setError('Timeout al cargar el perfil. Intenta recargar la página.');
+        } else {
+          setError(err.message || 'Error al cargar el perfil');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchProfile();
-  }, [user?.id, userIdLoading]);
+  }, [user?.id]);
 
   const isSuperAdmin = profile?.profile_type === 'superadmin';
   const isClient = profile?.profile_type === 'client';
@@ -65,7 +74,7 @@ export const useProfile = () => {
 
   return {
     profile,
-    loading: loading || userIdLoading,
+    loading,
     error,
     isSuperAdmin,
     isClient,
@@ -75,7 +84,6 @@ export const useProfile = () => {
     refetchProfile: () => {
       if (user?.id) {
         setLoading(true);
-        // Re-trigger the effect
         setProfile(null);
       }
     }

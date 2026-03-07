@@ -17,13 +17,27 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Safety timeout to avoid infinite loading
+  useEffect(() => {
+    if (isLoading) {
+      const timeout = setTimeout(() => {
+        setIsLoading(false);
+        toast({
+          title: "Tiempo de espera agotado",
+          description: "El servidor tardó demasiado en responder. Intenta de nuevo.",
+          variant: "destructive",
+        });
+      }, 15000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading, toast]);
+
   useEffect(() => {
     if (user && !profileLoading && profile) {
       // Redirect based on profile_type
       if (profile.profile_type === 'superadmin') {
         navigate('/admin');
       } else if (profile.profile_type === 'client' || profile.profile_type === 'cajero') {
-        // Both client admins and cajeros go to embudos/leads page
         navigate('/leads');
       }
     }
