@@ -11,7 +11,7 @@ export const salesService = {
   async getProducts(userId: string): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, name, description, price, stock, user_id, created_at, updated_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
