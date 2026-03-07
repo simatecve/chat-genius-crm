@@ -56,8 +56,8 @@ export const salesService = {
     const { data, error } = await supabase
       .from('sales')
       .select(`
-        *,
-        product:products(*),
+        id, client_id, product_id, quantity, total_amount, sale_date, seller_id, user_id, created_at, updated_at,
+        product:products(id, name, price),
         client:leads(id, name, phone)
       `)
       .eq('user_id', userId)
