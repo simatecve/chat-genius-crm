@@ -90,7 +90,7 @@ export const useInfiniteLeads = ({
         .select(`
           id, name, phone, email, company, tags, notes, value, column_id, position,
           bot_active, last_inbound_message_time, created_at, updated_at, user_id,
-          lead_columns(id, name, color, position, workspace_id, is_default),
+          lead_columns(id, name, color, position, workspace_id, is_default, created_at, updated_at, user_id),
           conversations:conversations!conversations_lead_id_fkey(
             id,
             phone_number,
