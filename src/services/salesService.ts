@@ -11,7 +11,7 @@ export const salesService = {
   async getProducts(userId: string): Promise<Product[]> {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, name, description, price, stock, user_id, created_at, updated_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -56,8 +56,8 @@ export const salesService = {
     const { data, error } = await supabase
       .from('sales')
       .select(`
-        *,
-        product:products(*),
+        id, client_id, product_id, quantity, total_amount, sale_date, seller_id, user_id, created_at, updated_at,
+        product:products(id, name, price),
         client:leads(id, name, phone)
       `)
       .eq('user_id', userId)
@@ -71,7 +71,7 @@ export const salesService = {
     // First, get the product and update stock
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('*')
+      .select('id, name, price, stock')
       .eq('id', sale.product_id)
       .single();
 

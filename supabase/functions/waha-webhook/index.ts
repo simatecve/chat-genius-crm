@@ -765,7 +765,7 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
 
     // Manejar mensajes con archivos multimedia
     if (hasMedia && messageData.media) {
-      mediaUrl = messageData.media.url;
+      const wahaMediaUrl = messageData.media.url;
       const mimetype = messageData.media.mimetype || '';
       
       if (mimetype.startsWith('image/')) {
@@ -782,7 +782,62 @@ async function processMessageEvent(supabase: any, payload: any, session: string,
         messageContent = messageContent || '[Archivo]';
       }
       
-      console.log(`Media message detected: ${mediaType} at ${mediaUrl}`);
+      console.log(`Media message detected: ${mediaType} at ${wahaMediaUrl}`);
+
+      // Intentar descargar y subir a Supabase Storage para acceso público
+      try {
+        const WAHA_BASE_URL = Deno.env.get('WAHA_BASE_URL');
+        const WAHA_API_KEY = Deno.env.get('WAHA_API_KEY');
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+        
+        if (WAHA_BASE_URL && WAHA_API_KEY && wahaMediaUrl) {
+          // Construir URL completa si es relativa
+          const fullMediaUrl = wahaMediaUrl.startsWith('http') 
+            ? wahaMediaUrl 
+            : `${WAHA_BASE_URL}${wahaMediaUrl}`;
+          
+          console.log(`[Media Upload] Downloading from WAHA: ${fullMediaUrl}`);
+          
+          const mediaResponse = await fetch(fullMediaUrl, {
+            headers: { 'Authorization': `Bearer ${WAHA_API_KEY}` }
+          });
+          
+          if (mediaResponse.ok) {
+            const mediaBlob = await mediaResponse.arrayBuffer();
+            const extension = mimetype.split('/')[1]?.split(';')[0] || 'bin';
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${extension}`;
+            const storagePath = `${session}/${phoneNumber}/${fileName}`;
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('chat-attachments')
+              .upload(storagePath, mediaBlob, {
+                contentType: mimetype,
+                upsert: false
+              });
+            
+            if (!uploadError && uploadData) {
+              // Obtener URL pública
+              const { data: publicUrlData } = supabase.storage
+                .from('chat-attachments')
+                .getPublicUrl(storagePath);
+              
+              mediaUrl = publicUrlData?.publicUrl || wahaMediaUrl;
+              console.log(`[Media Upload] Successfully uploaded to Storage: ${mediaUrl}`);
+            } else {
+              console.error('[Media Upload] Upload failed:', uploadError);
+              mediaUrl = wahaMediaUrl; // Fallback a URL de WAHA
+            }
+          } else {
+            console.error('[Media Upload] Download failed:', mediaResponse.status);
+            mediaUrl = wahaMediaUrl; // Fallback a URL de WAHA
+          }
+        } else {
+          mediaUrl = wahaMediaUrl; // Fallback si no hay config
+        }
+      } catch (uploadErr) {
+        console.error('[Media Upload] Error:', uploadErr);
+        mediaUrl = messageData.media.url; // Fallback a URL de WAHA
+      }
     }
 
     // Ignorar mensajes de sistema sin contenido ni media

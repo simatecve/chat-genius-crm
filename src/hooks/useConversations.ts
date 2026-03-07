@@ -103,14 +103,48 @@ export const useConversations = () => {
           table: 'messages'
         },
         (payload) => {
-          console.log('New message received globally:', payload);
-          // Actualizar unread count directamente en cache en lugar de invalidar
-          queryClient.setQueryData<number>(
-            ['unreadCount', effectiveUserId],
-            (old = 0) => old + 1
+          const newMsg = payload.new as any;
+          console.log('New message received globally:', newMsg?.conversation_id);
+          
+          // Actualizar unread count directamente en cache
+          if (newMsg?.direction === 'inbound' || newMsg?.direction === 'incoming') {
+            queryClient.setQueryData<number>(
+              ['unreadCount', effectiveUserId],
+              (old = 0) => old + 1
+            );
+          }
+          
+          // Actualizar la conversación afectada directamente en cache en vez de refetch completo
+          queryClient.setQueryData<ConversationWithLastMessage[]>(
+            ['conversations', effectiveUserId],
+            (old) => {
+              if (!old) return old;
+              
+              const convId = newMsg?.conversation_id;
+              if (!convId) return old;
+              
+              const updated = old.map(conv => {
+                if (conv.id === convId) {
+                  return {
+                    ...conv,
+                    last_message: newMsg.content || conv.last_message,
+                    last_message_time: newMsg.created_at || new Date().toISOString(),
+                    unread_count: (newMsg.direction === 'inbound' || newMsg.direction === 'incoming')
+                      ? (conv.unread_count || 0) + 1
+                      : conv.unread_count
+                  };
+                }
+                return conv;
+              });
+              
+              // Reordenar por last_message_time
+              return updated.sort((a, b) => {
+                const aTime = a.last_message_time || a.updated_at || '';
+                const bTime = b.last_message_time || b.updated_at || '';
+                return new Date(bTime).getTime() - new Date(aTime).getTime();
+              });
+            }
           );
-          // Solo invalidar conversaciones para reordenar - no unreadCount
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
       )
       .subscribe();

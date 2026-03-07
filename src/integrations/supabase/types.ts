@@ -2560,6 +2560,37 @@ export type Database = {
         Returns: boolean
       }
       get_account_owner_id: { Args: { user_id: string }; Returns: string }
+      get_conversations_by_hour: {
+        Args: { p_start_date: string; p_user_id: string }
+        Returns: {
+          hour: number
+          new_count: number
+          recurring_count: number
+        }[]
+      }
+      get_conversion_rate: {
+        Args: { p_user_id: string }
+        Returns: {
+          qualified_leads: number
+          total_leads: number
+        }[]
+      }
+      get_messages_by_hour: {
+        Args: { p_start_date: string; p_user_id: string }
+        Returns: {
+          hour: number
+          incoming: number
+          outgoing: number
+        }[]
+      }
+      get_messages_heatmap: {
+        Args: { p_start_date: string; p_user_id: string }
+        Returns: {
+          day_of_week: number
+          hour: number
+          msg_count: number
+        }[]
+      }
       get_unread_count: { Args: { user_uuid: string }; Returns: number }
       has_role: {
         Args: {
