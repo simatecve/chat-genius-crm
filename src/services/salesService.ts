@@ -71,7 +71,7 @@ export const salesService = {
     // First, get the product and update stock
     const { data: product, error: productError } = await supabase
       .from('products')
-      .select('*')
+      .select('id, name, price, stock')
       .eq('id', sale.product_id)
       .single();
 

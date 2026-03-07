@@ -86,7 +86,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     try {
       const { data, error } = await supabase
         .from('internal_messages')
-        .select('*')
+        .select('id, sender_id, receiver_id, content, is_read, created_at, updated_at')
         .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${currentUserId})`)
         .order('created_at', { ascending: true });
 

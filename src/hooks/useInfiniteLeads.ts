@@ -84,12 +84,13 @@ export const useInfiniteLeads = ({
         .select('id', { count: 'exact', head: true })
         .eq('column_id', columnId);
 
-      // Cargar leads con paginación
+      // Cargar leads con paginación - columnas específicas para reducir egress
       const { data, error } = await supabase
         .from('leads')
         .select(`
-          *,
-          lead_columns(*),
+          id, name, phone, email, company, tags, notes, value, column_id, position,
+          bot_active, last_inbound_message_time, created_at, updated_at, user_id,
+          lead_columns(id, name, color, position, workspace_id, is_default),
           conversations:conversations!conversations_lead_id_fkey(
             id,
             phone_number,
