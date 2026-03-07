@@ -36,17 +36,17 @@ export const useProfile = () => {
         setError(null);
 
         // Add timeout to avoid infinite loading
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT')), 10000)
+        );
 
-        const { data, error } = await supabase
+        const queryPromise = supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single()
-          .abortSignal(controller.signal);
+          .single();
 
-        clearTimeout(timeout);
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
         if (error) {
           throw error;
