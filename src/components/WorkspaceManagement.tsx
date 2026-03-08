@@ -163,10 +163,11 @@ const WorkspaceManagement = () => {
     }
 
       setWorkspaces(workspaces.map(ws => 
-        ws.id === editingWorkspace.id ? { ...ws, name: workspaceName, channel_type: workspaceChannelType } : ws
+        ws.id === editingWorkspace.id ? { ...ws, name: workspaceName, channel_type: workspaceChannelType, casino_api_config_id: workspaceCasinoApiId } : ws
       ));
     setEditingWorkspace(null);
     setWorkspaceName('');
+    setWorkspaceCasinoApiId(null);
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
