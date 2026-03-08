@@ -583,6 +583,22 @@ const WorkspaceManagement = () => {
                 ))}
               </div>
             </div>
+            {casinoApiConfigs.length > 0 && (
+              <div className="space-y-2">
+                <Label>API de Casino (Opcional)</Label>
+                <Select value={workspaceCasinoApiId || ''} onValueChange={(val) => setWorkspaceCasinoApiId(val || null)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin API seleccionada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin API</SelectItem>
+                    {casinoApiConfigs.map((api) => (
+                      <SelectItem key={api.id} value={api.id}>{api.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowWorkspaceDialog(false)}>
