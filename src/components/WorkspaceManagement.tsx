@@ -145,7 +145,11 @@ const WorkspaceManagement = () => {
 
       const { error } = await supabase
         .from('workspaces')
-        .update({ name: workspaceName, channel_type: workspaceChannelType })
+        .update({ 
+          name: workspaceName, 
+          channel_type: workspaceChannelType,
+          casino_api_config_id: workspaceCasinoApiId
+        })
       .eq('id', editingWorkspace.id);
 
     if (error) {
