@@ -647,10 +647,10 @@ const Leads = () => {
     }
     console.log('[Leads] Orphan conversations loaded:', orphanConversations?.length || 0, 'defaultColumnId:', defaultColumnId, 'wsChannelType:', wsChannelType);
 
-    // Filtrar conversaciones webchat de los leads reales
+    // Usar todos los leads reales sin filtrar webchat
     const filteredRealLeads = (realLeads || []).map(lead => ({
       ...lead,
-      conversations: lead.conversations?.filter((c: any) => c.channel_type !== 'webchat') || []
+      conversations: lead.conversations || []
     }));
 
     // Crear leads virtuales desde conversaciones huérfanas

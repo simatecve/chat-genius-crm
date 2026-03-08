@@ -574,6 +574,12 @@ const Settings = () => {
             <CostEstimatorTab userId={effectiveUserId} />
           </TabsContent>
         )}
+
+        {isAdmin && (
+          <TabsContent value="casino-api" className="mt-6">
+            <CasinoApiConfigTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
 
