@@ -113,7 +113,8 @@ const WorkspaceManagement = () => {
         name: workspaceName,
         position: workspaces.length,
         user_id: user?.id,
-        channel_type: workspaceChannelType
+        channel_type: workspaceChannelType,
+        casino_api_config_id: workspaceCasinoApiId
       })
       .select()
       .single();
