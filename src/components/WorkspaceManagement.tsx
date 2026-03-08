@@ -45,10 +45,10 @@ const WorkspaceManagement = () => {
   const [columnColor, setColumnColor] = useState('#3b82f6');
 
   useEffect(() => {
-    if (user) {
+    if (user && effectiveUserId) {
       loadData();
     }
-  }, [user]);
+  }, [user, effectiveUserId]);
 
   const loadData = async () => {
     try {

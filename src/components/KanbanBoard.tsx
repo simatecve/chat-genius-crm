@@ -23,7 +23,7 @@ const getChannelIcon = (channelType: string | null | undefined) => {
       return <Phone className="h-2.5 w-2.5 text-red-500" />;
     case 'webchat':
     case 'web':
-      return <MessageCircle className="h-2.5 w-2.5 text-purple-500" />;
+      return <Globe className="h-2.5 w-2.5 text-primary" />;
     default:
       return <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />;
   }
