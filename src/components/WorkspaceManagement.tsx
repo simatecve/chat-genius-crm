@@ -593,22 +593,27 @@ const WorkspaceManagement = () => {
                 ))}
               </div>
             </div>
-            {casinoApiConfigs.length > 0 && (
-              <div className="space-y-2">
-                <Label>API de Casino (Opcional)</Label>
-                <Select value={workspaceCasinoApiId || ''} onValueChange={(val) => setWorkspaceCasinoApiId(val || null)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin API seleccionada" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Sin API</SelectItem>
-                    {casinoApiConfigs.map((api) => (
-                      <SelectItem key={api.id} value={api.id}>{api.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>API de Casino (Opcional)</Label>
+              <Select
+                value={workspaceCasinoApiId ?? CASINO_API_NONE}
+                onValueChange={(val) => setWorkspaceCasinoApiId(val === CASINO_API_NONE ? null : val)}
+                disabled={casinoApiConfigs.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin API seleccionada" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CASINO_API_NONE}>Sin API</SelectItem>
+                  {casinoApiConfigs.map((api) => (
+                    <SelectItem key={api.id} value={api.id}>{api.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {casinoApiConfigs.length === 0 && (
+                <p className="text-xs text-muted-foreground">No hay APIs de casino activas.</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowWorkspaceDialog(false)}>
