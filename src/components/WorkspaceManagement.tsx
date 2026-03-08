@@ -436,6 +436,12 @@ const WorkspaceManagement = () => {
                     }`}>
                       {CHANNEL_TYPES.find(c => c.value === workspace.channel_type)?.label || 'WhatsApp'}
                     </span>
+                    {workspace.casino_api_config_id && (
+                      <Badge variant="outline" className="text-xs">
+                        <Building className="h-3 w-3 mr-1" />
+                        Casino API
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
