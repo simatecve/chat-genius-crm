@@ -72,7 +72,7 @@ const WorkspaceManagement = () => {
     const { data, error } = await supabase
       .from('workspaces')
       .select('*')
-      .eq('user_id', user?.id)
+      .eq('user_id', effectiveUserId)
       .order('position');
 
     if (error) {
