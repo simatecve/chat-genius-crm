@@ -298,6 +298,7 @@ const WorkspaceManagement = () => {
     setEditingWorkspace(null);
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
+    setWorkspaceCasinoApiId(null);
     setShowWorkspaceDialog(true);
   };
 
