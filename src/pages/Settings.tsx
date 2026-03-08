@@ -23,6 +23,7 @@ import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 import TagsTab from '@/components/settings/TagsTab';
 import IADefaultTab from '@/components/settings/IADefaultTab';
 import CostEstimatorTab from '@/components/settings/CostEstimatorTab';
+import CasinoApiConfigTab from '@/components/settings/CasinoApiConfigTab';
 
 interface UserProfile {
   first_name: string | null;
