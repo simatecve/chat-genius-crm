@@ -884,7 +884,7 @@ serve(async (req) => {
       const password = 'Capibet1234';
       
       // Crear jugador
-      const result = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '');
+      const result = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '', casinoApiConfig);
       
       if (result.success) {
         const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
