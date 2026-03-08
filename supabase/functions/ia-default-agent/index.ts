@@ -24,6 +24,14 @@ type DefaultAgentResponse = {
   combinedMessage?: boolean;
 };
 
+type CasinoApiConfig = {
+  id: string;
+  name?: string | null;
+  webhook_url?: string | null;
+  api_key?: string | null;
+  api_base_url?: string | null;
+};
+
 // ============= CONFIGURACIÓN DE HUMANIZACIÓN =============
 
 const saludoVariantes = [

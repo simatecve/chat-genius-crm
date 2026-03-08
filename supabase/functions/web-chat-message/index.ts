@@ -72,6 +72,46 @@ const casinoTools = [
   }
 ];
 
+type CasinoApiConfig = {
+  id: string;
+  name?: string | null;
+  webhook_url?: string | null;
+  api_key?: string | null;
+  api_base_url?: string | null;
+};
+
+async function getWorkspaceCasinoApiConfig(
+  supabase: any,
+  userId: string,
+  workspaceId?: string | null
+): Promise<CasinoApiConfig | null> {
+  if (!workspaceId) return null;
+
+  try {
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('casino_api_config_id')
+      .eq('id', workspaceId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!workspace?.casino_api_config_id) return null;
+
+    const { data: casinoApi } = await supabase
+      .from('casino_api_configs')
+      .select('id, name, webhook_url, api_key, api_base_url')
+      .eq('id', workspace.casino_api_config_id)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    return (casinoApi as CasinoApiConfig) || null;
+  } catch (error) {
+    console.warn('[web-chat-message] Could not resolve workspace casino API config:', error);
+    return null;
+  }
+}
+
 // Function to create player via n8n webhook
 async function crearJugador(
   userName: string, 
