@@ -28,6 +28,7 @@ const CHANNEL_TYPES = [
 
 const WorkspaceManagement = () => {
   const { user } = useAuth();
+  const { effectiveUserId, loading: effectiveUserLoading } = useEffectiveUserId();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [columns, setColumns] = useState<LeadColumn[]>([]);
   const [casinoApiConfigs, setCasinoApiConfigs] = useState<{ id: string; name: string }[]>([]);
