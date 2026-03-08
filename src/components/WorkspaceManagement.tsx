@@ -29,12 +29,14 @@ const WorkspaceManagement = () => {
   const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [columns, setColumns] = useState<LeadColumn[]>([]);
+  const [casinoApiConfigs, setCasinoApiConfigs] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWorkspaceDialog, setShowWorkspaceDialog] = useState(false);
   const [showColumnDialog, setShowColumnDialog] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [editingColumn, setEditingColumn] = useState<LeadColumn | null>(null);
   const [workspaceChannelType, setWorkspaceChannelType] = useState('whatsapp');
+  const [workspaceCasinoApiId, setWorkspaceCasinoApiId] = useState<string | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState('');
   const [columnName, setColumnName] = useState('');
