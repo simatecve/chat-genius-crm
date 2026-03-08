@@ -365,6 +365,51 @@ export type Database = {
           },
         ]
       }
+      casino_api_configs: {
+        Row: {
+          agent_username: string | null
+          api_base_url: string | null
+          api_key: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          parent_id: string | null
+          skin_id: string | null
+          updated_at: string | null
+          user_id: string
+          webhook_url: string | null
+        }
+        Insert: {
+          agent_username?: string | null
+          api_base_url?: string | null
+          api_key?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          parent_id?: string | null
+          skin_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          webhook_url?: string | null
+        }
+        Update: {
+          agent_username?: string | null
+          api_base_url?: string | null
+          api_key?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          parent_id?: string | null
+          skin_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       column_message_triggers: {
         Row: {
           column_id: string
@@ -2522,6 +2567,7 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          casino_api_config_id: string | null
           channel_type: string | null
           created_at: string | null
           id: string
@@ -2531,6 +2577,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          casino_api_config_id?: string | null
           channel_type?: string | null
           created_at?: string | null
           id?: string
@@ -2540,6 +2587,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          casino_api_config_id?: string | null
           channel_type?: string | null
           created_at?: string | null
           id?: string
@@ -2548,7 +2596,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_casino_api_config_id_fkey"
+            columns: ["casino_api_config_id"]
+            isOneToOne: false
+            referencedRelation: "casino_api_configs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

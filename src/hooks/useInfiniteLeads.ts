@@ -111,10 +111,10 @@ export const useInfiniteLeads = ({
         return;
       }
 
-      // Filtrar conversaciones webchat
+      // Usar todas las conversaciones incluyendo webchat
       const filteredLeads = (data || []).map(lead => ({
         ...lead,
-        conversations: lead.conversations?.filter((c: any) => c.channel_type !== 'webchat') || []
+        conversations: lead.conversations || []
       }));
 
       // Ordenar por último mensaje recibido (inbound)
@@ -188,7 +188,7 @@ export const useInfiniteLeads = ({
         .select('id, phone_number, pushname, last_message, last_message_time, last_inbound_message_time, unread_count, channel_type, twilio_connection_id, telegram_bot_id, created_at, updated_at')
         .eq('user_id', userId)
         .is('lead_id', null)
-        .or('channel_type.neq.webchat,channel_type.is.null');
+        ;
 
       // Aplicar filtro por conexiones si el workspace tiene channel_type específico
       if (workspaceChannelType === 'twilio') {

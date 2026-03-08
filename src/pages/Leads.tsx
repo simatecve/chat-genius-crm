@@ -406,11 +406,11 @@ const Leads = () => {
   const loadWorkspaces = async () => {
     if (!effectiveUserId) return;
 
-    // IMPORTANTE: Excluir workspaces de webchat - estos se manejan en LeadsWebChat.tsx
+    // Mostrar todos los workspaces incluyendo webchat
     const {
       data,
       error
-    } = await supabase.from('workspaces').select('*').eq('user_id', effectiveUserId).or('channel_type.is.null,channel_type.neq.webchat').order('position');
+    } = await supabase.from('workspaces').select('*').eq('user_id', effectiveUserId).order('position');
     if (error) {
       console.error('Error loading workspaces:', error);
       return;
@@ -611,7 +611,7 @@ const Leads = () => {
       .select('id, phone_number, pushname, last_message, last_message_time, last_inbound_message_time, unread_count, channel_type, twilio_connection_id, telegram_bot_id, created_at, updated_at')
       .eq('user_id', effectiveUserId)
       .is('lead_id', null)
-      .or('channel_type.neq.webchat,channel_type.is.null');
+      ;
     
     // Aplicar filtro por conexiones si el workspace tiene channel_type específico
     if (wsChannelType === 'twilio') {
@@ -647,10 +647,10 @@ const Leads = () => {
     }
     console.log('[Leads] Orphan conversations loaded:', orphanConversations?.length || 0, 'defaultColumnId:', defaultColumnId, 'wsChannelType:', wsChannelType);
 
-    // Filtrar conversaciones webchat de los leads reales
+    // Usar todos los leads reales sin filtrar webchat
     const filteredRealLeads = (realLeads || []).map(lead => ({
       ...lead,
-      conversations: lead.conversations?.filter((c: any) => c.channel_type !== 'webchat') || []
+      conversations: lead.conversations || []
     }));
 
     // Crear leads virtuales desde conversaciones huérfanas

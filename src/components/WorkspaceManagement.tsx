@@ -6,13 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Briefcase, GripVertical } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, Trash2, Briefcase, GripVertical, Building } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { embudoServices } from '@/services/embudoServices';
+import { Badge } from '@/components/ui/badge';
 
-type Workspace = Tables<'workspaces'> & { channel_type?: string };
+type Workspace = Tables<'workspaces'> & { channel_type?: string; casino_api_config_id?: string | null };
 type LeadColumn = Tables<'lead_columns'>;
 
 const CHANNEL_TYPES = [
@@ -27,12 +29,14 @@ const WorkspaceManagement = () => {
   const { user } = useAuth();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [columns, setColumns] = useState<LeadColumn[]>([]);
+  const [casinoApiConfigs, setCasinoApiConfigs] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWorkspaceDialog, setShowWorkspaceDialog] = useState(false);
   const [showColumnDialog, setShowColumnDialog] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [editingColumn, setEditingColumn] = useState<LeadColumn | null>(null);
   const [workspaceChannelType, setWorkspaceChannelType] = useState('whatsapp');
+  const [workspaceCasinoApiId, setWorkspaceCasinoApiId] = useState<string | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState('');
   const [columnName, setColumnName] = useState('');
@@ -47,7 +51,7 @@ const WorkspaceManagement = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadWorkspaces(), loadColumns()]);
+      await Promise.all([loadWorkspaces(), loadColumns(), loadCasinoApiConfigs()]);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -90,6 +94,18 @@ const WorkspaceManagement = () => {
     setColumns(data || []);
   };
 
+  const loadCasinoApiConfigs = async () => {
+    const { data, error } = await supabase
+      .from('casino_api_configs')
+      .select('id, name')
+      .eq('user_id', user?.id)
+      .eq('is_active', true);
+
+    if (!error && data) {
+      setCasinoApiConfigs(data);
+    }
+  };
+
   const handleCreateWorkspace = async () => {
     if (!workspaceName.trim()) return;
 
@@ -99,7 +115,8 @@ const WorkspaceManagement = () => {
         name: workspaceName,
         position: workspaces.length,
         user_id: user?.id,
-        channel_type: workspaceChannelType
+        channel_type: workspaceChannelType,
+        casino_api_config_id: workspaceCasinoApiId
       })
       .select()
       .single();
@@ -117,6 +134,7 @@ const WorkspaceManagement = () => {
     setWorkspaces([...workspaces, data]);
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
+    setWorkspaceCasinoApiId(null);
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
@@ -129,7 +147,11 @@ const WorkspaceManagement = () => {
 
       const { error } = await supabase
         .from('workspaces')
-        .update({ name: workspaceName, channel_type: workspaceChannelType })
+        .update({ 
+          name: workspaceName, 
+          channel_type: workspaceChannelType,
+          casino_api_config_id: workspaceCasinoApiId
+        })
       .eq('id', editingWorkspace.id);
 
     if (error) {
@@ -143,10 +165,11 @@ const WorkspaceManagement = () => {
     }
 
       setWorkspaces(workspaces.map(ws => 
-        ws.id === editingWorkspace.id ? { ...ws, name: workspaceName, channel_type: workspaceChannelType } : ws
+        ws.id === editingWorkspace.id ? { ...ws, name: workspaceName, channel_type: workspaceChannelType, casino_api_config_id: workspaceCasinoApiId } : ws
       ));
     setEditingWorkspace(null);
     setWorkspaceName('');
+    setWorkspaceCasinoApiId(null);
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
@@ -277,6 +300,7 @@ const WorkspaceManagement = () => {
     setEditingWorkspace(null);
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
+    setWorkspaceCasinoApiId(null);
     setShowWorkspaceDialog(true);
   };
 
@@ -284,6 +308,7 @@ const WorkspaceManagement = () => {
     setEditingWorkspace(workspace);
     setWorkspaceName(workspace.name);
     setWorkspaceChannelType(workspace.channel_type || 'whatsapp');
+    setWorkspaceCasinoApiId(workspace.casino_api_config_id || null);
     setShowWorkspaceDialog(true);
   };
 
@@ -411,6 +436,12 @@ const WorkspaceManagement = () => {
                     }`}>
                       {CHANNEL_TYPES.find(c => c.value === workspace.channel_type)?.label || 'WhatsApp'}
                     </span>
+                    {workspace.casino_api_config_id && (
+                      <Badge variant="outline" className="text-xs">
+                        <Building className="h-3 w-3 mr-1" />
+                        Casino API
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
@@ -558,6 +589,22 @@ const WorkspaceManagement = () => {
                 ))}
               </div>
             </div>
+            {casinoApiConfigs.length > 0 && (
+              <div className="space-y-2">
+                <Label>API de Casino (Opcional)</Label>
+                <Select value={workspaceCasinoApiId || ''} onValueChange={(val) => setWorkspaceCasinoApiId(val || null)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin API seleccionada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin API</SelectItem>
+                    {casinoApiConfigs.map((api) => (
+                      <SelectItem key={api.id} value={api.id}>{api.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowWorkspaceDialog(false)}>

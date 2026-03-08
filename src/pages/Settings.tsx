@@ -23,6 +23,7 @@ import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 import TagsTab from '@/components/settings/TagsTab';
 import IADefaultTab from '@/components/settings/IADefaultTab';
 import CostEstimatorTab from '@/components/settings/CostEstimatorTab';
+import CasinoApiConfigTab from '@/components/settings/CasinoApiConfigTab';
 
 interface UserProfile {
   first_name: string | null;
@@ -267,6 +268,12 @@ const Settings = () => {
             <TabsTrigger value="cost-estimator" className="flex items-center space-x-2 flex-shrink-0">
               <Calculator className="h-4 w-4" />
               <span>Costos</span>
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="casino-api" className="flex items-center space-x-2 flex-shrink-0">
+              <Building className="h-4 w-4" />
+              <span>Casino API</span>
             </TabsTrigger>
           )}
         </TabsList>
@@ -565,6 +572,12 @@ const Settings = () => {
         {isAdmin && (
           <TabsContent value="cost-estimator" className="mt-6">
             <CostEstimatorTab userId={effectiveUserId} />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="casino-api" className="mt-6">
+            <CasinoApiConfigTab />
           </TabsContent>
         )}
       </Tabs>
