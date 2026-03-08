@@ -510,6 +510,16 @@ serve(async (req) => {
       existingCasinoUsername
     });
 
+    const casinoApiConfig = await getCasinoApiConfigForConversation(supabase, userId, conversationId);
+
+    if (casinoApiConfig) {
+      console.log('[ia-default-agent] Using workspace casino API config:', {
+        id: casinoApiConfig.id,
+        name: casinoApiConfig.name,
+        hasWebhook: !!casinoApiConfig.webhook_url,
+      });
+    }
+
     // Obtener configuración global de IA
     const { data: settings, error: settingsError } = await supabase
       .from('ia_default_settings')
