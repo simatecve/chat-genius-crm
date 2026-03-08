@@ -508,6 +508,16 @@ serve(async (req) => {
       }
     }
 
+    const workspaceCasinoApiConfig = await getWorkspaceCasinoApiConfig(supabase, webchat.user_id, effectiveWorkspaceId);
+
+    if (workspaceCasinoApiConfig) {
+      console.log('[web-chat-message] Using workspace casino API config:', {
+        id: workspaceCasinoApiConfig.id,
+        name: workspaceCasinoApiConfig.name,
+        hasWebhook: !!workspaceCasinoApiConfig.webhook_url,
+      });
+    }
+
     // Find or create conversation for this session
     let conversation = await getOrCreateConversation(supabase, webchat.user_id, sessionId, webchat.name, effectiveDefaultColumnId);
 
