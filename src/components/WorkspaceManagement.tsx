@@ -90,7 +90,17 @@ const WorkspaceManagement = () => {
       console.error('Error loading columns:', error);
       return;
     }
+  const loadCasinoApiConfigs = async () => {
+    const { data, error } = await supabase
+      .from('casino_api_configs')
+      .select('id, name')
+      .eq('user_id', user?.id)
+      .eq('is_active', true);
 
+    if (!error && data) {
+      setCasinoApiConfigs(data);
+    }
+  };
     setColumns(data || []);
   };
 
