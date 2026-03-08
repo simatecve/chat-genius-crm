@@ -102,7 +102,7 @@ const WorkspaceManagement = () => {
     const { data, error } = await supabase
       .from('casino_api_configs')
       .select('id, name')
-      .eq('user_id', user?.id)
+      .eq('user_id', effectiveUserId)
       .eq('is_active', true);
 
     if (!error && data) {
