@@ -132,6 +132,7 @@ const WorkspaceManagement = () => {
     setWorkspaces([...workspaces, data]);
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
+    setWorkspaceCasinoApiId(null);
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
