@@ -385,7 +385,7 @@ const WorkspaceManagement = () => {
     });
   };
 
-  if (loading) {
+  if (loading || effectiveUserLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
