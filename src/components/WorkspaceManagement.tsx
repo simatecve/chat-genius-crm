@@ -216,7 +216,7 @@ const WorkspaceManagement = () => {
         color: columnColor,
         position: workspaceColumns.length,
         workspace_id: selectedWorkspace,
-        user_id: user?.id
+        user_id: effectiveUserId
       })
       .select()
       .single();
