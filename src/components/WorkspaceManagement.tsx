@@ -306,6 +306,7 @@ const WorkspaceManagement = () => {
     setEditingWorkspace(workspace);
     setWorkspaceName(workspace.name);
     setWorkspaceChannelType(workspace.channel_type || 'whatsapp');
+    setWorkspaceCasinoApiId(workspace.casino_api_config_id || null);
     setShowWorkspaceDialog(true);
   };
 
