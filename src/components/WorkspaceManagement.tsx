@@ -6,13 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Edit, Trash2, Briefcase, GripVertical } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, Trash2, Briefcase, GripVertical, Building } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { embudoServices } from '@/services/embudoServices';
+import { Badge } from '@/components/ui/badge';
 
-type Workspace = Tables<'workspaces'> & { channel_type?: string };
+type Workspace = Tables<'workspaces'> & { channel_type?: string; casino_api_config_id?: string | null };
 type LeadColumn = Tables<'lead_columns'>;
 
 const CHANNEL_TYPES = [
