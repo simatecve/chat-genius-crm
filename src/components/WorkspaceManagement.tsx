@@ -51,7 +51,7 @@ const WorkspaceManagement = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadWorkspaces(), loadColumns()]);
+      await Promise.all([loadWorkspaces(), loadColumns(), loadCasinoApiConfigs()]);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
