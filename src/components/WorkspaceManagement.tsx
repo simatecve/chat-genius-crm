@@ -26,6 +26,8 @@ const CHANNEL_TYPES = [
   { value: 'all', label: 'Todos', color: 'bg-purple-500' }
 ];
 
+const CASINO_API_NONE = '__none__';
+
 const WorkspaceManagement = () => {
   const { user } = useAuth();
   const { effectiveUserId, loading: effectiveUserLoading } = useEffectiveUserId();
