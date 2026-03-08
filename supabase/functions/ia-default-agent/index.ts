@@ -1214,7 +1214,7 @@ Mantené el tono natural y relajado. No seas repetitivo.`;
               const password = args.password || 'Capibet1234';
               
               console.log(`[ia-default-agent] Creating user with generated username: ${generatedUsername}`);
-              const toolResult = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '');
+              const toolResult = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '', casinoApiConfig);
               
               if (toolResult.success && toolResult.data) {
                 toolResult.data.credentials = { userName: generatedUsername, password };

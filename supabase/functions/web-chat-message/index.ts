@@ -871,7 +871,7 @@ serve(async (req) => {
                 const password = args.password || 'Capibet1234';
                 const contactName = conversation?.contact_name || "Usuario Web Chat";
                 
-                const result = await crearJugador(username, password, contactName, sessionId);
+                const result = await crearJugador(username, password, contactName, sessionId, workspaceCasinoApiConfig);
                 
                 if (result.success) {
                   // Mark conversation as user created
