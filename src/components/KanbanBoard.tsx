@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2, Send, MessageCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2, Send, Globe } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -23,7 +23,7 @@ const getChannelIcon = (channelType: string | null | undefined) => {
       return <Phone className="h-2.5 w-2.5 text-red-500" />;
     case 'webchat':
     case 'web':
-      return <MessageCircle className="h-2.5 w-2.5 text-purple-500" />;
+      return <Globe className="h-2.5 w-2.5 text-primary" />;
     default:
       return <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />;
   }

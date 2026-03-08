@@ -24,6 +24,14 @@ type DefaultAgentResponse = {
   combinedMessage?: boolean;
 };
 
+type CasinoApiConfig = {
+  id: string;
+  name?: string | null;
+  webhook_url?: string | null;
+  api_key?: string | null;
+  api_base_url?: string | null;
+};
+
 // ============= CONFIGURACIÓN DE HUMANIZACIÓN =============
 
 const saludoVariantes = [
@@ -241,16 +249,100 @@ function sanitizeCashierFromResponse(
   return sanitized;
 }
 
-// Función helper para crear jugador en el casino
-async function crearJugador(userName: string, password: string, contactName: string, phoneNumber: string) {
+async function getCasinoApiConfigForConversation(
+  supabase: any,
+  userId: string,
+  conversationId?: string
+): Promise<CasinoApiConfig | null> {
+  if (!conversationId) return null;
+
   try {
-    console.log(`Creating player: ${userName} for ${contactName} (${phoneNumber})`);
-    const response = await fetch('https://n8n2025.nocodeveloper.site/webhook/crear-usuario', {
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('lead_id')
+      .eq('id', conversationId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!conversation?.lead_id) return null;
+
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('column_id')
+      .eq('id', conversation.lead_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!lead?.column_id) return null;
+
+    const { data: column } = await supabase
+      .from('lead_columns')
+      .select('workspace_id')
+      .eq('id', lead.column_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!column?.workspace_id) return null;
+
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('casino_api_config_id')
+      .eq('id', column.workspace_id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!workspace?.casino_api_config_id) return null;
+
+    const { data: casinoApi } = await supabase
+      .from('casino_api_configs')
+      .select('id, name, webhook_url, api_key, api_base_url')
+      .eq('id', workspace.casino_api_config_id)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    return (casinoApi as CasinoApiConfig) || null;
+  } catch (error) {
+    console.warn('[ia-default-agent] Could not resolve workspace casino API config:', error);
+    return null;
+  }
+}
+
+// Función helper para crear jugador en el casino
+async function crearJugador(
+  userName: string,
+  password: string,
+  contactName: string,
+  phoneNumber: string,
+  casinoApiConfig?: CasinoApiConfig | null
+) {
+  try {
+    const webhookUrl = casinoApiConfig?.webhook_url?.trim() || 'https://n8n2025.nocodeveloper.site/webhook/crear-usuario';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+    if (casinoApiConfig?.api_key) {
+      headers['x-api-key'] = casinoApiConfig.api_key;
+    }
+
+    console.log(`Creating player: ${userName} for ${contactName} (${phoneNumber}) using webhook ${webhookUrl}`);
+
+    const response = await fetch(webhookUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ userName, password, contactName, phoneNumber })
     });
-    const result = await response.json();
+
+    const responseText = await response.text();
+    let result: any = null;
+
+    if (responseText?.trim()) {
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        result = responseText;
+      }
+    }
+
     console.log('Player creation result:', result);
     return { success: response.ok, data: result };
   } catch (error) {
@@ -417,6 +509,16 @@ serve(async (req) => {
       existingCasinoUser,
       existingCasinoUsername
     });
+
+    const casinoApiConfig = await getCasinoApiConfigForConversation(supabase, userId, conversationId);
+
+    if (casinoApiConfig) {
+      console.log('[ia-default-agent] Using workspace casino API config:', {
+        id: casinoApiConfig.id,
+        name: casinoApiConfig.name,
+        hasWebhook: !!casinoApiConfig.webhook_url,
+      });
+    }
 
     // Obtener configuración global de IA
     const { data: settings, error: settingsError } = await supabase
@@ -782,7 +884,7 @@ serve(async (req) => {
       const password = 'Capibet1234';
       
       // Crear jugador
-      const result = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '');
+      const result = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '', casinoApiConfig);
       
       if (result.success) {
         const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
@@ -866,7 +968,7 @@ serve(async (req) => {
           const generatedUsername = await generateUniqueUsername(supabase, nombreUsuario);
           const password = 'Capibet1234';
           
-          const result = await crearJugador(generatedUsername, password, nombreUsuario, phoneNumber || '');
+          const result = await crearJugador(generatedUsername, password, nombreUsuario, phoneNumber || '', casinoApiConfig);
           
           if (result.success) {
             const emoji = Math.random() * 100 < emojiFrequency ? ' 🎰' : '';
@@ -1112,7 +1214,7 @@ Mantené el tono natural y relajado. No seas repetitivo.`;
               const password = args.password || 'Capibet1234';
               
               console.log(`[ia-default-agent] Creating user with generated username: ${generatedUsername}`);
-              const toolResult = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '');
+              const toolResult = await crearJugador(generatedUsername, password, contactName || 'Usuario', phoneNumber || '', casinoApiConfig);
               
               if (toolResult.success && toolResult.data) {
                 toolResult.data.credentials = { userName: generatedUsername, password };

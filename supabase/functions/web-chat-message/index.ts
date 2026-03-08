@@ -72,19 +72,67 @@ const casinoTools = [
   }
 ];
 
+type CasinoApiConfig = {
+  id: string;
+  name?: string | null;
+  webhook_url?: string | null;
+  api_key?: string | null;
+  api_base_url?: string | null;
+};
+
+async function getWorkspaceCasinoApiConfig(
+  supabase: any,
+  userId: string,
+  workspaceId?: string | null
+): Promise<CasinoApiConfig | null> {
+  if (!workspaceId) return null;
+
+  try {
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('casino_api_config_id')
+      .eq('id', workspaceId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!workspace?.casino_api_config_id) return null;
+
+    const { data: casinoApi } = await supabase
+      .from('casino_api_configs')
+      .select('id, name, webhook_url, api_key, api_base_url')
+      .eq('id', workspace.casino_api_config_id)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    return (casinoApi as CasinoApiConfig) || null;
+  } catch (error) {
+    console.warn('[web-chat-message] Could not resolve workspace casino API config:', error);
+    return null;
+  }
+}
+
 // Function to create player via n8n webhook
 async function crearJugador(
-  userName: string, 
-  password: string = "Capibet1234", 
+  userName: string,
+  password: string = "Capibet1234",
   contactName: string = "Usuario Web Chat",
-  phoneNumber?: string
+  phoneNumber?: string,
+  casinoApiConfig?: CasinoApiConfig | null
 ): Promise<{ success: boolean; message: string; userName: string; password: string }> {
   try {
-    console.log(`Creating casino player: ${userName} for contact: ${contactName}`);
-    
-    const response = await fetch("https://n8n2025.nocodeveloper.site/webhook/crear-usuario", {
+    const webhookUrl = casinoApiConfig?.webhook_url?.trim() || "https://n8n2025.nocodeveloper.site/webhook/crear-usuario";
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+
+    if (casinoApiConfig?.api_key) {
+      headers['x-api-key'] = casinoApiConfig.api_key;
+    }
+
+    console.log(`Creating casino player: ${userName} for contact: ${contactName} using webhook ${webhookUrl}`);
+
+    const response = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         userName,
         password,
@@ -93,30 +141,31 @@ async function crearJugador(
       })
     });
 
-    if (response.ok) {
-      // Handle response - may not be valid JSON
-      let result = null;
-      try {
-        const text = await response.text();
-        if (text && text.trim()) {
-          result = JSON.parse(text);
-        }
-      } catch (parseError) {
-        console.log("Webhook response is not JSON, treating as success");
+    // Handle response - may not be valid JSON
+    let result = null;
+    const text = await response.text();
+
+    try {
+      if (text && text.trim()) {
+        result = JSON.parse(text);
       }
-      
+    } catch {
+      result = text;
+      console.log("Webhook response is not JSON, treating as text");
+    }
+
+    if (response.ok) {
       console.log("Player created successfully:", result);
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: `¡Listo! Usuario: ${userName} - Contraseña: ${password}`,
         userName,
         password
       };
-    } else {
-      const errorText = await response.text();
-      console.error("Error creating player:", errorText);
-      return { success: false, message: "Error al crear la cuenta. Contactá al cajero.", userName, password };
     }
+
+    console.error("Error creating player:", result || text);
+    return { success: false, message: "Error al crear la cuenta. Contactá al cajero.", userName, password };
   } catch (error) {
     console.error("Error in crearJugador:", error);
     return { success: false, message: "Error de conexión. Intentá de nuevo o contactá al cajero.", userName, password };
@@ -459,6 +508,16 @@ serve(async (req) => {
       }
     }
 
+    const workspaceCasinoApiConfig = await getWorkspaceCasinoApiConfig(supabase, webchat.user_id, effectiveWorkspaceId);
+
+    if (workspaceCasinoApiConfig) {
+      console.log('[web-chat-message] Using workspace casino API config:', {
+        id: workspaceCasinoApiConfig.id,
+        name: workspaceCasinoApiConfig.name,
+        hasWebhook: !!workspaceCasinoApiConfig.webhook_url,
+      });
+    }
+
     // Find or create conversation for this session
     let conversation = await getOrCreateConversation(supabase, webchat.user_id, sessionId, webchat.name, effectiveDefaultColumnId);
 
@@ -612,7 +671,7 @@ serve(async (req) => {
           const password = 'Capibet1234';
           
           const contactName = conversation?.contact_name || "Usuario Web Chat";
-          const result = await crearJugador(username, password, contactName, sessionId);
+          const result = await crearJugador(username, password, contactName, sessionId, workspaceCasinoApiConfig);
           
           if (result.success) {
             // Mark conversation as user created and save username
@@ -812,7 +871,7 @@ serve(async (req) => {
                 const password = args.password || 'Capibet1234';
                 const contactName = conversation?.contact_name || "Usuario Web Chat";
                 
-                const result = await crearJugador(username, password, contactName, sessionId);
+                const result = await crearJugador(username, password, contactName, sessionId, workspaceCasinoApiConfig);
                 
                 if (result.success) {
                   // Mark conversation as user created

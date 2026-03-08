@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,8 +26,11 @@ const CHANNEL_TYPES = [
   { value: 'all', label: 'Todos', color: 'bg-purple-500' }
 ];
 
+const CASINO_API_NONE = '__none__';
+
 const WorkspaceManagement = () => {
   const { user } = useAuth();
+  const { effectiveUserId, loading: effectiveUserLoading } = useEffectiveUserId();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [columns, setColumns] = useState<LeadColumn[]>([]);
   const [casinoApiConfigs, setCasinoApiConfigs] = useState<{ id: string; name: string }[]>([]);
@@ -43,10 +47,10 @@ const WorkspaceManagement = () => {
   const [columnColor, setColumnColor] = useState('#3b82f6');
 
   useEffect(() => {
-    if (user) {
+    if (user && effectiveUserId) {
       loadData();
     }
-  }, [user]);
+  }, [user, effectiveUserId]);
 
   const loadData = async () => {
     try {
@@ -68,7 +72,7 @@ const WorkspaceManagement = () => {
     const { data, error } = await supabase
       .from('workspaces')
       .select('*')
-      .eq('user_id', user?.id)
+      .eq('user_id', effectiveUserId)
       .order('position');
 
     if (error) {
@@ -83,7 +87,7 @@ const WorkspaceManagement = () => {
     const { data, error } = await supabase
       .from('lead_columns')
       .select('*')
-      .eq('user_id', user?.id)
+      .eq('user_id', effectiveUserId)
       .order('position');
 
     if (error) {
@@ -98,7 +102,7 @@ const WorkspaceManagement = () => {
     const { data, error } = await supabase
       .from('casino_api_configs')
       .select('id, name')
-      .eq('user_id', user?.id)
+      .eq('user_id', effectiveUserId)
       .eq('is_active', true);
 
     if (!error && data) {
@@ -114,7 +118,7 @@ const WorkspaceManagement = () => {
       .insert({
         name: workspaceName,
         position: workspaces.length,
-        user_id: user?.id,
+        user_id: effectiveUserId,
         channel_type: workspaceChannelType,
         casino_api_config_id: workspaceCasinoApiId
       })
@@ -212,7 +216,7 @@ const WorkspaceManagement = () => {
         color: columnColor,
         position: workspaceColumns.length,
         workspace_id: selectedWorkspace,
-        user_id: user?.id
+        user_id: effectiveUserId
       })
       .select()
       .single();
@@ -381,7 +385,7 @@ const WorkspaceManagement = () => {
     });
   };
 
-  if (loading) {
+  if (loading || effectiveUserLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -589,22 +593,27 @@ const WorkspaceManagement = () => {
                 ))}
               </div>
             </div>
-            {casinoApiConfigs.length > 0 && (
-              <div className="space-y-2">
-                <Label>API de Casino (Opcional)</Label>
-                <Select value={workspaceCasinoApiId || ''} onValueChange={(val) => setWorkspaceCasinoApiId(val || null)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin API seleccionada" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Sin API</SelectItem>
-                    {casinoApiConfigs.map((api) => (
-                      <SelectItem key={api.id} value={api.id}>{api.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>API de Casino (Opcional)</Label>
+              <Select
+                value={workspaceCasinoApiId ?? CASINO_API_NONE}
+                onValueChange={(val) => setWorkspaceCasinoApiId(val === CASINO_API_NONE ? null : val)}
+                disabled={casinoApiConfigs.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin API seleccionada" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CASINO_API_NONE}>Sin API</SelectItem>
+                  {casinoApiConfigs.map((api) => (
+                    <SelectItem key={api.id} value={api.id}>{api.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {casinoApiConfigs.length === 0 && (
+                <p className="text-xs text-muted-foreground">No hay APIs de casino activas.</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowWorkspaceDialog(false)}>
