@@ -270,6 +270,12 @@ const Settings = () => {
               <span>Costos</span>
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="casino-api" className="flex items-center space-x-2 flex-shrink-0">
+              <Building className="h-4 w-4" />
+              <span>Casino API</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
