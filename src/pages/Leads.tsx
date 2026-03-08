@@ -406,11 +406,11 @@ const Leads = () => {
   const loadWorkspaces = async () => {
     if (!effectiveUserId) return;
 
-    // IMPORTANTE: Excluir workspaces de webchat - estos se manejan en LeadsWebChat.tsx
+    // Mostrar todos los workspaces incluyendo webchat
     const {
       data,
       error
-    } = await supabase.from('workspaces').select('*').eq('user_id', effectiveUserId).or('channel_type.is.null,channel_type.neq.webchat').order('position');
+    } = await supabase.from('workspaces').select('*').eq('user_id', effectiveUserId).order('position');
     if (error) {
       console.error('Error loading workspaces:', error);
       return;
