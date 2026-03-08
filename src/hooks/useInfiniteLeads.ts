@@ -111,10 +111,10 @@ export const useInfiniteLeads = ({
         return;
       }
 
-      // Filtrar conversaciones webchat
+      // Usar todas las conversaciones incluyendo webchat
       const filteredLeads = (data || []).map(lead => ({
         ...lead,
-        conversations: lead.conversations?.filter((c: any) => c.channel_type !== 'webchat') || []
+        conversations: lead.conversations || []
       }));
 
       // Ordenar por último mensaje recibido (inbound)
