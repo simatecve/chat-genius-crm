@@ -118,7 +118,7 @@ const WorkspaceManagement = () => {
       .insert({
         name: workspaceName,
         position: workspaces.length,
-        user_id: user?.id,
+        user_id: effectiveUserId,
         channel_type: workspaceChannelType,
         casino_api_config_id: workspaceCasinoApiId
       })
