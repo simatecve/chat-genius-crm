@@ -1,12 +1,23 @@
 
 
-# Update System Version
+# Plan: Eliminar respuesta "OK" del webhook Twilio
 
-Replace all instances of `Versión 2.35 01-03-26` with `Versión 3.0 17-03-26` in three files:
+## Problema
 
-1. **`src/pages/Login.tsx`** (line 163)
-2. **`src/components/layout/Sidebar.tsx`** (line 249)
-3. **`src/components/layout/AdminLayout.tsx`** (line 184)
+El webhook de Twilio actualmente responde con el texto `"OK"` en el body de la respuesta HTTP. Esto es innecesario — Twilio solo necesita un status code 200 con body vacío (o TwiML vacío). Otras plataformas no envían este texto de vuelta.
 
-Straightforward text replacement, no logic changes.
+## Cambios
+
+**Archivo:** `supabase/functions/twilio-webhook/index.ts`
+
+Reemplazar todas las respuestas `new Response('OK', ...)` por `new Response(null, ...)` con status 200 y sin body:
+
+| Línea | Actual | Nuevo |
+|-------|--------|-------|
+| 487 | `return new Response('OK', { status: 200, headers: corsHeaders });` | `return new Response(null, { status: 200, headers: corsHeaders });` |
+| 508 | `return new Response('OK', { status: 200, headers: corsHeaders });` | `return new Response(null, { status: 200, headers: corsHeaders });` |
+| 649-652 | `return new Response('OK', { status: 200, headers: {...} });` | `return new Response(null, { status: 200, headers: corsHeaders });` |
+| 656-658 | `return new Response('OK', { status: 200, headers: corsHeaders });` | `return new Response(null, { status: 200, headers: corsHeaders });` |
+
+Son 4 ocurrencias en total. Se reemplaza `'OK'` por `null` en todas. El webhook seguirá respondiendo con HTTP 200 (que es lo que Twilio necesita) pero sin enviar contenido en el body.
 
