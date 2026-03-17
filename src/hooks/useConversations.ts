@@ -352,14 +352,20 @@ export const useMessages = (conversationId: string | null) => {
         console.log('Message change:', payload);
         
         if (payload.eventType === 'INSERT') {
-          // Agregar nuevo mensaje a la cache
+          // Agregar nuevo mensaje a la cache con la key correcta (incluye effectiveUserId)
           queryClient.setQueryData(
-            ['messages', conversationId],
+            ['messages', conversationId, effectiveUserId],
             (oldMessages: Message[] = []) => {
-              // Evitar duplicados
+              // Evitar duplicados por ID real
               const exists = oldMessages.some(msg => msg.id === payload.new.id);
               if (exists) return oldMessages;
-              return [...oldMessages, payload.new];
+              // Remover mensajes temporales optimistas que coincidan con este mensaje real
+              const filtered = oldMessages.filter(msg => {
+                if (!msg.id.startsWith('temp-')) return true;
+                // Si el mensaje temporal tiene el mismo contenido y conversación, reemplazar
+                return msg.content !== payload.new.content || msg.conversation_id !== payload.new.conversation_id;
+              });
+              return [...filtered, payload.new];
             }
           );
         }
