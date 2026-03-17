@@ -142,18 +142,29 @@ serve(async (req) => {
 
     if (dbError) {
       console.error('Error saving message to database:', dbError);
-    } else {
-      console.log('Message saved to database:', savedMessage.id);
-      
-      // Actualizar última fecha de mensaje en la conversación
-      await supabase
-        .from('conversations')
-        .update({
-          last_message: message,
-          last_message_time: new Date().toISOString(),
-        })
-        .eq('id', conversationId);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Message sent via Twilio but failed to save in database: ${dbError.message}`,
+          twilioResult: twilioResult
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
     }
+
+    console.log('Message saved to database:', savedMessage.id);
+    
+    // Actualizar última fecha de mensaje en la conversación
+    await supabase
+      .from('conversations')
+      .update({
+        last_message: message,
+        last_message_time: new Date().toISOString(),
+      })
+      .eq('id', conversationId);
 
     return new Response(
       JSON.stringify({

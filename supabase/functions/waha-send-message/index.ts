@@ -322,25 +322,53 @@ serve(async (req) => {
       }
     };
 
-    const { data: savedMessage, error: dbError } = await supabase
+    let { data: savedMessage, error: dbError } = await supabase
       .from('messages')
       .insert(messageData)
       .select()
       .single();
 
+    // Handle duplicate waha_id race condition (webhook beat us)
+    if (dbError && dbError.code === '23505' && messageData.metadata?.waha_id) {
+      console.log('[waha-send-message] Duplicate waha_id detected, fetching existing message...');
+      const { data: existingMsg } = await supabase
+        .from('messages')
+        .select()
+        .eq('conversation_id', conversationId)
+        .filter('metadata->>waha_id', 'eq', messageData.metadata.waha_id)
+        .single();
+      
+      if (existingMsg) {
+        savedMessage = existingMsg;
+        dbError = null;
+        console.log('[waha-send-message] Found existing message:', existingMsg.id);
+      }
+    }
+
     if (dbError) {
       console.error('Error saving message to database:', dbError);
-    } else {
-      console.log('Message saved to database:', savedMessage.id);
-      
-      await supabase
-        .from('conversations')
-        .update({
-          last_message: message,
-          last_message_time: new Date().toISOString(),
-        })
-        .eq('id', conversationId);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Message sent via WhatsApp but failed to save in database: ${dbError.message}`,
+          wahaResult: wahaResult
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
     }
+
+    console.log('Message saved to database:', savedMessage?.id);
+    
+    await supabase
+      .from('conversations')
+      .update({
+        last_message: message,
+        last_message_time: new Date().toISOString(),
+      })
+      .eq('id', conversationId);
 
     return new Response(
       JSON.stringify({
