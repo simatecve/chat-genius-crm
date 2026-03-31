@@ -308,12 +308,11 @@ const Leads = () => {
     }
     setIsRefreshing(true);
     reloadTimeoutRef.current = setTimeout(async () => {
-      if (loadLeadsRef.current) {
-        await loadLeadsRef.current();
-      }
+      // Use refreshAll from useInfiniteLeads to update the actual displayed data
+      await refreshAll();
       setIsRefreshing(false);
     }, 500);
-  }, [isMoving]);
+  }, [isMoving, refreshAll]);
 
   // Limpiar timeout al desmontar
   useEffect(() => {

@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,6 +38,7 @@ export default function CreateMassCampaign() {
   const [campaignName, setCampaignName] = useState('');
   const [channelType, setChannelType] = useState<'whatsapp' | 'telegram' | 'twilio'>('whatsapp');
   const [selectedConnection, setSelectedConnection] = useState('');
+  const [selectedWhatsAppConnections, setSelectedWhatsAppConnections] = useState<string[]>([]);
   const [selectedContactList, setSelectedContactList] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [message, setMessage] = useState('');
@@ -116,8 +118,15 @@ export default function CreateMassCampaign() {
       setWaitTimeEnabled((campaign.min_delay || 0) > 0);
 
       // Cargar conexión según el tipo de canal
-      if (campaign.channel_type === 'whatsapp' && campaign.whatsapp_connection_id) {
-        setSelectedConnection(campaign.whatsapp_connection_id);
+      if (campaign.channel_type === 'whatsapp') {
+        // Load multi-session if available
+        const connectionIds = (campaign as any).whatsapp_connection_ids;
+        if (connectionIds && Array.isArray(connectionIds) && connectionIds.length > 0) {
+          setSelectedWhatsAppConnections(connectionIds);
+        } else if (campaign.whatsapp_connection_id) {
+          setSelectedWhatsAppConnections([campaign.whatsapp_connection_id]);
+          setSelectedConnection(campaign.whatsapp_connection_id);
+        }
       } else if (campaign.channel_type === 'telegram' && campaign.telegram_bot_id) {
         setSelectedConnection(campaign.telegram_bot_id);
       } else if (campaign.channel_type === 'twilio' && campaign.twilio_connection_id) {
@@ -212,7 +221,16 @@ export default function CreateMassCampaign() {
 
   const handleSubmit = async () => {
     // Validar que haya conexión seleccionada
-    if (!selectedConnection) {
+    if (channelType === 'whatsapp') {
+      if (selectedWhatsAppConnections.length === 0) {
+        toast({
+          title: "Error",
+          description: "Por favor selecciona al menos una sesión de WhatsApp",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (!selectedConnection) {
       toast({
         title: "Error",
         description: "Por favor selecciona una sesión",
@@ -288,9 +306,15 @@ export default function CreateMassCampaign() {
 
       // Asignar la conexión según el tipo de canal
       if (channelType === 'whatsapp') {
-        const selectedConn = whatsappConnections.find(c => c.id === selectedConnection);
-        campaignData.whatsapp_connection_id = selectedConnection;
-        campaignData.whatsapp_connection_name = selectedConn?.name || selectedConn?.phone_number || 'WhatsApp';
+        // Multi-session support
+        campaignData.whatsapp_connection_ids = selectedWhatsAppConnections;
+        // Keep backward compat - use first selected as primary
+        campaignData.whatsapp_connection_id = selectedWhatsAppConnections[0];
+        const selectedNames = selectedWhatsAppConnections.map(id => {
+          const conn = whatsappConnections.find(c => c.id === id);
+          return conn?.name || conn?.phone_number || 'WhatsApp';
+        });
+        campaignData.whatsapp_connection_name = selectedNames.join(', ');
       } else if (channelType === 'telegram') {
         const selectedConn = telegramConnections.find(c => c.id === selectedConnection);
         campaignData.telegram_bot_id = selectedConnection;
@@ -406,25 +430,55 @@ export default function CreateMassCampaign() {
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <Label className="text-foreground mb-2 block">
-              Sesión de {channelType === 'whatsapp' ? 'WhatsApp' : channelType === 'telegram' ? 'Telegram' : 'Twilio'}
+              {channelType === 'whatsapp' ? 'Sesiones de WhatsApp (multi-selección)' : `Sesión de ${channelType === 'telegram' ? 'Telegram' : 'Twilio'}`}
             </Label>
-            <Select value={selectedConnection} onValueChange={setSelectedConnection}>
-              <SelectTrigger className="bg-card border-border text-foreground">
-                <SelectValue placeholder={`Buscar sesión de ${channelType}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {getCurrentConnections().map((conn: any) => (
-                  <SelectItem key={conn.id} value={conn.id}>
-                    {channelType === 'whatsapp' 
-                      ? `${conn.name || conn.phone_number}` 
-                      : channelType === 'telegram'
-                      ? `${conn.bot_name}`
-                      : `${conn.connection_name} - ${conn.phone_number}`
-                    }
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            
+            {channelType === 'whatsapp' ? (
+              /* Multi-select checkboxes for WhatsApp */
+              <div className="bg-card border border-border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto">
+                {whatsappConnections.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay sesiones activas</p>
+                ) : (
+                  whatsappConnections.map((conn) => (
+                    <label key={conn.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1.5 rounded-md">
+                      <Checkbox
+                        checked={selectedWhatsAppConnections.includes(conn.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedWhatsAppConnections(prev => [...prev, conn.id]);
+                          } else {
+                            setSelectedWhatsAppConnections(prev => prev.filter(id => id !== conn.id));
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-foreground">{conn.name || conn.phone_number}</span>
+                    </label>
+                  ))
+                )}
+                {selectedWhatsAppConnections.length > 0 && (
+                  <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+                    {selectedWhatsAppConnections.length} sesión(es) seleccionada(s) — los mensajes se distribuirán en round-robin
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Single select for Telegram/Twilio */
+              <Select value={selectedConnection} onValueChange={setSelectedConnection}>
+                <SelectTrigger className="bg-card border-border text-foreground">
+                  <SelectValue placeholder={`Buscar sesión de ${channelType}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {getCurrentConnections().map((conn: any) => (
+                    <SelectItem key={conn.id} value={conn.id}>
+                      {channelType === 'telegram'
+                        ? `${conn.bot_name}`
+                        : `${conn.connection_name} - ${conn.phone_number}`
+                      }
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             
             {/* Twilio Usage Warning */}
             {channelType === 'twilio' && selectedConnection && (
