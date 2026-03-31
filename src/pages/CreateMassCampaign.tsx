@@ -221,7 +221,16 @@ export default function CreateMassCampaign() {
 
   const handleSubmit = async () => {
     // Validar que haya conexión seleccionada
-    if (!selectedConnection) {
+    if (channelType === 'whatsapp') {
+      if (selectedWhatsAppConnections.length === 0) {
+        toast({
+          title: "Error",
+          description: "Por favor selecciona al menos una sesión de WhatsApp",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (!selectedConnection) {
       toast({
         title: "Error",
         description: "Por favor selecciona una sesión",
