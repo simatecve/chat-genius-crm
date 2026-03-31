@@ -430,25 +430,55 @@ export default function CreateMassCampaign() {
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <Label className="text-foreground mb-2 block">
-              Sesión de {channelType === 'whatsapp' ? 'WhatsApp' : channelType === 'telegram' ? 'Telegram' : 'Twilio'}
+              {channelType === 'whatsapp' ? 'Sesiones de WhatsApp (multi-selección)' : `Sesión de ${channelType === 'telegram' ? 'Telegram' : 'Twilio'}`}
             </Label>
-            <Select value={selectedConnection} onValueChange={setSelectedConnection}>
-              <SelectTrigger className="bg-card border-border text-foreground">
-                <SelectValue placeholder={`Buscar sesión de ${channelType}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {getCurrentConnections().map((conn: any) => (
-                  <SelectItem key={conn.id} value={conn.id}>
-                    {channelType === 'whatsapp' 
-                      ? `${conn.name || conn.phone_number}` 
-                      : channelType === 'telegram'
-                      ? `${conn.bot_name}`
-                      : `${conn.connection_name} - ${conn.phone_number}`
-                    }
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            
+            {channelType === 'whatsapp' ? (
+              /* Multi-select checkboxes for WhatsApp */
+              <div className="bg-card border border-border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto">
+                {whatsappConnections.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay sesiones activas</p>
+                ) : (
+                  whatsappConnections.map((conn) => (
+                    <label key={conn.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1.5 rounded-md">
+                      <Checkbox
+                        checked={selectedWhatsAppConnections.includes(conn.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedWhatsAppConnections(prev => [...prev, conn.id]);
+                          } else {
+                            setSelectedWhatsAppConnections(prev => prev.filter(id => id !== conn.id));
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-foreground">{conn.name || conn.phone_number}</span>
+                    </label>
+                  ))
+                )}
+                {selectedWhatsAppConnections.length > 0 && (
+                  <p className="text-xs text-muted-foreground pt-1 border-t border-border">
+                    {selectedWhatsAppConnections.length} sesión(es) seleccionada(s) — los mensajes se distribuirán en round-robin
+                  </p>
+                )}
+              </div>
+            ) : (
+              /* Single select for Telegram/Twilio */
+              <Select value={selectedConnection} onValueChange={setSelectedConnection}>
+                <SelectTrigger className="bg-card border-border text-foreground">
+                  <SelectValue placeholder={`Buscar sesión de ${channelType}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {getCurrentConnections().map((conn: any) => (
+                    <SelectItem key={conn.id} value={conn.id}>
+                      {channelType === 'telegram'
+                        ? `${conn.bot_name}`
+                        : `${conn.connection_name} - ${conn.phone_number}`
+                      }
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             
             {/* Twilio Usage Warning */}
             {channelType === 'twilio' && selectedConnection && (
