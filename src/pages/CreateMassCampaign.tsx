@@ -118,8 +118,15 @@ export default function CreateMassCampaign() {
       setWaitTimeEnabled((campaign.min_delay || 0) > 0);
 
       // Cargar conexión según el tipo de canal
-      if (campaign.channel_type === 'whatsapp' && campaign.whatsapp_connection_id) {
-        setSelectedConnection(campaign.whatsapp_connection_id);
+      if (campaign.channel_type === 'whatsapp') {
+        // Load multi-session if available
+        const connectionIds = (campaign as any).whatsapp_connection_ids;
+        if (connectionIds && Array.isArray(connectionIds) && connectionIds.length > 0) {
+          setSelectedWhatsAppConnections(connectionIds);
+        } else if (campaign.whatsapp_connection_id) {
+          setSelectedWhatsAppConnections([campaign.whatsapp_connection_id]);
+          setSelectedConnection(campaign.whatsapp_connection_id);
+        }
       } else if (campaign.channel_type === 'telegram' && campaign.telegram_bot_id) {
         setSelectedConnection(campaign.telegram_bot_id);
       } else if (campaign.channel_type === 'twilio' && campaign.twilio_connection_id) {
