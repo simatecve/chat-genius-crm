@@ -1,0 +1,1 @@
+ALTER TABLE mass_campaigns ADD COLUMN IF NOT EXISTS whatsapp_connection_ids uuid[] DEFAULT NULL;
