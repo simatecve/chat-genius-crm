@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,6 +38,7 @@ export default function CreateMassCampaign() {
   const [campaignName, setCampaignName] = useState('');
   const [channelType, setChannelType] = useState<'whatsapp' | 'telegram' | 'twilio'>('whatsapp');
   const [selectedConnection, setSelectedConnection] = useState('');
+  const [selectedWhatsAppConnections, setSelectedWhatsAppConnections] = useState<string[]>([]);
   const [selectedContactList, setSelectedContactList] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState('');
   const [message, setMessage] = useState('');
