@@ -306,9 +306,15 @@ export default function CreateMassCampaign() {
 
       // Asignar la conexión según el tipo de canal
       if (channelType === 'whatsapp') {
-        const selectedConn = whatsappConnections.find(c => c.id === selectedConnection);
-        campaignData.whatsapp_connection_id = selectedConnection;
-        campaignData.whatsapp_connection_name = selectedConn?.name || selectedConn?.phone_number || 'WhatsApp';
+        // Multi-session support
+        campaignData.whatsapp_connection_ids = selectedWhatsAppConnections;
+        // Keep backward compat - use first selected as primary
+        campaignData.whatsapp_connection_id = selectedWhatsAppConnections[0];
+        const selectedNames = selectedWhatsAppConnections.map(id => {
+          const conn = whatsappConnections.find(c => c.id === id);
+          return conn?.name || conn?.phone_number || 'WhatsApp';
+        });
+        campaignData.whatsapp_connection_name = selectedNames.join(', ');
       } else if (channelType === 'telegram') {
         const selectedConn = telegramConnections.find(c => c.id === selectedConnection);
         campaignData.telegram_bot_id = selectedConnection;
