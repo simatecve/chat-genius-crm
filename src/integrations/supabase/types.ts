@@ -2508,6 +2508,7 @@ export type Database = {
       whatsapp_connections: {
         Row: {
           ai_enabled: boolean | null
+          connection_subtype: string | null
           created_at: string | null
           default_column_id: string | null
           id: string
@@ -2523,6 +2524,7 @@ export type Database = {
         }
         Insert: {
           ai_enabled?: boolean | null
+          connection_subtype?: string | null
           created_at?: string | null
           default_column_id?: string | null
           id?: string
@@ -2538,6 +2540,7 @@ export type Database = {
         }
         Update: {
           ai_enabled?: boolean | null
+          connection_subtype?: string | null
           created_at?: string | null
           default_column_id?: string | null
           id?: string
