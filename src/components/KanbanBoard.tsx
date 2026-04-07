@@ -1,4 +1,5 @@
 import React, { useState, useCallback, memo, useMemo, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -482,6 +483,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     refresh: refreshTags
   } = useTags();
   const queryClient = useQueryClient();
+
+  // Fetch WhatsApp API connection phone numbers
+  const { data: apiConnectionNumbers } = useQuery({
+    queryKey: ['whatsapp-api-connection-numbers', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return new Set<string>();
+      const { data } = await supabase
+        .from('whatsapp_connections')
+        .select('phone_number, connection_subtype')
+        .eq('user_id', user.id)
+        .eq('connection_subtype', 'api');
+      return new Set((data || []).map(c => c.phone_number));
+    },
+    enabled: !!user?.id,
+    staleTime: 60000,
+  });
   const getLeadsByColumn = (columnId: string) => {
     return leads.filter(lead => lead && lead.column_id === columnId).sort((a, b) => {
       // Obtener el último mensaje de cada lead
