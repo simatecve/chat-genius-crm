@@ -45,7 +45,9 @@ serve(async (req) => {
       first_name,
       last_name,
       company_name,
-      plan_type
+      plan_type,
+      connection_subtype,
+      n8n_webhook_url
     } = payload;
 
     if (!session_name || !user_id) {
@@ -117,6 +119,8 @@ serve(async (req) => {
         phone_number,
         workspace_id: workspace_id || null,
         default_column_id: default_column_id || null,
+        n8n_webhook_url: n8n_webhook_url || null,
+        connection_subtype: connection_subtype || 'qr',
         status: 'STARTING',
       })
       .select()
