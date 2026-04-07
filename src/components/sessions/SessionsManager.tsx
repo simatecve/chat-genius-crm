@@ -9,6 +9,7 @@ import { useTwilioUsage } from '@/hooks/useTwilioUsage';
 import { useSessionStats } from '@/hooks/useSessionStats';
 import { supabase } from '@/integrations/supabase/client';
 import WhatsAppConnectionForm from './WhatsAppConnectionForm';
+import WhatsAppAPIConnectionForm from './WhatsAppAPIConnectionForm';
 import TelegramConnectionForm from './TelegramConnectionForm';
 import TelegramBotConnectionForm from './TelegramBotConnectionForm';
 import TwilioConnectionForm from './TwilioConnectionForm';
@@ -28,7 +29,7 @@ interface Channel {
 interface Session {
   id: string;
   name: string;
-  type: 'whatsapp' | 'telegram' | 'telegram-bot' | 'twilio' | 'webchat' | 'facebook' | 'instagram';
+  type: 'whatsapp' | 'whatsapp-api' | 'telegram' | 'telegram-bot' | 'twilio' | 'webchat' | 'facebook' | 'instagram';
   identifier: string;
   status: string;
   created_at: string;
@@ -55,7 +56,7 @@ const channels: Channel[] = [
   { id: 'twilio-whatsapp', name: 'Twilio WhatsApp', icon: '📞', color: 'hsl(var(--twilio-red))', enabled: true },
   { id: 'telegram', name: 'Telegram', icon: '✈️', color: 'hsl(var(--telegram-blue))', enabled: true },
   { id: 'telegram-bot', name: 'Telegram Bot', icon: '🤖', color: 'hsl(var(--telegram-blue))', enabled: true },
-  { id: 'whatsapp-api', name: 'WhatsApp API', icon: '📱', color: 'hsl(var(--muted))', enabled: false },
+  { id: 'whatsapp-api', name: 'WhatsApp API', icon: '🔌', color: '#8b5cf6', enabled: true },
   { id: 'facebook', name: 'Facebook/Instagram', icon: '📘', color: 'hsl(var(--primary))', enabled: true },
   { id: 'web-chat', name: 'Web Chatbot', icon: '💻', color: 'hsl(var(--primary))', enabled: true },
   { id: 'google-calendar', name: 'Google Calendar', icon: '📅', color: 'hsl(var(--muted))', enabled: false },
@@ -67,6 +68,7 @@ type ChannelFilterType = 'all' | Session['type'];
 const filterOptions: { value: ChannelFilterType; label: string; icon: string }[] = [
   { value: 'all', label: 'Todos los canales', icon: '📡' },
   { value: 'whatsapp', label: 'WhatsApp QR', icon: '📱' },
+  { value: 'whatsapp-api', label: 'WhatsApp API', icon: '🔌' },
   { value: 'twilio', label: 'Twilio', icon: '📞' },
   { value: 'telegram-bot', label: 'Telegram Bot', icon: '🤖' },
   { value: 'webchat', label: 'Web Chat', icon: '💻' },
@@ -162,10 +164,11 @@ const SessionsManager = () => {
       // Add WhatsApp sessions
       if (whatsappData) {
         whatsappData.forEach(conn => {
+          const subtype = (conn as any).connection_subtype;
           allSessions.push({
             id: conn.id,
             name: conn.name || 'Sin nombre',
-            type: 'whatsapp',
+            type: subtype === 'api' ? 'whatsapp-api' : 'whatsapp',
             identifier: conn.phone_number,
             status: conn.status || 'disconnected',
             created_at: conn.created_at,
@@ -295,6 +298,7 @@ const SessionsManager = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'whatsapp': return '📱';
+      case 'whatsapp-api': return '🔌';
       case 'telegram': return '✈️';
       case 'telegram-bot': return '🤖';
       case 'twilio': return '📞';
@@ -308,6 +312,7 @@ const SessionsManager = () => {
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'whatsapp': return 'hsl(var(--whatsapp-green))';
+      case 'whatsapp-api': return '#8b5cf6';
       case 'telegram':
       case 'telegram-bot': return 'hsl(var(--telegram-blue))';
       case 'twilio': return 'hsl(var(--twilio-red))';
@@ -319,7 +324,7 @@ const SessionsManager = () => {
   };
 
   const handleVerifyStatus = async (session: Session) => {
-    if (session.type !== 'whatsapp') {
+    if (session.type !== 'whatsapp' && session.type !== 'whatsapp-api') {
       toast({
         title: "No disponible",
         description: "La verificación de estatus solo está disponible para WhatsApp",
@@ -375,6 +380,7 @@ const SessionsManager = () => {
     try {
       switch (session.type) {
         case 'whatsapp':
+        case 'whatsapp-api':
           const { error: wahaError } = await supabase.functions.invoke('waha-delete-session', {
             body: { 
               session_name: session.name,
@@ -631,7 +637,7 @@ const SessionsManager = () => {
                     <Pencil className="h-3 w-3" />
                     <span className="ml-1 text-xs">Editar</span>
                   </Button>
-                  {session.type === 'whatsapp' && (
+                  {(session.type === 'whatsapp' || session.type === 'whatsapp-api') && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -722,6 +728,9 @@ const SessionsManager = () => {
       {selectedChannel === 'whatsapp-qr' && (
         <WhatsAppConnectionForm onClose={handleCloseForm} />
       )}
+      {selectedChannel === 'whatsapp-api' && (
+        <WhatsAppAPIConnectionForm onClose={handleCloseForm} />
+      )}
       {selectedChannel === 'telegram' && (
         <TelegramConnectionForm onClose={handleCloseForm} />
       )}
@@ -756,7 +765,7 @@ const SessionsManager = () => {
         <EditSessionDialog
           open={!!editingSession}
           onClose={() => setEditingSession(null)}
-          sessionType={editingSession.type === 'telegram-bot' ? 'telegram' : editingSession.type}
+          sessionType={editingSession.type === 'telegram-bot' ? 'telegram' : editingSession.type === 'whatsapp-api' ? 'whatsapp' : editingSession.type}
           session={{
             id: editingSession.id,
             name: editingSession.name,
