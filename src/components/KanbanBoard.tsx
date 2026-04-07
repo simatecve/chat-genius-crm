@@ -7,15 +7,18 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2, Send, Globe } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2, Send, Globe, Plug } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // Helper function to get channel icon
-const getChannelIcon = (channelType: string | null | undefined) => {
+const getChannelIcon = (channelType: string | null | undefined, isWhatsAppApi?: boolean) => {
   if (!channelType) return null;
   switch (channelType.toLowerCase()) {
     case 'whatsapp':
+      if (isWhatsAppApi) {
+        return <Plug className="h-2.5 w-2.5 text-violet-500" />;
+      }
       return <MessageSquare className="h-2.5 w-2.5 text-green-500" />;
     case 'telegram':
       return <Send className="h-2.5 w-2.5 text-blue-500" />;
@@ -49,6 +52,7 @@ interface ConversationSummary {
   last_inbound_message_time?: string | null;
   unread_count: number | null;
   channel_type?: string | null;
+  whatsapp_number?: string | null;
 }
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
