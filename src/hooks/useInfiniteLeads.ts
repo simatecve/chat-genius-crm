@@ -14,6 +14,7 @@ interface ConversationSummary {
   last_inbound_message_time?: string | null;
   unread_count: number | null;
   channel_type?: string | null;
+  whatsapp_number?: string | null;
 }
 
 export interface LeadWithColumn extends Lead {
@@ -99,7 +100,8 @@ export const useInfiniteLeads = ({
             last_message_time,
             last_inbound_message_time,
             unread_count,
-            channel_type
+            channel_type,
+            whatsapp_number
           )
         `)
         .eq('column_id', columnId)
@@ -185,7 +187,7 @@ export const useInfiniteLeads = ({
       // Base query para conversaciones huérfanas
       let query = supabase
         .from('conversations')
-        .select('id, phone_number, pushname, last_message, last_message_time, last_inbound_message_time, unread_count, channel_type, twilio_connection_id, telegram_bot_id, created_at, updated_at')
+        .select('id, phone_number, pushname, last_message, last_message_time, last_inbound_message_time, unread_count, channel_type, whatsapp_number, twilio_connection_id, telegram_bot_id, created_at, updated_at')
         .eq('user_id', userId)
         .is('lead_id', null)
         ;
@@ -247,7 +249,8 @@ export const useInfiniteLeads = ({
           last_message_time: conv.last_message_time,
           last_inbound_message_time: conv.last_inbound_message_time,
           unread_count: conv.unread_count,
-          channel_type: conv.channel_type
+          channel_type: conv.channel_type,
+          whatsapp_number: conv.whatsapp_number
         }]
       }));
 

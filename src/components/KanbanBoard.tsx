@@ -1,4 +1,5 @@
 import React, { useState, useCallback, memo, useMemo, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,15 +8,18 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2, Send, Globe } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, MessageSquare, BotOff, Bot, Tag, Clock, Loader2, Send, Globe, Plug } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // Helper function to get channel icon
-const getChannelIcon = (channelType: string | null | undefined) => {
+const getChannelIcon = (channelType: string | null | undefined, isWhatsAppApi?: boolean) => {
   if (!channelType) return null;
   switch (channelType.toLowerCase()) {
     case 'whatsapp':
+      if (isWhatsAppApi) {
+        return <Plug className="h-2.5 w-2.5 text-violet-500" />;
+      }
       return <MessageSquare className="h-2.5 w-2.5 text-green-500" />;
     case 'telegram':
       return <Send className="h-2.5 w-2.5 text-blue-500" />;
@@ -49,6 +53,7 @@ interface ConversationSummary {
   last_inbound_message_time?: string | null;
   unread_count: number | null;
   channel_type?: string | null;
+  whatsapp_number?: string | null;
 }
 interface LeadWithColumn extends Lead {
   lead_columns?: LeadColumn;
@@ -97,6 +102,7 @@ interface LeadCardProps {
     channel_type?: string;
   }[];
   onMoveToWorkspace?: (leadId: string, workspaceId: string) => void;
+  apiConnectionNumbers?: Set<string>;
 }
 const LeadCardComponent: React.FC<LeadCardProps & {
   etiquetas: any[];
@@ -111,7 +117,8 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   etiquetas,
   onTagsUpdated,
   allWorkspaces,
-  onMoveToWorkspace
+  onMoveToWorkspace,
+  apiConnectionNumbers
 }) => {
   const navigate = useNavigate();
   const {
@@ -195,6 +202,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   // Get display name (pushname first, then lead name)
   const displayName = conversation?.pushname || lead.name;
   const channelType = conversation?.channel_type || null;
+  const isWhatsAppApi = channelType === 'whatsapp' && !!conversation?.whatsapp_number && !!apiConnectionNumbers?.has(conversation.whatsapp_number);
   const lastMessage = conversation?.last_message;
   const lastMessageTime = conversation?.last_message_time;
   
@@ -246,7 +254,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                 {/* Icono de canal superpuesto */}
                 {channelType && (
                   <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-background flex items-center justify-center border border-border shadow-sm">
-                    {getChannelIcon(channelType)}
+                    {getChannelIcon(channelType, isWhatsAppApi)}
                   </div>
                 )}
               </div>
@@ -475,6 +483,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     refresh: refreshTags
   } = useTags();
   const queryClient = useQueryClient();
+
+  // Fetch WhatsApp API connection phone numbers
+  const { data: apiConnectionNumbers } = useQuery({
+    queryKey: ['whatsapp-api-connection-numbers', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return new Set<string>();
+      const { data } = await supabase
+        .from('whatsapp_connections')
+        .select('phone_number, connection_subtype')
+        .eq('user_id', user.id)
+        .eq('connection_subtype', 'api');
+      return new Set((data || []).map(c => c.phone_number));
+    },
+    enabled: !!user?.id,
+    staleTime: 60000,
+  });
   const getLeadsByColumn = (columnId: string) => {
     return leads.filter(lead => lead && lead.column_id === columnId).sort((a, b) => {
       // Obtener el último mensaje de cada lead
@@ -539,7 +563,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           const conversationsCount = columnLeads.reduce((count, lead) => {
             return count + (lead.conversations?.length || 0);
           }, 0);
-          return <ColumnWithInfiniteScroll key={column.id} column={column} columnLeads={columnLeads} columnState={columnState} conversationsCount={conversationsCount} onEditColumn={onEditColumn} onDeleteColumn={onDeleteColumn} onCreateLead={onCreateLead} onEditLead={onEditLead} onDeleteLead={onDeleteLead} onConvertToContactList={onConvertToContactList} onManageMessageTriggers={onManageMessageTriggers} onOpenConversation={onOpenConversation} onLoadMore={onLoadMore} allWorkspaces={allWorkspaces} onMoveLeadToWorkspace={onMoveLeadToWorkspace} getTagColor={getTagColor} etiquetas={etiquetas} refreshTags={refreshTags} queryClient={queryClient} />;
+          return <ColumnWithInfiniteScroll key={column.id} column={column} columnLeads={columnLeads} columnState={columnState} conversationsCount={conversationsCount} onEditColumn={onEditColumn} onDeleteColumn={onDeleteColumn} onCreateLead={onCreateLead} onEditLead={onEditLead} onDeleteLead={onDeleteLead} onConvertToContactList={onConvertToContactList} onManageMessageTriggers={onManageMessageTriggers} onOpenConversation={onOpenConversation} onLoadMore={onLoadMore} allWorkspaces={allWorkspaces} onMoveLeadToWorkspace={onMoveLeadToWorkspace} getTagColor={getTagColor} etiquetas={etiquetas} refreshTags={refreshTags} queryClient={queryClient} apiConnectionNumbers={apiConnectionNumbers} />;
         })}
         </div>
       </TooltipProvider>
@@ -571,6 +595,7 @@ interface ColumnWithInfiniteScrollProps {
   etiquetas: any[];
   refreshTags: () => void;
   queryClient: any;
+  apiConnectionNumbers?: Set<string>;
 }
 const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
   column,
@@ -591,7 +616,8 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
   getTagColor,
   etiquetas,
   refreshTags,
-  queryClient
+  queryClient,
+  apiConnectionNumbers
 }) => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -708,7 +734,7 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
           <div ref={scrollContainerRef} className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
             <Droppable droppableId={column.id}>
               {(provided, snapshot) => <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[200px] space-y-2 rounded-lg transition-all duration-200 ${snapshot.isDraggingOver ? 'bg-primary/10 border-2 border-dashed border-primary/40 p-2 scale-[1.01]' : 'border-2 border-transparent'}`}>
-                  {filteredLeads.map((lead, index) => <LeadCard key={lead.id} lead={lead} index={index} onEdit={onEditLead} onDelete={onDeleteLead} onOpenConversation={onOpenConversation} getTagColor={getTagColor} etiquetas={etiquetas} allWorkspaces={allWorkspaces} onMoveToWorkspace={onMoveLeadToWorkspace} onTagsUpdated={() => {
+                  {filteredLeads.map((lead, index) => <LeadCard key={lead.id} lead={lead} index={index} onEdit={onEditLead} onDelete={onDeleteLead} onOpenConversation={onOpenConversation} getTagColor={getTagColor} etiquetas={etiquetas} allWorkspaces={allWorkspaces} onMoveToWorkspace={onMoveLeadToWorkspace} apiConnectionNumbers={apiConnectionNumbers} onTagsUpdated={() => {
                 refreshTags();
                 queryClient.invalidateQueries({
                   queryKey: ['leads']
