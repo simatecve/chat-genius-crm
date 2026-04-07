@@ -101,6 +101,7 @@ interface LeadCardProps {
     channel_type?: string;
   }[];
   onMoveToWorkspace?: (leadId: string, workspaceId: string) => void;
+  apiConnectionNumbers?: Set<string>;
 }
 const LeadCardComponent: React.FC<LeadCardProps & {
   etiquetas: any[];
@@ -115,7 +116,8 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   etiquetas,
   onTagsUpdated,
   allWorkspaces,
-  onMoveToWorkspace
+  onMoveToWorkspace,
+  apiConnectionNumbers
 }) => {
   const navigate = useNavigate();
   const {
@@ -199,6 +201,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   // Get display name (pushname first, then lead name)
   const displayName = conversation?.pushname || lead.name;
   const channelType = conversation?.channel_type || null;
+  const isWhatsAppApi = channelType === 'whatsapp' && !!conversation?.whatsapp_number && !!apiConnectionNumbers?.has(conversation.whatsapp_number);
   const lastMessage = conversation?.last_message;
   const lastMessageTime = conversation?.last_message_time;
   
@@ -250,7 +253,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                 {/* Icono de canal superpuesto */}
                 {channelType && (
                   <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-background flex items-center justify-center border border-border shadow-sm">
-                    {getChannelIcon(channelType)}
+                    {getChannelIcon(channelType, isWhatsAppApi)}
                   </div>
                 )}
               </div>
