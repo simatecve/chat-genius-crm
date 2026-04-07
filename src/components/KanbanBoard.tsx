@@ -563,7 +563,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           const conversationsCount = columnLeads.reduce((count, lead) => {
             return count + (lead.conversations?.length || 0);
           }, 0);
-          return <ColumnWithInfiniteScroll key={column.id} column={column} columnLeads={columnLeads} columnState={columnState} conversationsCount={conversationsCount} onEditColumn={onEditColumn} onDeleteColumn={onDeleteColumn} onCreateLead={onCreateLead} onEditLead={onEditLead} onDeleteLead={onDeleteLead} onConvertToContactList={onConvertToContactList} onManageMessageTriggers={onManageMessageTriggers} onOpenConversation={onOpenConversation} onLoadMore={onLoadMore} allWorkspaces={allWorkspaces} onMoveLeadToWorkspace={onMoveLeadToWorkspace} getTagColor={getTagColor} etiquetas={etiquetas} refreshTags={refreshTags} queryClient={queryClient} />;
+          return <ColumnWithInfiniteScroll key={column.id} column={column} columnLeads={columnLeads} columnState={columnState} conversationsCount={conversationsCount} onEditColumn={onEditColumn} onDeleteColumn={onDeleteColumn} onCreateLead={onCreateLead} onEditLead={onEditLead} onDeleteLead={onDeleteLead} onConvertToContactList={onConvertToContactList} onManageMessageTriggers={onManageMessageTriggers} onOpenConversation={onOpenConversation} onLoadMore={onLoadMore} allWorkspaces={allWorkspaces} onMoveLeadToWorkspace={onMoveLeadToWorkspace} getTagColor={getTagColor} etiquetas={etiquetas} refreshTags={refreshTags} queryClient={queryClient} apiConnectionNumbers={apiConnectionNumbers} />;
         })}
         </div>
       </TooltipProvider>
@@ -595,6 +595,7 @@ interface ColumnWithInfiniteScrollProps {
   etiquetas: any[];
   refreshTags: () => void;
   queryClient: any;
+  apiConnectionNumbers?: Set<string>;
 }
 const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
   column,
@@ -615,7 +616,8 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
   getTagColor,
   etiquetas,
   refreshTags,
-  queryClient
+  queryClient,
+  apiConnectionNumbers
 }) => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
