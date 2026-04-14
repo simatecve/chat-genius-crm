@@ -353,6 +353,8 @@ const WorkspaceManagement = () => {
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
     setWorkspaceCasinoApiId(null);
+    setWorkspaceIsDefault(false);
+    setFirstFunnelName('Nuevos Contactos');
     setShowWorkspaceDialog(true);
   };
 
@@ -361,6 +363,7 @@ const WorkspaceManagement = () => {
     setWorkspaceName(workspace.name);
     setWorkspaceChannelType(workspace.channel_type || 'whatsapp');
     setWorkspaceCasinoApiId(workspace.casino_api_config_id || null);
+    setWorkspaceIsDefault(workspace.is_default || false);
     setShowWorkspaceDialog(true);
   };
 
