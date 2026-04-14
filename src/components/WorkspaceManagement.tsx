@@ -497,6 +497,12 @@ const WorkspaceManagement = () => {
                         Casino API
                       </Badge>
                     )}
+                    {workspace.is_default && (
+                      <Badge className="text-xs bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
+                        <Star className="h-3 w-3 mr-1 fill-current" />
+                        Predeterminado
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
@@ -622,6 +628,27 @@ const WorkspaceManagement = () => {
                 value={workspaceName}
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 placeholder="Ej: Ventas, Marketing, Soporte"
+              />
+            </div>
+            {!editingWorkspace && (
+              <div className="space-y-2">
+                <Label htmlFor="first-funnel-name">Nombre del primer embudo</Label>
+                <Input
+                  id="first-funnel-name"
+                  value={firstFunnelName}
+                  onChange={(e) => setFirstFunnelName(e.target.value)}
+                  placeholder="Ej: Nuevos Contactos"
+                />
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Espacio predeterminado</Label>
+                <p className="text-xs text-muted-foreground">Se abrirá por defecto al entrar a Embudos</p>
+              </div>
+              <Switch
+                checked={workspaceIsDefault}
+                onCheckedChange={setWorkspaceIsDefault}
               />
             </div>
             <div className="space-y-2">
