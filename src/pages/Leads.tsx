@@ -446,15 +446,16 @@ const Leads = () => {
     }
     setWorkspaces(data || []);
 
-    // Verificar que el workspace seleccionado sea válido (no webchat)
+    // Verificar que el workspace seleccionado sea válido
     const validWorkspaceIds = data.map(w => w.id);
     if (selectedWorkspace && !validWorkspaceIds.includes(selectedWorkspace)) {
-      // El workspace seleccionado no es válido (es webchat), resetear al primero
-      console.log('[Leads] Resetting selectedWorkspace - current is webchat or invalid');
-      setSelectedWorkspace(data[0].id);
+      console.log('[Leads] Resetting selectedWorkspace - current is invalid');
+      const defaultWs = data.find(w => w.is_default) || data[0];
+      setSelectedWorkspace(defaultWs.id);
     } else if (!selectedWorkspace && data.length > 0) {
-      // Seleccionar el primer workspace por defecto
-      setSelectedWorkspace(data[0].id);
+      // Prefer workspace marked as default, otherwise first by position
+      const defaultWs = data.find(w => w.is_default) || data[0];
+      setSelectedWorkspace(defaultWs.id);
     }
   };
   const loadColumns = async () => {
