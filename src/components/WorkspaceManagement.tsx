@@ -44,6 +44,8 @@ const WorkspaceManagement = () => {
   const [workspaceCasinoApiId, setWorkspaceCasinoApiId] = useState<string | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState('');
+  const [workspaceIsDefault, setWorkspaceIsDefault] = useState(false);
+  const [firstFunnelName, setFirstFunnelName] = useState('Nuevos Contactos');
   const [columnName, setColumnName] = useState('');
   const [columnColor, setColumnColor] = useState('#3b82f6');
 
