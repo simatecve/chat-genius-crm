@@ -116,6 +116,14 @@ const WorkspaceManagement = () => {
   const handleCreateWorkspace = async () => {
     if (!workspaceName.trim()) return;
 
+    // If setting as default, clear other defaults first
+    if (workspaceIsDefault) {
+      await supabase
+        .from('workspaces')
+        .update({ is_default: false })
+        .eq('user_id', effectiveUserId);
+    }
+
     const { data, error } = await supabase
       .from('workspaces')
       .insert({
@@ -123,7 +131,8 @@ const WorkspaceManagement = () => {
         position: workspaces.length,
         user_id: effectiveUserId,
         channel_type: workspaceChannelType,
-        casino_api_config_id: workspaceCasinoApiId
+        casino_api_config_id: workspaceCasinoApiId,
+        is_default: workspaceIsDefault
       })
       .select()
       .single();
@@ -138,10 +147,29 @@ const WorkspaceManagement = () => {
       return;
     }
 
-    setWorkspaces([...workspaces, data]);
+    // Auto-create first funnel column
+    const funnelName = firstFunnelName.trim() || 'Nuevos Contactos';
+    await supabase.from('lead_columns').insert({
+      user_id: effectiveUserId,
+      workspace_id: data.id,
+      name: funnelName,
+      color: '#22c55e',
+      position: 0,
+      is_default: true
+    });
+
+    // Update local state for is_default
+    if (workspaceIsDefault) {
+      setWorkspaces([...workspaces.map(ws => ({ ...ws, is_default: false })), data]);
+    } else {
+      setWorkspaces([...workspaces, data]);
+    }
+    await loadColumns();
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
     setWorkspaceCasinoApiId(null);
+    setWorkspaceIsDefault(false);
+    setFirstFunnelName('Nuevos Contactos');
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
@@ -152,12 +180,21 @@ const WorkspaceManagement = () => {
   const handleUpdateWorkspace = async () => {
     if (!editingWorkspace || !workspaceName.trim()) return;
 
+    // If setting as default, clear other defaults first
+    if (workspaceIsDefault && !editingWorkspace.is_default) {
+      await supabase
+        .from('workspaces')
+        .update({ is_default: false })
+        .eq('user_id', effectiveUserId);
+    }
+
       const { error } = await supabase
         .from('workspaces')
         .update({ 
           name: workspaceName, 
           channel_type: workspaceChannelType,
-          casino_api_config_id: workspaceCasinoApiId
+          casino_api_config_id: workspaceCasinoApiId,
+          is_default: workspaceIsDefault
         })
       .eq('id', editingWorkspace.id);
 
@@ -171,12 +208,20 @@ const WorkspaceManagement = () => {
       return;
     }
 
-      setWorkspaces(workspaces.map(ws => 
-        ws.id === editingWorkspace.id ? { ...ws, name: workspaceName, channel_type: workspaceChannelType, casino_api_config_id: workspaceCasinoApiId } : ws
-      ));
+      setWorkspaces(workspaces.map(ws => {
+        if (ws.id === editingWorkspace.id) {
+          return { ...ws, name: workspaceName, channel_type: workspaceChannelType, casino_api_config_id: workspaceCasinoApiId, is_default: workspaceIsDefault };
+        }
+        // If we just set this one as default, clear others
+        if (workspaceIsDefault) {
+          return { ...ws, is_default: false };
+        }
+        return ws;
+      }));
     setEditingWorkspace(null);
     setWorkspaceName('');
     setWorkspaceCasinoApiId(null);
+    setWorkspaceIsDefault(false);
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
