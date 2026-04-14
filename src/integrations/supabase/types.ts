@@ -2577,6 +2577,7 @@ export type Database = {
           channel_type: string | null
           created_at: string | null
           id: string
+          is_default: boolean | null
           name: string
           position: number
           updated_at: string | null
@@ -2587,6 +2588,7 @@ export type Database = {
           channel_type?: string | null
           created_at?: string | null
           id?: string
+          is_default?: boolean | null
           name: string
           position?: number
           updated_at?: string | null
@@ -2597,6 +2599,7 @@ export type Database = {
           channel_type?: string | null
           created_at?: string | null
           id?: string
+          is_default?: boolean | null
           name?: string
           position?: number
           updated_at?: string | null
