@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Briefcase, GripVertical, Building } from 'lucide-react';
+import { Plus, Edit, Trash2, Briefcase, GripVertical, Building, Star } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
@@ -43,6 +44,8 @@ const WorkspaceManagement = () => {
   const [workspaceCasinoApiId, setWorkspaceCasinoApiId] = useState<string | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState('');
+  const [workspaceIsDefault, setWorkspaceIsDefault] = useState(false);
+  const [firstFunnelName, setFirstFunnelName] = useState('Nuevos Contactos');
   const [columnName, setColumnName] = useState('');
   const [columnColor, setColumnColor] = useState('#3b82f6');
 
@@ -113,6 +116,14 @@ const WorkspaceManagement = () => {
   const handleCreateWorkspace = async () => {
     if (!workspaceName.trim()) return;
 
+    // If setting as default, clear other defaults first
+    if (workspaceIsDefault) {
+      await supabase
+        .from('workspaces')
+        .update({ is_default: false })
+        .eq('user_id', effectiveUserId);
+    }
+
     const { data, error } = await supabase
       .from('workspaces')
       .insert({
@@ -120,7 +131,8 @@ const WorkspaceManagement = () => {
         position: workspaces.length,
         user_id: effectiveUserId,
         channel_type: workspaceChannelType,
-        casino_api_config_id: workspaceCasinoApiId
+        casino_api_config_id: workspaceCasinoApiId,
+        is_default: workspaceIsDefault
       })
       .select()
       .single();
@@ -135,10 +147,29 @@ const WorkspaceManagement = () => {
       return;
     }
 
-    setWorkspaces([...workspaces, data]);
+    // Auto-create first funnel column
+    const funnelName = firstFunnelName.trim() || 'Nuevos Contactos';
+    await supabase.from('lead_columns').insert({
+      user_id: effectiveUserId,
+      workspace_id: data.id,
+      name: funnelName,
+      color: '#22c55e',
+      position: 0,
+      is_default: true
+    });
+
+    // Update local state for is_default
+    if (workspaceIsDefault) {
+      setWorkspaces([...workspaces.map(ws => ({ ...ws, is_default: false })), data]);
+    } else {
+      setWorkspaces([...workspaces, data]);
+    }
+    await loadColumns();
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
     setWorkspaceCasinoApiId(null);
+    setWorkspaceIsDefault(false);
+    setFirstFunnelName('Nuevos Contactos');
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
@@ -149,12 +180,21 @@ const WorkspaceManagement = () => {
   const handleUpdateWorkspace = async () => {
     if (!editingWorkspace || !workspaceName.trim()) return;
 
+    // If setting as default, clear other defaults first
+    if (workspaceIsDefault && !editingWorkspace.is_default) {
+      await supabase
+        .from('workspaces')
+        .update({ is_default: false })
+        .eq('user_id', effectiveUserId);
+    }
+
       const { error } = await supabase
         .from('workspaces')
         .update({ 
           name: workspaceName, 
           channel_type: workspaceChannelType,
-          casino_api_config_id: workspaceCasinoApiId
+          casino_api_config_id: workspaceCasinoApiId,
+          is_default: workspaceIsDefault
         })
       .eq('id', editingWorkspace.id);
 
@@ -168,12 +208,20 @@ const WorkspaceManagement = () => {
       return;
     }
 
-      setWorkspaces(workspaces.map(ws => 
-        ws.id === editingWorkspace.id ? { ...ws, name: workspaceName, channel_type: workspaceChannelType, casino_api_config_id: workspaceCasinoApiId } : ws
-      ));
+      setWorkspaces(workspaces.map(ws => {
+        if (ws.id === editingWorkspace.id) {
+          return { ...ws, name: workspaceName, channel_type: workspaceChannelType, casino_api_config_id: workspaceCasinoApiId, is_default: workspaceIsDefault };
+        }
+        // If we just set this one as default, clear others
+        if (workspaceIsDefault) {
+          return { ...ws, is_default: false };
+        }
+        return ws;
+      }));
     setEditingWorkspace(null);
     setWorkspaceName('');
     setWorkspaceCasinoApiId(null);
+    setWorkspaceIsDefault(false);
     setShowWorkspaceDialog(false);
     toast({
       title: "Éxito",
@@ -305,6 +353,8 @@ const WorkspaceManagement = () => {
     setWorkspaceName('');
     setWorkspaceChannelType('whatsapp');
     setWorkspaceCasinoApiId(null);
+    setWorkspaceIsDefault(false);
+    setFirstFunnelName('Nuevos Contactos');
     setShowWorkspaceDialog(true);
   };
 
@@ -313,6 +363,7 @@ const WorkspaceManagement = () => {
     setWorkspaceName(workspace.name);
     setWorkspaceChannelType(workspace.channel_type || 'whatsapp');
     setWorkspaceCasinoApiId(workspace.casino_api_config_id || null);
+    setWorkspaceIsDefault(workspace.is_default || false);
     setShowWorkspaceDialog(true);
   };
 
@@ -446,6 +497,12 @@ const WorkspaceManagement = () => {
                         Casino API
                       </Badge>
                     )}
+                    {workspace.is_default && (
+                      <Badge className="text-xs bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
+                        <Star className="h-3 w-3 mr-1 fill-current" />
+                        Predeterminado
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
@@ -571,6 +628,27 @@ const WorkspaceManagement = () => {
                 value={workspaceName}
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 placeholder="Ej: Ventas, Marketing, Soporte"
+              />
+            </div>
+            {!editingWorkspace && (
+              <div className="space-y-2">
+                <Label htmlFor="first-funnel-name">Nombre del primer embudo</Label>
+                <Input
+                  id="first-funnel-name"
+                  value={firstFunnelName}
+                  onChange={(e) => setFirstFunnelName(e.target.value)}
+                  placeholder="Ej: Nuevos Contactos"
+                />
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Espacio predeterminado</Label>
+                <p className="text-xs text-muted-foreground">Se abrirá por defecto al entrar a Embudos</p>
+              </div>
+              <Switch
+                checked={workspaceIsDefault}
+                onCheckedChange={setWorkspaceIsDefault}
               />
             </div>
             <div className="space-y-2">
