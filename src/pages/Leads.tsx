@@ -212,13 +212,30 @@ const Leads = () => {
       // Si es WhatsApp (WAHA) - usar la sesión seleccionada
       let sessionName = selectedWhatsAppSession;
       
-      // Si no hay sesión seleccionada, buscar una activa
+      // Prioridad 1: Buscar la sesión original por whatsapp_number de la conversación
+      if (!sessionName && selectedConversation.whatsapp_number) {
+        const { data: originalConn } = await supabase
+          .from('whatsapp_connections')
+          .select('name')
+          .eq('user_id', effectiveUserId)
+          .eq('phone_number', selectedConversation.whatsapp_number)
+          .in('status', ['WORKING', 'connected'])
+          .limit(1)
+          .single();
+        if (originalConn) sessionName = originalConn.name;
+      }
+
+      // Prioridad 2: Cualquier sesión activa (fallback)
       if (!sessionName) {
-        const {
-          data: whatsappConnection
-        } = await supabase.from('whatsapp_connections').select('name').eq('user_id', effectiveUserId).eq('status', 'WORKING').limit(1).single();
+        const { data: anyConn } = await supabase
+          .from('whatsapp_connections')
+          .select('name')
+          .eq('user_id', effectiveUserId)
+          .in('status', ['WORKING', 'connected'])
+          .limit(1)
+          .single();
         
-        if (!whatsappConnection) {
+        if (!anyConn) {
           toast({
             title: "Error",
             description: "No se encontró una sesión activa de WhatsApp para responder",
@@ -226,7 +243,7 @@ const Leads = () => {
           });
           return;
         }
-        sessionName = whatsappConnection.name;
+        sessionName = anyConn.name;
       }
       
       await sendMessage({
