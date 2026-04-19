@@ -111,7 +111,7 @@ const TelegramBotConnectionForm = ({ onClose }: TelegramBotConnectionFormProps) 
     
     try {
       // Paso 1: Validar el token con Telegram API
-      console.log('[TelegramBot] Validando token con Telegram API...');
+      logger.debug('[TelegramBot] Validando token con Telegram API...');
       const botInfoResponse = await fetch(`https://api.telegram.org/bot${formData.bot_token}/getMe`);
       
       if (!botInfoResponse.ok) {
