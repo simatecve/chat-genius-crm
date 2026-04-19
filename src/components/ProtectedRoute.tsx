@@ -6,6 +6,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import AdminLayout from '@/components/layout/AdminLayout';
 import SuperAdminImpersonationLayout from '@/components/layout/SuperAdminImpersonationLayout';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { profile, loading: profileLoading, isSuperAdmin, isClient, isImpersonating } = useProfile();
+  const { profile, loading: profileLoading, error: profileError, isSuperAdmin, isClient, isImpersonating, refetchProfile } = useProfile();
   const location = useLocation();
 
   logger.debug('ProtectedRoute - authLoading:', authLoading, 'profileType:', profile?.profile_type);
@@ -33,8 +34,34 @@ const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteP
 
   // Redirect to login if no user
   if (!user) {
-    console.log('No user found, redirecting to login');
+    logger.debug('No user found, redirecting to login');
     return <Navigate to="/login" replace />;
+  }
+
+  // Profile failed to load — show retry UI instead of infinite spinner
+  if (profileError && !profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-4">
+          <h2 className="text-xl font-semibold text-foreground">No pudimos cargar tu perfil</h2>
+          <p className="text-sm text-muted-foreground">{profileError}</p>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={refetchProfile}
+              className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition"
+            >
+              Reintentar
+            </button>
+            <button
+              onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login'; }}
+              className="px-4 py-2 rounded-md bg-muted text-foreground hover:opacity-90 transition"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // If profile is not loaded yet, show loading
@@ -51,19 +78,19 @@ const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteP
 
   // Handle super admin routes
   if (requireSuperAdmin && !isSuperAdmin) {
-    console.log('Access denied: Super admin required');
+    logger.debug('Access denied: Super admin required');
     return <Navigate to="/" replace />;
   }
 
   // Redirect super admin to admin panel if trying to access regular routes (unless impersonating)
   if (isSuperAdmin && !location.pathname.startsWith('/admin') && !requireSuperAdmin && !isImpersonating) {
-    console.log('Super admin detected, redirecting to admin panel');
+    logger.debug('Super admin detected, redirecting to admin panel');
     return <Navigate to="/admin" replace />;
   }
 
   // Redirect regular clients to main panel if trying to access admin routes
   if ((isClient || profile?.profile_type === 'cajero') && location.pathname.startsWith('/admin')) {
-    console.log('Regular client or cajero trying to access admin, redirecting to main panel');
+    logger.debug('Regular client or cajero trying to access admin, redirecting to main panel');
     return <Navigate to="/" replace />;
   }
 
