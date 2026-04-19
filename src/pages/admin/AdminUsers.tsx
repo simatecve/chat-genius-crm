@@ -22,7 +22,7 @@ import {
   LogIn,
   Key
 } from 'lucide-react';
-import { supabase, supabaseAdmin } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
@@ -65,7 +65,7 @@ const AdminUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      
+
       // Get profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -74,34 +74,26 @@ const AdminUsers = () => {
 
       if (profilesError) throw profilesError;
 
-      // Get auth users with their emails using admin API
-      const usersWithEmail = await Promise.all(
-        (profiles || []).map(async (profile) => {
-          try {
-            // Get user email from auth.users using admin API
-            const { data: authUser, error: authError } = await (supabaseAdmin || supabase).auth.admin.getUserById(profile.id);
-            
-            if (authError || !authUser.user) {
-              console.warn(`Could not fetch auth data for user ${profile.id}:`, authError);
-              return {
-                ...profile,
-                email: 'No disponible'
-              };
-            }
-            
-            return {
-              ...profile,
-              email: authUser.user.email || 'No disponible'
-            };
-          } catch (error) {
-            console.warn(`Error fetching email for user ${profile.id}:`, error);
-            return {
-              ...profile,
-              email: 'No disponible'
-            };
+      // Get auth emails via secure edge function (single batched call)
+      let emailMap = new Map<string, string>();
+      try {
+        const { data: emailData, error: emailErr } = await supabase.functions.invoke(
+          'admin-list-users',
+          { body: {} }
+        );
+        if (!emailErr && emailData?.success && Array.isArray(emailData.users)) {
+          for (const u of emailData.users) {
+            if (u?.id && u?.email) emailMap.set(u.id, u.email);
           }
-        })
-      );
+        }
+      } catch (err) {
+        console.warn('Could not fetch auth emails (admin-list-users):', err);
+      }
+
+      const usersWithEmail = (profiles || []).map((profile) => ({
+        ...profile,
+        email: emailMap.get(profile.id) || profile.email || 'No disponible',
+      }));
 
       setUsers(usersWithEmail);
     } catch (error) {
@@ -126,87 +118,59 @@ const AdminUsers = () => {
       return;
     }
 
-    if (!supabaseAdmin) {
-      toast({
-        title: "Error",
-        description: "No se ha configurado la clave de administrador. Contacta al administrador del sistema.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       setCreating(true);
 
-      // Create auth user using admin API to bypass RLS
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: formData.email,
-        password: formData.password,
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
-          first_name: formData.first_name || null,
-          last_name: formData.last_name || null,
-          phone: formData.phone || null,
-          company_name: formData.company_name || null,
-          profile_type: formData.profile_type
-        }
+      // Create user via secure edge function
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.first_name || '',
+          lastName: formData.last_name || '',
+          role: 'user',
+        },
       });
 
-      if (authError) throw authError;
+      if (error) throw new Error(error.message || 'No se pudo crear el usuario');
+      if (!data?.success) throw new Error(data?.error || 'No se pudo crear el usuario');
 
-      if (authData.user) {
-        // Wait a moment for the auth user to be fully created
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // Create profile using supabaseAdmin to bypass RLS with UPSERT to handle duplicates
-        const { error: profileError } = await supabaseAdmin
+      // Update profile fields not handled by create-user (phone, company, profile_type)
+      if (data.user?.id) {
+        const { error: profileError } = await supabase
           .from('profiles')
-          .upsert([{
-            id: authData.user.id,
-            email: authData.user.email || '',
-            first_name: formData.first_name || null,
-            last_name: formData.last_name || null,
+          .update({
             phone: formData.phone || null,
             company_name: formData.company_name || null,
             profile_type: formData.profile_type,
-          }]);
+          })
+          .eq('id', data.user.id);
 
         if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // If profile creation fails, try to delete the auth user
-          try {
-            await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-          } catch (deleteError) {
-            console.error('Failed to cleanup auth user:', deleteError);
-          }
-          throw new Error(`No se pudo crear el perfil del usuario: ${profileError.message}`);
+          console.warn('Profile fields not fully updated:', profileError);
         }
-        
-        console.log('Profile created successfully using supabaseAdmin');
+      }
 
-        toast({
-          title: "Usuario creado",
-          description: "El usuario ha sido creado exitosamente",
-        });
+      toast({
+        title: "Usuario creado",
+        description: "El usuario ha sido creado exitosamente",
+      });
 
-        setIsCreateDialogOpen(false);
-        setFormData({
-          email: '',
-          password: '',
-          first_name: '',
-          last_name: '',
-          phone: '',
-          company_name: '',
-          profile_type: 'client'
-        });
-        
-        // Refresh users list separately to avoid affecting success message
-        try {
-          await fetchUsers();
-        } catch (fetchError) {
-          console.error('Error refreshing users list:', fetchError);
-          // Don't show error toast for this, user creation was successful
-        }
+      setIsCreateDialogOpen(false);
+      setFormData({
+        email: '',
+        password: '',
+        first_name: '',
+        last_name: '',
+        phone: '',
+        company_name: '',
+        profile_type: 'client'
+      });
+
+      try {
+        await fetchUsers();
+      } catch (fetchError) {
+        console.error('Error refreshing users list:', fetchError);
       }
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -264,25 +228,15 @@ const AdminUsers = () => {
   const handleChangeEmail = async () => {
     if (!selectedUser || !formData.email) return;
 
-    if (!supabaseAdmin) {
-      toast({
-        title: "Error",
-        description: "No se ha configurado la clave de administrador.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       setChangingEmail(true);
 
-      // Update email using admin API
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(
-        selectedUser.id,
-        { email: formData.email }
-      );
+      const { data, error } = await supabase.functions.invoke('admin-update-user', {
+        body: { userId: selectedUser.id, email: formData.email },
+      });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'No se pudo cambiar el email');
+      if (!data?.success) throw new Error(data?.error || 'No se pudo cambiar el email');
 
       toast({
         title: "Email actualizado",
@@ -305,25 +259,15 @@ const AdminUsers = () => {
   const handleChangePassword = async () => {
     if (!selectedUser || !newPassword) return;
 
-    if (!supabaseAdmin) {
-      toast({
-        title: "Error",
-        description: "No se ha configurado la clave de administrador.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
       setChangingPassword(true);
 
-      // Update password using admin API
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(
-        selectedUser.id,
-        { password: newPassword }
-      );
+      const { data, error } = await supabase.functions.invoke('admin-update-user', {
+        body: { userId: selectedUser.id, password: newPassword },
+      });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'No se pudo cambiar la contraseña');
+      if (!data?.success) throw new Error(data?.error || 'No se pudo cambiar la contraseña');
 
       toast({
         title: "Contraseña actualizada",

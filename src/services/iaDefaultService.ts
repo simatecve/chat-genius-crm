@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface IADefaultSettings {
   id: number;

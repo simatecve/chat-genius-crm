@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
 export type AppRole = Database['public']['Enums']['app_role'];
@@ -69,34 +69,15 @@ export const createUser = async (
   lastName: string,
   role: AppRole
 ) => {
-  if (!supabaseAdmin) {
-    throw new Error('No se puede crear usuario: falta configuración de admin');
-  }
-
-  // Crear usuario en auth
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      first_name: firstName,
-      last_name: lastName
-    }
+  // Delegated to secure edge function (no service_role key in client)
+  const { data, error } = await supabase.functions.invoke('create-user', {
+    body: { email, password, firstName, lastName, role },
   });
 
-  if (authError) throw authError;
+  if (error) throw new Error(error.message || 'Error al crear usuario');
+  if (!data?.success) throw new Error(data?.error || 'Error al crear usuario');
 
-  // Asignar rol
-  const { error: roleError } = await supabaseAdmin
-    .from('user_roles')
-    .insert({
-      user_id: authData.user.id,
-      role
-    });
-
-  if (roleError) throw roleError;
-
-  return authData.user;
+  return data.user;
 };
 
 export const updateUserRole = async (userId: string, newRole: AppRole) => {
@@ -135,12 +116,13 @@ export const updateRolePermissions = async (role: AppRole, permissionIds: string
 };
 
 export const deleteUser = async (userId: string) => {
-  if (!supabaseAdmin) {
-    throw new Error('No se puede eliminar usuario: falta configuración de admin');
-  }
+  // Delegated to secure edge function (no service_role key in client)
+  const { data, error } = await supabase.functions.invoke('delete-user', {
+    body: { userId },
+  });
 
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-  if (error) throw error;
+  if (error) throw new Error(error.message || 'Error al eliminar usuario');
+  if (!data?.success) throw new Error(data?.error || 'Error al eliminar usuario');
 };
 
 export const checkUserHasPermission = async (userId: string, permissionName: string) => {
