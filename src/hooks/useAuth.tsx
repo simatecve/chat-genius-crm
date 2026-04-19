@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email);
+        logger.debug('Auth state change:', event);
         
         // Update state for normal auth events
         setSession(session);
@@ -41,12 +41,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         // Handle token refresh outside the callback to avoid deadlocks
         if (event === 'TOKEN_REFRESHED') {
-          console.log('[useAuth] Token refreshed successfully');
+          logger.debug('[useAuth] Token refreshed successfully');
         }
         
         // If session is invalid, attempt refresh
         if (event === 'SIGNED_OUT' || !session) {
-          console.log('[useAuth] Session ended or invalid');
+          logger.debug('[useAuth] Session ended or invalid');
         }
       }
     );
