@@ -4,12 +4,18 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://pxvembsxhwvpotydtiqa.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dmVtYnN4aHd2cG90eWR0aXFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3NTgwMzcsImV4cCI6MjA3OTMzNDAzN30.PsDIcCO0Dq1Zis-2iO-ffAbnK11ksSxEqsrRMua49pk";
-const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-// Regular client for normal operations
+// Regular client for normal operations.
+// SECURITY: The service_role key MUST NEVER be exposed to the client.
+// All administrative operations (creating/deleting users, listing auth users,
+// updating emails/passwords) are now performed via secure edge functions:
+//   - admin-list-users
+//   - admin-update-user
+//   - create-user
+//   - delete-user
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
@@ -17,13 +23,3 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
-
-// Admin client for administrative operations (requires service_role key)
-export const supabaseAdmin = SUPABASE_SERVICE_ROLE_KEY 
-  ? createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
-  : null;
