@@ -125,10 +125,10 @@ const TelegramBotConnectionForm = ({ onClose }: TelegramBotConnectionFormProps) 
       }
 
       const botInfo = botInfoData.result;
-      console.log('[TelegramBot] Token válido. Bot:', botInfo.username);
+      logger.debug('[TelegramBot] Token válido. Bot:', botInfo.username);
       
       // Paso 2: Insertar el bot en la base de datos
-      console.log('[TelegramBot] Creando registro en base de datos...');
+      logger.debug('[TelegramBot] Creando registro en base de datos...');
       const { data: insertedBot, error: insertError } = await supabase
         .from('telegram_bots')
         .insert({
