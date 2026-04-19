@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,43 +29,32 @@ export interface FacebookPage {
   instagram_username?: string;
 }
 
+const fetchFacebookConnections = async (userId: string): Promise<FacebookConnection[]> => {
+  const { data, error } = await supabase
+    .from('facebook_connections')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []) as FacebookConnection[];
+};
+
 export function useFacebookConnections(userId?: string) {
-  const [connections, setConnections] = useState<FacebookConnection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
+  const queryKey = ['facebook-connections', userId];
+
+  const { data: connections = [], isLoading, refetch } = useQuery({
+    queryKey,
+    queryFn: () => fetchFacebookConnections(userId!),
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 2,
+  });
 
   const fetchConnections = useCallback(async () => {
-    if (!userId) {
-      setConnections([]);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('facebook_connections')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setConnections(data || []);
-    } catch (error: any) {
-      console.error('Error fetching Facebook connections:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron cargar las conexiones de Facebook',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, toast]);
-
-  useEffect(() => {
-    fetchConnections();
-  }, [fetchConnections]);
+    await refetch();
+  }, [refetch]);
 
   const createConnection = async (
     page: FacebookPage,
@@ -96,7 +86,7 @@ export function useFacebookConnections(userId?: string) {
 
       if (error) throw error;
 
-      setConnections((prev) => [data, ...prev]);
+      queryClient.invalidateQueries({ queryKey });
       toast({
         title: 'Conexión creada',
         description: `Página "${page.name}" conectada exitosamente`,
@@ -128,10 +118,7 @@ export function useFacebookConnections(userId?: string) {
 
       if (error) throw error;
 
-      setConnections((prev) =>
-        prev.map((conn) => (conn.id === connectionId ? data : conn))
-      );
-
+      queryClient.invalidateQueries({ queryKey });
       toast({
         title: 'Conexión actualizada',
         description: 'Los cambios se guardaron correctamente',
@@ -158,7 +145,7 @@ export function useFacebookConnections(userId?: string) {
 
       if (error) throw error;
 
-      setConnections((prev) => prev.filter((conn) => conn.id !== connectionId));
+      queryClient.invalidateQueries({ queryKey });
       toast({
         title: 'Conexión eliminada',
         description: 'La conexión se eliminó correctamente',
@@ -178,7 +165,7 @@ export function useFacebookConnections(userId?: string) {
 
   return {
     connections,
-    loading,
+    loading: isLoading,
     fetchConnections,
     createConnection,
     updateConnection,
