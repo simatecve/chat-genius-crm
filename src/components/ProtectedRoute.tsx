@@ -5,6 +5,7 @@ import { useProfile } from '@/hooks/useProfile';
 import AppLayout from '@/components/layout/AppLayout';
 import AdminLayout from '@/components/layout/AdminLayout';
 import SuperAdminImpersonationLayout from '@/components/layout/SuperAdminImpersonationLayout';
+import { logger } from '@/lib/logger';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +17,7 @@ const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteP
   const { profile, loading: profileLoading, isSuperAdmin, isClient, isImpersonating } = useProfile();
   const location = useLocation();
 
-  console.log('ProtectedRoute - user:', user?.email, 'loading:', authLoading, 'profile:', profile?.profile_type);
+  logger.debug('ProtectedRoute - authLoading:', authLoading, 'profileType:', profile?.profile_type);
 
   // Show loading while auth or profile is loading
   if (authLoading || profileLoading) {
