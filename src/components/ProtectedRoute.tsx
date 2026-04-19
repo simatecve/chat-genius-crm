@@ -78,19 +78,19 @@ const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteP
 
   // Handle super admin routes
   if (requireSuperAdmin && !isSuperAdmin) {
-    console.log('Access denied: Super admin required');
+    logger.debug('Access denied: Super admin required');
     return <Navigate to="/" replace />;
   }
 
   // Redirect super admin to admin panel if trying to access regular routes (unless impersonating)
   if (isSuperAdmin && !location.pathname.startsWith('/admin') && !requireSuperAdmin && !isImpersonating) {
-    console.log('Super admin detected, redirecting to admin panel');
+    logger.debug('Super admin detected, redirecting to admin panel');
     return <Navigate to="/admin" replace />;
   }
 
   // Redirect regular clients to main panel if trying to access admin routes
   if ((isClient || profile?.profile_type === 'cajero') && location.pathname.startsWith('/admin')) {
-    console.log('Regular client or cajero trying to access admin, redirecting to main panel');
+    logger.debug('Regular client or cajero trying to access admin, redirecting to main panel');
     return <Navigate to="/" replace />;
   }
 
