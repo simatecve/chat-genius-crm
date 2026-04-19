@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { Bot, Loader2, ExternalLink } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface TelegramBotConnectionFormProps {
   onClose: () => void;
