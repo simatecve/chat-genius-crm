@@ -98,7 +98,7 @@ export const WebchatConversionStats = () => {
       <Card className="bg-card border-border">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-foreground">Actividad últimos 14 días</CardTitle>
-          <Button variant="outline" size="sm" onClick={refetch}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Actualizar
           </Button>
