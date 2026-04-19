@@ -320,7 +320,8 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2">
           <a 
-            href={blobUrl || attachmentUrl}
+            href={safeOpenUrl || '#'}
+            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
             download={fileName}
             target="_blank"
             rel="noopener noreferrer"
@@ -362,7 +363,8 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2">
           <a 
-            href={blobUrl || attachmentUrl}
+            href={safeOpenUrl || '#'}
+            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
             download={fileName}
             target="_blank"
             rel="noopener noreferrer"
@@ -404,7 +406,8 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2">
           <a 
-            href={blobUrl || attachmentUrl}
+            href={safeOpenUrl || '#'}
+            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
             download={fileName}
             target="_blank"
             rel="noopener noreferrer"
