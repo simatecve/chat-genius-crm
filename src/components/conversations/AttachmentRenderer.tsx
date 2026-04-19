@@ -124,8 +124,12 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   };
 
   const downloadFile = () => {
+    const href = (isTwilioUrl || attachmentUrl.includes('/api/files/'))
+      ? blobUrl
+      : (blobUrl || attachmentUrl);
+    if (!href) return;
     const link = document.createElement('a');
-    link.href = blobUrl || attachmentUrl;
+    link.href = href;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
