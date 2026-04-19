@@ -169,6 +169,11 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
     );
   }
 
+  // URL segura para abrir/descargar: para URLs protegidas (Twilio/WAHA) usar SOLO blobUrl
+  // para evitar el popup "Not Authorized" del navegador
+  const isProtectedUrl = isTwilioUrl || attachmentUrl.includes('/api/files/');
+  const safeOpenUrl = isProtectedUrl ? blobUrl : (blobUrl || attachmentUrl);
+
   // Renderizado según tipo de archivo
   switch (fileType) {
     case 'image':
@@ -178,7 +183,7 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
             src={blobUrl || attachmentUrl} 
             alt="Imagen adjunta"
             className="rounded-lg cursor-pointer hover:opacity-90 transition-opacity w-full h-auto"
-            onClick={() => window.open(blobUrl || attachmentUrl, '_blank')}
+            onClick={() => safeOpenUrl && window.open(safeOpenUrl, '_blank')}
             loading="lazy"
           />
         </div>
