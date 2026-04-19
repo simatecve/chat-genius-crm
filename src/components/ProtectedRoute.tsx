@@ -6,6 +6,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import AdminLayout from '@/components/layout/AdminLayout';
 import SuperAdminImpersonationLayout from '@/components/layout/SuperAdminImpersonationLayout';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
