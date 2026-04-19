@@ -107,13 +107,13 @@ export const useAuthenticatedMedia = (url: string | null, twilioConnectionId?: s
 
     loadAuthenticatedMedia();
 
-    // Cleanup: revocar blob URL cuando el componente se desmonte
+    // Cleanup: solo marcar como desmontado. NO revocar el blob aquí porque
+    // puede estar siendo usado en otra pestaña (window.open) o en un modal.
+    // El navegador liberará la memoria automáticamente al cerrar la pestaña.
     return () => {
       isMounted = false;
-      if (blobUrl && blobUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(blobUrl);
-      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, twilioConnectionId]);
 
   return { blobUrl, isLoading, error };

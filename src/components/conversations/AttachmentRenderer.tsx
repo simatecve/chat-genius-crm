@@ -124,8 +124,12 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
   };
 
   const downloadFile = () => {
+    const href = (isTwilioUrl || attachmentUrl.includes('/api/files/'))
+      ? blobUrl
+      : (blobUrl || attachmentUrl);
+    if (!href) return;
     const link = document.createElement('a');
-    link.href = blobUrl || attachmentUrl;
+    link.href = href;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
@@ -169,6 +173,11 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
     );
   }
 
+  // URL segura para abrir/descargar: para URLs protegidas (Twilio/WAHA) usar SOLO blobUrl
+  // para evitar el popup "Not Authorized" del navegador
+  const isProtectedUrl = isTwilioUrl || attachmentUrl.includes('/api/files/');
+  const safeOpenUrl = isProtectedUrl ? blobUrl : (blobUrl || attachmentUrl);
+
   // Renderizado según tipo de archivo
   switch (fileType) {
     case 'image':
@@ -178,7 +187,7 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
             src={blobUrl || attachmentUrl} 
             alt="Imagen adjunta"
             className="rounded-lg cursor-pointer hover:opacity-90 transition-opacity w-full h-auto"
-            onClick={() => window.open(blobUrl || attachmentUrl, '_blank')}
+            onClick={() => safeOpenUrl && window.open(safeOpenUrl, '_blank')}
             loading="lazy"
           />
         </div>
@@ -311,7 +320,8 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2">
           <a 
-            href={blobUrl || attachmentUrl}
+            href={safeOpenUrl || '#'}
+            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
             download={fileName}
             target="_blank"
             rel="noopener noreferrer"
@@ -353,7 +363,8 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2">
           <a 
-            href={blobUrl || attachmentUrl}
+            href={safeOpenUrl || '#'}
+            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
             download={fileName}
             target="_blank"
             rel="noopener noreferrer"
@@ -395,7 +406,8 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
       return (
         <div className="mb-2">
           <a 
-            href={blobUrl || attachmentUrl}
+            href={safeOpenUrl || '#'}
+            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
             download={fileName}
             target="_blank"
             rel="noopener noreferrer"
