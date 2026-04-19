@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { Bot, Loader2, ExternalLink } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface TelegramBotConnectionFormProps {
   onClose: () => void;
@@ -110,7 +111,7 @@ const TelegramBotConnectionForm = ({ onClose }: TelegramBotConnectionFormProps) 
     
     try {
       // Paso 1: Validar el token con Telegram API
-      console.log('[TelegramBot] Validando token con Telegram API...');
+      logger.debug('[TelegramBot] Validando token con Telegram API...');
       const botInfoResponse = await fetch(`https://api.telegram.org/bot${formData.bot_token}/getMe`);
       
       if (!botInfoResponse.ok) {
@@ -124,10 +125,10 @@ const TelegramBotConnectionForm = ({ onClose }: TelegramBotConnectionFormProps) 
       }
 
       const botInfo = botInfoData.result;
-      console.log('[TelegramBot] Token válido. Bot:', botInfo.username);
+      logger.debug('[TelegramBot] Token válido. Bot:', botInfo.username);
       
       // Paso 2: Insertar el bot en la base de datos
-      console.log('[TelegramBot] Creando registro en base de datos...');
+      logger.debug('[TelegramBot] Creando registro en base de datos...');
       const { data: insertedBot, error: insertError } = await supabase
         .from('telegram_bots')
         .insert({

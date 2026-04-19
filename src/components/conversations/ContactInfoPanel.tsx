@@ -616,10 +616,10 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
         if (contactError) {
           console.error('Error updating contact name:', contactError);
         } else {
-          console.log('Contact name updated to:', newName);
+          // Contact name updated successfully
         }
       } else {
-        console.log('No matching contact found for phone:', phoneNumber);
+        // No matching contact found
       }
     } catch (error) {
       console.error('Error in updateContactName:', error);
