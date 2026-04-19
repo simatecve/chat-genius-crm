@@ -319,13 +319,11 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
     case 'pdf':
       return (
         <div className="mb-2">
-          <a 
-            href={safeOpenUrl || '#'}
-            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
-            download={fileName}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
+          <button
+            type="button"
+            onClick={downloadFile}
+            disabled={!safeOpenUrl}
+            className="block w-full text-left disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className={cn(
               "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-80 transition-opacity",
@@ -355,20 +353,18 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
                 isOutgoing ? "text-white/70" : "text-[#8696a0]"
               )} />
             </div>
-          </a>
+          </button>
         </div>
       );
 
     case 'document':
       return (
         <div className="mb-2">
-          <a 
-            href={safeOpenUrl || '#'}
-            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
-            download={fileName}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
+          <button
+            type="button"
+            onClick={downloadFile}
+            disabled={!safeOpenUrl}
+            className="block w-full text-left disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className={cn(
               "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-80 transition-opacity",
@@ -398,20 +394,18 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
                 isOutgoing ? "text-white/70" : "text-[#8696a0]"
               )} />
             </div>
-          </a>
+          </button>
         </div>
       );
 
     default:
       return (
         <div className="mb-2">
-          <a 
-            href={safeOpenUrl || '#'}
-            onClick={(e) => { if (!safeOpenUrl) e.preventDefault(); }}
-            download={fileName}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
+          <button
+            type="button"
+            onClick={downloadFile}
+            disabled={!safeOpenUrl}
+            className="block w-full text-left disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <div className={cn(
               "flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-80 transition-opacity",
@@ -441,7 +435,7 @@ const AttachmentRenderer: React.FC<AttachmentRendererProps> = ({
                 isOutgoing ? "text-white/70" : "text-[#8696a0]"
               )} />
             </div>
-          </a>
+          </button>
         </div>
       );
   }
