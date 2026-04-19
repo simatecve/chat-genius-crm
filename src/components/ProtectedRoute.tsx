@@ -7,6 +7,7 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import SuperAdminImpersonationLayout from '@/components/layout/SuperAdminImpersonationLayout';
 import { logger } from '@/lib/logger';
 import { supabase } from '@/integrations/supabase/client';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -95,15 +96,13 @@ const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteP
   }
 
   // Choose the appropriate layout based on user type and impersonation status
+  // Each route is wrapped in ErrorBoundary so a render error in one page doesn't crash the entire app
   if (requireSuperAdmin) {
-    // Admin routes always use AdminLayout
-    return <AdminLayout>{children}</AdminLayout>;
+    return <AdminLayout><ErrorBoundary>{children}</ErrorBoundary></AdminLayout>;
   } else if (isSuperAdmin && isImpersonating) {
-    // Super admin impersonating a user uses special layout
-    return <SuperAdminImpersonationLayout>{children}</SuperAdminImpersonationLayout>;
+    return <SuperAdminImpersonationLayout><ErrorBoundary>{children}</ErrorBoundary></SuperAdminImpersonationLayout>;
   } else {
-    // Regular users and non-impersonating super admins use AppLayout
-    return <AppLayout>{children}</AppLayout>;
+    return <AppLayout><ErrorBoundary>{children}</ErrorBoundary></AppLayout>;
   }
 };
 
