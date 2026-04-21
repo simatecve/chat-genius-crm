@@ -80,7 +80,18 @@ const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const { isCajero } = useProfile();
   const { etiquetas, getTagColor } = useTags();
+  const isMobile = useIsMobile();
   const [contactTags, setContactTags] = useState<Record<string, string[]>>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Cuántos filtros activos hay (para badge en mobile)
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (assignmentFilter !== 'all') n++;
+    if (filterMode !== 'all') n++;
+    if (selectedSessionFilter) n++;
+    return n;
+  }, [assignmentFilter, filterMode, selectedSessionFilter]);
 
   // Cargar etiquetas de contactos - lazy loading con debounce
   // Solo cargar cuando hay conversaciones visibles, no en cada cambio
