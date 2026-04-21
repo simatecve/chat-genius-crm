@@ -455,7 +455,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Área de mensajes */}
       <ScrollArea 
-        className="flex-1 min-h-0 p-4 bg-background"
+        className="flex-1 min-h-0 p-3 md:p-4 bg-background"
         ref={scrollAreaRef}
       >
         <div className="space-y-4">
