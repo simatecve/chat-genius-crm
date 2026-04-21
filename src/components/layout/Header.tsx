@@ -70,6 +70,9 @@ export const Header = () => {
       <div className="flex items-center justify-between h-full px-6">
         {/* Right section - Actions */}
         <div className="flex items-center space-x-4 ml-auto">
+          {/* Presence chip (cajero only) */}
+          <AgentPresenceChip />
+
           {/* Notifications */}
           <DropdownMenu open={alertsOpen} onOpenChange={setAlertsOpen}>
             <DropdownMenuTrigger asChild>
