@@ -765,6 +765,9 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
           </Button>
         </div>
 
+        {/* AGENTE ASIGNADO */}
+        <AssignedAgentSection conversationId={conversationId} />
+
         {/* ETIQUETAS */}
         <Card className="p-3 bg-card border-border">
           <button
