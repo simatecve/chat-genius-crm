@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { dashboardService, ActiveConversation } from '@/services/dashboardService';
 import { useProfile } from '@/hooks/useProfile';
+import { AgentPresenceChip } from './AgentPresenceChip';
 export const Header = () => {
   const { signOut, user } = useAuth();
   const { profile } = useProfile();
