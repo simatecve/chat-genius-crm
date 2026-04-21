@@ -352,13 +352,13 @@ const ConversationItem = memo<ConversationItemProps>(({
     <div 
       onClick={onSelect} 
       className={cn(
-        "p-4 cursor-pointer hover:bg-muted/50 transition-colors", 
+        "p-3 md:p-4 cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted", 
         isSelected && "bg-muted"
       )}
     >
       <div className="flex items-center gap-3">
         <div className="relative">
-          <Avatar className="h-12 w-12">
+          <Avatar className="h-11 w-11 md:h-12 md:w-12">
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials(conversation.pushname)}
             </AvatarFallback>
@@ -371,20 +371,20 @@ const ConversationItem = memo<ConversationItemProps>(({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-medium truncate">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="text-sm md:text-base font-medium truncate">
                 {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
               </h3>
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[11px] md:text-xs text-muted-foreground shrink-0">
               {conversation.last_message_time && formatTime(conversation.last_message_time)}
             </span>
           </div>
 
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
-              {tags.slice(0, 3).map((tag) => (
+              {tags.slice(0, 2).map((tag) => (
                 <Badge 
                   key={tag} 
                   variant="outline" 
@@ -397,9 +397,9 @@ const ConversationItem = memo<ConversationItemProps>(({
                   {tag}
                 </Badge>
               ))}
-              {tags.length > 3 && (
+              {tags.length > 2 && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                  +{tags.length - 3}
+                  +{tags.length - 2}
                 </Badge>
               )}
             </div>
