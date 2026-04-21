@@ -246,7 +246,7 @@ export const Sidebar = () => {
                 </div>}
             </div>
             {!isCollapsed && <div className="text-xs text-muted-foreground text-center mt-3">
-                Versión 3.1 30-03-26
+                Versión 3.3 21-04-26
               </div>}
           </div>
         </div>
