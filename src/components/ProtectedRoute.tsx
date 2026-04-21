@@ -16,18 +16,30 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
-  const { profile, loading: profileLoading, error: profileError, isSuperAdmin, isClient, isImpersonating, refetchProfile } = useProfile();
+  const { profile, loading: profileLoading, error: profileError, retrying, retryCount, isSuperAdmin, isClient, isImpersonating, refetchProfile } = useProfile();
   const location = useLocation();
 
   logger.debug('ProtectedRoute - authLoading:', authLoading, 'profileType:', profile?.profile_type);
 
-  // Show loading while auth or profile is loading
+  // Show loading while auth or profile is loading.
+  // If we're auto-retrying after a transient failure, show a "Reconnecting…" message
+  // instead of the generic spinner — keeps the user informed without forcing manual action.
   if (authLoading || profileLoading) {
+    const reconnecting = retrying && retryCount > 0;
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Cargando...</p>
+          <p className="mt-2 text-muted-foreground">
+            {reconnecting
+              ? `Reconectando con el servidor… (intento ${retryCount})`
+              : 'Cargando...'}
+          </p>
+          {reconnecting && (
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Esto puede tardar unos segundos si el servidor está saturado.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -39,7 +51,8 @@ const ProtectedRoute = ({ children, requireSuperAdmin = false }: ProtectedRouteP
     return <Navigate to="/login" replace />;
   }
 
-  // Profile failed to load — show retry UI instead of infinite spinner
+  // Profile failed to load with a NON-recoverable error (profile not found, 401/403, etc.)
+  // Transient errors (timeout/network/5xx) never reach this branch — the hook keeps retrying.
   if (profileError && !profile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
