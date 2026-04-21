@@ -78,6 +78,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   );
   const { autoStopEnabled } = useBotAutoStop();
   const { isCajero } = useProfile();
+  const isMobile = useIsMobile();
 
   // Función para enmascarar números de teléfono
   const maskPhoneNumber = (phone: string | null) => {
