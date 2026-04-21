@@ -14,13 +14,26 @@ export class ConversationService {
   /**
    * Obtiene todas las conversaciones del usuario actual
    */
-  static async getConversations(userId: string): Promise<ConversationWithLastMessage[]> {
+  static async getConversations(
+    userId: string,
+    opts?: { restrictToAgentId?: string | null; includeUnassigned?: boolean }
+  ): Promise<ConversationWithLastMessage[]> {
     try {
       // Seleccionar columnas necesarias (excluyendo mensajes) para reducir egress
-      const { data, error } = await supabase
+      let query = supabase
         .from('conversations')
-        .select('id, user_id, pushname, phone_number, whatsapp_number, last_message, last_message_time, unread_count, status, channel_type, telegram_bot_id, twilio_connection_id, facebook_connection_id, lead_id, created_at, updated_at, contact_name, casino_user_created, casino_username, last_inbound_message_time, payment_receipt_detected_at, payment_receipt_sent')
-        .eq('user_id', userId)
+        .select('id, user_id, pushname, phone_number, whatsapp_number, last_message, last_message_time, unread_count, status, channel_type, telegram_bot_id, twilio_connection_id, facebook_connection_id, lead_id, created_at, updated_at, contact_name, casino_user_created, casino_username, last_inbound_message_time, payment_receipt_detected_at, payment_receipt_sent, assigned_to, assigned_at, assigned_by')
+        .eq('user_id', userId);
+
+      if (opts?.restrictToAgentId) {
+        if (opts.includeUnassigned) {
+          query = query.or(`assigned_to.eq.${opts.restrictToAgentId},assigned_to.is.null`);
+        } else {
+          query = query.eq('assigned_to', opts.restrictToAgentId);
+        }
+      }
+
+      const { data, error } = await query
         .order('last_message_time', { ascending: false })
         .limit(100);
 
@@ -67,7 +80,7 @@ export class ConversationService {
       // Seleccionar columnas necesarias (excluyendo mensajes) para reducir egress
       const { data, error } = await supabase
         .from('conversations')
-        .select('id, user_id, pushname, phone_number, whatsapp_number, last_message, last_message_time, unread_count, status, channel_type, telegram_bot_id, twilio_connection_id, facebook_connection_id, lead_id, created_at, updated_at, contact_name, casino_user_created, casino_username, last_inbound_message_time, payment_receipt_detected_at, payment_receipt_sent')
+        .select('id, user_id, pushname, phone_number, whatsapp_number, last_message, last_message_time, unread_count, status, channel_type, telegram_bot_id, twilio_connection_id, facebook_connection_id, lead_id, created_at, updated_at, contact_name, casino_user_created, casino_username, last_inbound_message_time, payment_receipt_detected_at, payment_receipt_sent, assigned_to, assigned_at, assigned_by')
         .eq('user_id', userId)
         .or(`pushname.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`)
         .order('last_message_time', { ascending: false })
