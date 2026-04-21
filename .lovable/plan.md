@@ -1,67 +1,81 @@
 
 
-# Plan: Mejoras al sistema + documentación de backend + bump v3.3
+# Plan: Reducir tamaño de BD (~500 MB → estimado ~150 MB)
 
-## Parte 1 — Actualización de versión a v3.3 21-04-26
+## Diagnóstico actual
 
-Reemplazar el string `Versión 3.1 30-03-26` por `Versión 3.3 21-04-26` en los 3 lugares donde aparece:
-- `src/pages/Login.tsx` (línea 163)
-- `src/components/layout/Sidebar.tsx` (línea 249)
-- `src/components/layout/AdminLayout.tsx` (línea 184)
+| Tabla | Tamaño | % del total | Filas relevantes |
+|---|---|---|---|
+| `messages` | **210 MB** | ~70% | 359.751 (todo 2026) |
+| `conversations` | 48 MB | 16% | ~28k |
+| `leads` | 18 MB | 6% | ~30k (5.981 huérfanos viejos) |
+| `contacts` | 9 MB | 3% | — |
+| `contacto_bloqueado_bot` | 7 MB | 2% | 24.020 |
+| Resto (auth, sistema) | ~7 MB | 3% | — |
 
-## Parte 2 — Documentación completa del backend
+Ya borraste 2025 antes. Lo único que queda son 4 meses de 2026 con volumen muy alto (~90k mensajes/mes promedio).
 
-Crear `docs/BACKEND.md` (markdown único, autocontenido) con todo lo necesario para clonar el proyecto en una BD nueva:
+## Estrategia de limpieza (4 acciones)
 
-1. **Resumen arquitectónico** — modelo multi-tenant (account_owner_id), jerarquía 3-tier (superadmin/cliente/cajero), canales soportados.
-2. **Diagrama ER simplificado** en ASCII (conversations ↔ messages ↔ leads ↔ contacts ↔ profiles).
-3. **DDL completo** de las ~40 tablas con columnas, tipos, defaults y nullables (incluyendo las nuevas: `agent_presence`, `assignment_settings`, columnas `assigned_to/at/by` en conversations).
-4. **Enums y tipos custom**: `app_role`, `profile_type`.
-5. **Funciones SQL** (todas las que aparecen en `<db-functions>`): `get_account_owner_id`, `has_role`, `auto_assign_conversation`, `handle_new_user`, `setup_default_workspace_and_funnel`, `increment_usage`, `get_unread_count`, `get_messages_by_hour`, `get_conversations_by_hour`, `get_messages_heatmap`, `get_conversion_rate`, `update_lead_on_inbound_message`, `update_last_inbound_message_time`, `check_message_exists_by_waha_id`, `update_contact_full_name`, `update_*_updated_at`.
-6. **Triggers**: `on_auth_user_created`, `on_user_created_setup_workspace`, `trg_conversation_auto_assign`, `trg_update_lead_inbound`, `trg_contact_full_name`, etc.
-7. **Políticas RLS** completas por tabla (las que ya están en el contexto).
-8. **Storage buckets**: `chat-attachments` (público) y rutas esperadas.
-9. **Realtime**: tablas con REPLICA IDENTITY FULL (`messages`, `conversations`, `agent_presence`, `campaign_sends`).
-10. **Edge Functions** (lista completa de las ~40 funciones de `supabase/functions/`) con: nombre, propósito en una línea, `verify_jwt` (de config.toml), variables de entorno usadas, endpoint público.
-11. **Secrets requeridos**: `WAHA_API_KEY`, `WAHA_BASE_URL`, `GOOGLE_GEMINI_API_KEY`, `LOVABLE_API_KEY`, `FACEBOOK_APP_ID/SECRET/VERIFY_TOKEN`, `SUPABASE_*`.
-12. **Seeds mínimos**: filas iniciales de `permissions`, `payment_plans`, `ia_default_settings (id=1)`, `ia_humanization_settings (id=1)`.
-13. **Webhooks externos** a configurar: WAHA → `waha-webhook`, Twilio → `twilio-webhook`, Telegram → `telegram-bot-webhook`, Meta → `facebook-instagram-webhook`, MercadoPago → `mercadopago-webhook`.
-14. **Pasos de instalación** en orden: crear proyecto Supabase → ejecutar DDL → crear funciones/triggers → aplicar RLS → crear bucket → cargar secrets → desplegar edge functions → seeds → conectar canales.
+### 1. Backup CSV antes de borrar (obligatorio, igual que la vez anterior)
+Exporto a `/mnt/documents/`:
+- `messages_pre_cleanup_2026-04-21.csv.gz`
+- `conversations_pre_cleanup_2026-04-21.csv.gz`
+- `leads_huerfanos_pre_cleanup_2026-04-21.csv`
+- `contacto_bloqueado_bot_pre_cleanup_2026-04-21.csv`
 
-Archivo entregado en `/mnt/documents/BACKEND.md` como artefacto descargable, **y** copia en el repo en `docs/BACKEND.md` para que viaje con el código.
+### 2. Borrar mensajes de enero + febrero 2026
+- **236.774 mensajes** → libera estimado **~135 MB** (tabla + índices).
+- Conserva marzo y abril 2026 (123k mensajes, ~75 MB) → operación reciente intacta.
+- Las **conversaciones se mantienen** (solo se borran los mensajes), así no perdés contactos ni embudos.
 
-## Parte 3 — Mejoras propuestas para hacer el sistema más útil
+### 3. Limpiar `contacto_bloqueado_bot` antiguos
+- Borrar registros de bloqueo > 90 días (la mayoría de los 24.020).
+- Libera ~5-6 MB. Si un contacto vuelve a hablar y necesita ser bloqueado, se re-agrega.
 
-Lista priorizada. Implemento solo las que apruebes; este plan únicamente las describe.
+### 4. Limpiar leads huérfanos viejos
+- 5.981 leads sin conversación asociada y sin actividad en 60+ días.
+- Libera ~3-4 MB en `leads` + reduce índices.
 
-### Alta prioridad (impacto directo en operación diaria)
+### 5. VACUUM FULL post-borrado
+- Compacta físicamente las tablas y reconstruye índices.
+- Sin esto, Postgres marca el espacio como "reusable" pero **no lo devuelve al disco**. Es el paso que realmente baja los MB que ve Supabase.
 
-1. **Notificaciones de escritorio + sonido para mensajes nuevos** — alerta al cajero cuando llega una conversación asignada a él, incluso con la pestaña en background. Hoy depende de mirar la lista.
-2. **SLA / tiempo de primera respuesta** — medir tiempo entre `last_inbound_message_time` y la primera respuesta del cajero; mostrar badge rojo en conversaciones sin responder >X min y reporte semanal por cajero.
-3. **Reasignación masiva + transferencia entre cajeros** — botón "Transferir a otro agente" en el chat con nota opcional; útil cuando un cajero sale de turno.
-4. **Auto-reasignación al desconectarse** — si un cajero pasa a `offline` con conversaciones activas sin respuesta, redistribuirlas automáticamente al resto online.
-5. **Búsqueda global de conversaciones/mensajes** — buscar por contenido, teléfono, nombre, casino_username. Hoy hay que scrollear.
-6. **Plantillas de respuesta por categoría + variables** — extender quick replies con `{nombre}`, `{usuario_casino}`, `{cbu}` que se sustituyen al enviar.
+## Resultado esperado
 
-### Media prioridad (calidad de vida y retención)
+| Después | Tamaño estimado |
+|---|---|
+| `messages` | ~75 MB (-135 MB) |
+| `conversations` | ~48 MB (igual, sin cambios) |
+| `leads` | ~14 MB (-4 MB) |
+| `contacto_bloqueado_bot` | ~1.5 MB (-5.5 MB) |
+| **Total BD** | **~150-180 MB** (de ~500 MB) |
 
-7. **Tags/etiquetas visibles en la lista de conversaciones** — colorear/filtrar por etiqueta sin abrir cada chat.
-8. **Notas internas en la conversación** — mensajes solo visibles para el equipo, no enviados al contacto. Útil para handoff.
-9. **Historial de asignaciones por conversación** — quién la tomó, cuándo se transfirió, motivo.
-10. **Dashboard por cajero** — conversaciones atendidas, ventas cerradas, tiempo promedio, ranking del mes.
-11. **Modo "ausente automático"** — si no hay actividad del cajero en X minutos, pasar a `away` y dejar de recibir auto-asignaciones.
-12. **Recordatorios programados sobre una conversación** — "recordame este chat en 2 h" → notificación al cajero.
+Reducción aproximada: **65%**.
 
-### Baja prioridad (nice-to-have)
+## Lo que NO toco
 
-13. **Exportar conversación a PDF** para compartir con el cliente.
-14. **Atajos de teclado globales** — `J/K` navegar conversaciones, `R` responder, `A` asignar.
-15. **Métricas de IA** — tasa de handoff IA→humano, satisfacción inferida, costo por conversación.
-16. **Webhook saliente configurable** — disparar a un endpoint externo cuando se cierra una venta o llega lead nuevo.
+- Ningún mensaje de marzo/abril 2026.
+- Ninguna conversación (todas siguen visibles, solo sin historial viejo de mensajes).
+- Contactos, embudos, sesiones WhatsApp/Twilio/Telegram, configuración IA, plantillas, presencia de agentes, asignaciones — todo intacto.
+- Auth/usuarios — nada.
 
 ## Detalles técnicos
 
-- La doc se genera estáticamente leyendo `<supabase-tables>`, `<db-functions>` y `supabase/config.toml` ya disponibles en contexto + `code--list_dir supabase/functions`. No necesita consultas a la BD.
-- El bump de versión es 3 ediciones puntuales con `code--line_replace`, idénticas en estructura.
-- Las mejoras de Parte 3 son **catálogo para que elijas**. No se implementa ninguna en este turno; cuando indiques cuáles querés, hago un plan dedicado por feature.
+- **Orden de ejecución**: 1) export CSV → 2) DELETE en orden (`messages` enero-feb → `contacto_bloqueado_bot` >90d → `leads` huérfanos viejos) → 3) `VACUUM FULL` por tabla.
+- **`VACUUM FULL` bloquea la tabla** mientras se ejecuta. Para `messages` puede tardar 1-3 minutos durante los cuales no entrarán mensajes nuevos. Recomendable hacerlo en horario de baja actividad.
+- **Alternativa más segura**: `VACUUM` (no FULL) + `REINDEX TABLE` no bloquean pero recuperan menos espacio. Si preferís cero downtime aviso y uso esta variante (recupera ~70% en lugar del 100%).
+- **Irreversible** una vez ejecutado el commit del DELETE. Solo restauración vía CSV exportado.
+- **Memoria**: actualizo `mem://constraints/data-preservation-complete` con esta segunda excepción autorizada (2026-04-21 fase 2).
+
+## Advertencia
+
+Esto **viola** la regla `mem://constraints/data-preservation-complete`. Procedo solo con tu confirmación explícita, igual que la operación anterior de 2025.
+
+## Pregunta antes de ejecutar
+
+Decime si querés:
+- **A)** Plan completo (puntos 2+3+4 + VACUUM FULL) → máximo ahorro, ~3 min de bloqueo en `messages`.
+- **B)** Conservador (solo punto 2 + VACUUM normal) → ahorro ~110 MB sin bloqueos.
+- **C)** Ajustar el corte (ej. borrar solo enero y conservar febrero).
 
