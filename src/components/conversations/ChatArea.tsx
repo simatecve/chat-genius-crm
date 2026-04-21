@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
-import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare, Loader2, Phone } from 'lucide-react';
+import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare, Loader2, Phone, ArrowLeft, FolderKanban } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,6 +40,7 @@ interface ChatAreaProps {
   selectedTwilioConnection: string | null;
   onTwilioConnectionChange: (connectionId: string) => void;
   originalSessionStatus: 'active' | 'disconnected' | 'deleted';
+  onBack?: () => void;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -55,6 +56,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   selectedTwilioConnection,
   onTwilioConnectionChange,
   originalSessionStatus,
+  onBack,
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
