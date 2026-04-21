@@ -15,9 +15,9 @@ export default function EmbudosFilter({
 
     return (
         <div className="bg-card border-b border-border">
-            <div className="px-4 py-3">
+            <div className="px-3 py-2 md:px-4 md:py-3">
                 <div
-                    className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide"
+                    className="flex items-center gap-1.5 md:gap-2 overflow-x-auto pb-2 scrollbar-hide"
                     style={{
                         scrollbarWidth: 'none',
                         msOverflowStyle: 'none',
@@ -26,7 +26,7 @@ export default function EmbudosFilter({
                     {/* Opción "Todos" */}
                     <button
                         onClick={() => onEmbudoSelect(null)}
-                        className={`flex-shrink-0 px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                        className={`flex-shrink-0 px-4 py-1.5 md:px-5 md:py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap min-h-[36px] md:min-h-0 ${
                             selectedEmbudo === null
                                 ? 'bg-primary text-primary-foreground shadow-md'
                                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -43,7 +43,7 @@ export default function EmbudosFilter({
                             <button
                                 key={embudo.id}
                                 onClick={() => onEmbudoSelect(embudo)}
-                                className={`flex-shrink-0 px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                                className={`flex-shrink-0 px-4 py-1.5 md:px-5 md:py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap min-h-[36px] md:min-h-0 ${
                                     isSelected
                                         ? 'bg-primary text-primary-foreground shadow-md'
                                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
