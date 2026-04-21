@@ -1,81 +1,41 @@
 
 
-# Plan: Reducir tamaño de BD (~500 MB → estimado ~150 MB)
+# Plan: Eliminar timeout fijo + retry automático en carga de perfil
 
-## Diagnóstico actual
+## Problema
+`useProfile` aborta a los 10 s con `TIMEOUT` y muestra la pantalla de error "No pudimos cargar tu perfil". Cuando la BD de Supabase está lenta o saturada (justo lo que vimos hoy con el error 544 "Connection terminated due to connection timeout"), cualquier hipo de red >10 s deja al usuario afuera y obliga a clickear Reintentar manualmente.
 
-| Tabla | Tamaño | % del total | Filas relevantes |
-|---|---|---|---|
-| `messages` | **210 MB** | ~70% | 359.751 (todo 2026) |
-| `conversations` | 48 MB | 16% | ~28k |
-| `leads` | 18 MB | 6% | ~30k (5.981 huérfanos viejos) |
-| `contacts` | 9 MB | 3% | — |
-| `contacto_bloqueado_bot` | 7 MB | 2% | 24.020 |
-| Resto (auth, sistema) | ~7 MB | 3% | — |
+## Solución
 
-Ya borraste 2025 antes. Lo único que queda son 4 meses de 2026 con volumen muy alto (~90k mensajes/mes promedio).
+### 1. `src/hooks/useProfile.tsx` — quitar el timeout duro y reintentar solo
+- **Eliminar** el `Promise.race` con `TIMEOUT` de 10 s. La query queda corriendo hasta que Supabase responda (éxito o error real).
+- **Agregar retry automático con backoff exponencial** ante errores de red/transitorios:
+  - Intentos: ilimitados mientras la sesión esté activa.
+  - Espera: 2s, 4s, 8s, 16s, 30s (tope 30s) entre intentos.
+  - Reintenta solo si el error es de red/timeout/5xx. Si es "perfil no existe" (data null) o error de permisos (4xx), no reintenta.
+- **Exponer `retrying: boolean` y `retryCount: number`** además de `loading` y `error`, para que el ProtectedRoute muestre "Reconectando… (intento N)" en vez del error.
+- Mantener `refetchProfile()` para reintento manual (resetea el contador).
+- Cancelar el loop al desmontar (`cancelled` flag ya existe).
 
-## Estrategia de limpieza (4 acciones)
+### 2. `src/components/ProtectedRoute.tsx` — UX de reconexión persistente
+- Mientras `retrying === true` (hay un intento en curso después del primer fallo), mostrar el spinner con texto "Reconectando con el servidor… (intento N)" en vez de la pantalla de error.
+- La pantalla de error con botones Reintentar/Cerrar sesión solo aparece si el error es **no recuperable** (perfil inexistente, sesión inválida, 401/403). Nunca por timeout/red.
+- Botón "Reintentar" sigue funcionando y resetea el backoff.
 
-### 1. Backup CSV antes de borrar (obligatorio, igual que la vez anterior)
-Exporto a `/mnt/documents/`:
-- `messages_pre_cleanup_2026-04-21.csv.gz`
-- `conversations_pre_cleanup_2026-04-21.csv.gz`
-- `leads_huerfanos_pre_cleanup_2026-04-21.csv`
-- `contacto_bloqueado_bot_pre_cleanup_2026-04-21.csv`
+### 3. Misma lógica defensiva en otros puntos críticos (opcional, recomendado)
+Revisar y aplicar el mismo patrón "sin timeout, con retry exponencial" en:
+- `useEffectiveUserId` (si tiene timeout similar).
+- `useAuth.getInitialSession` (hoy no tiene timeout pero conviene tolerar fallo inicial).
 
-### 2. Borrar mensajes de enero + febrero 2026
-- **236.774 mensajes** → libera estimado **~135 MB** (tabla + índices).
-- Conserva marzo y abril 2026 (123k mensajes, ~75 MB) → operación reciente intacta.
-- Las **conversaciones se mantienen** (solo se borran los mensajes), así no perdés contactos ni embudos.
-
-### 3. Limpiar `contacto_bloqueado_bot` antiguos
-- Borrar registros de bloqueo > 90 días (la mayoría de los 24.020).
-- Libera ~5-6 MB. Si un contacto vuelve a hablar y necesita ser bloqueado, se re-agrega.
-
-### 4. Limpiar leads huérfanos viejos
-- 5.981 leads sin conversación asociada y sin actividad en 60+ días.
-- Libera ~3-4 MB en `leads` + reduce índices.
-
-### 5. VACUUM FULL post-borrado
-- Compacta físicamente las tablas y reconstruye índices.
-- Sin esto, Postgres marca el espacio como "reusable" pero **no lo devuelve al disco**. Es el paso que realmente baja los MB que ve Supabase.
+Solo si confirmás, agrego esto en el mismo cambio. Si no, dejo solo el perfil.
 
 ## Resultado esperado
-
-| Después | Tamaño estimado |
-|---|---|
-| `messages` | ~75 MB (-135 MB) |
-| `conversations` | ~48 MB (igual, sin cambios) |
-| `leads` | ~14 MB (-4 MB) |
-| `contacto_bloqueado_bot` | ~1.5 MB (-5.5 MB) |
-| **Total BD** | **~150-180 MB** (de ~500 MB) |
-
-Reducción aproximada: **65%**.
-
-## Lo que NO toco
-
-- Ningún mensaje de marzo/abril 2026.
-- Ninguna conversación (todas siguen visibles, solo sin historial viejo de mensajes).
-- Contactos, embudos, sesiones WhatsApp/Twilio/Telegram, configuración IA, plantillas, presencia de agentes, asignaciones — todo intacto.
-- Auth/usuarios — nada.
+- Si la BD está lenta 30 s o 2 min, el usuario ve "Reconectando…" y entra automáticamente cuando la BD responde — sin tocar nada.
+- La pantalla de error solo aparece para problemas reales del perfil (no existe, sin permisos), no por hipos de red.
+- Cero cambios visuales cuando todo funciona bien.
 
 ## Detalles técnicos
-
-- **Orden de ejecución**: 1) export CSV → 2) DELETE en orden (`messages` enero-feb → `contacto_bloqueado_bot` >90d → `leads` huérfanos viejos) → 3) `VACUUM FULL` por tabla.
-- **`VACUUM FULL` bloquea la tabla** mientras se ejecuta. Para `messages` puede tardar 1-3 minutos durante los cuales no entrarán mensajes nuevos. Recomendable hacerlo en horario de baja actividad.
-- **Alternativa más segura**: `VACUUM` (no FULL) + `REINDEX TABLE` no bloquean pero recuperan menos espacio. Si preferís cero downtime aviso y uso esta variante (recupera ~70% en lugar del 100%).
-- **Irreversible** una vez ejecutado el commit del DELETE. Solo restauración vía CSV exportado.
-- **Memoria**: actualizo `mem://constraints/data-preservation-complete` con esta segunda excepción autorizada (2026-04-21 fase 2).
-
-## Advertencia
-
-Esto **viola** la regla `mem://constraints/data-preservation-complete`. Procedo solo con tu confirmación explícita, igual que la operación anterior de 2025.
-
-## Pregunta antes de ejecutar
-
-Decime si querés:
-- **A)** Plan completo (puntos 2+3+4 + VACUUM FULL) → máximo ahorro, ~3 min de bloqueo en `messages`.
-- **B)** Conservador (solo punto 2 + VACUUM normal) → ahorro ~110 MB sin bloqueos.
-- **C)** Ajustar el corte (ej. borrar solo enero y conservar febrero).
+- Detección de "error transitorio": código de error Supabase `PGRST*` con status >=500, fetch `TypeError` (red caída), `AbortError`, o cualquier error sin código (caída de socket).
+- El backoff usa `setTimeout` cancelable vía la flag `cancelled` ya existente, sin librerías nuevas.
+- `reloadKey` se mantiene para forzar reset manual desde `refetchProfile`.
 
