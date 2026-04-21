@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ConversationService, ConversationWithLastMessage } from '@/services/conversationService';
 import { useEffectiveUserId } from './useEffectiveUserId';
+import { useAuth } from './useAuth';
+import { useUserPermissions } from './useUserPermissions';
+import { useAssignmentSettings } from './useAssignmentSettings';
 import { Database } from '@/integrations/supabase/types';
 import { useEffect } from 'react';
 import { useToast } from './use-toast';
@@ -13,16 +16,26 @@ type MessageInsert = Database['public']['Tables']['messages']['Insert'];
  */
 export const useConversations = () => {
   const { effectiveUserId } = useEffectiveUserId();
+  const { user } = useAuth();
+  const { isAdmin, hasPermission } = useUserPermissions();
+  const { settings } = useAssignmentSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Query para obtener todas las conversaciones - optimizado para reducir egress
+  const canSeeAll = isAdmin || hasPermission('puede_ver_mensajes_otros');
+  const restrictToAgentId = !canSeeAll && user?.id ? user.id : null;
+  const includeUnassigned = settings?.include_unassigned_for_all ?? true;
+
   const conversationsQuery = useQuery({
-    queryKey: ['conversations', effectiveUserId],
-    queryFn: () => ConversationService.getConversations(effectiveUserId || ''),
+    queryKey: ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned],
+    queryFn: () =>
+      ConversationService.getConversations(effectiveUserId || '', {
+        restrictToAgentId,
+        includeUnassigned,
+      }),
     enabled: !!effectiveUserId,
-    staleTime: 30000, // 30 segundos - Realtime maneja actualizaciones instantáneas
-    refetchInterval: 60000, // 60 segundos - reducido para menos polling
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   // Query para obtener el conteo de no leídos - usa RPC eficiente
