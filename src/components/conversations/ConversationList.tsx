@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
-import { Search, MessageCircle, Phone, Send } from 'lucide-react';
+import { Search, MessageCircle, Phone, Send, SlidersHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import EmbudosFilter from './EmbudosFilter';
@@ -12,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useProfile } from '@/hooks/useProfile';
 import { FilterMode, SessionOption } from '@/pages/Conversations';
 import { useTags } from '@/hooks/useTags';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
@@ -77,7 +80,18 @@ const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const { isCajero } = useProfile();
   const { etiquetas, getTagColor } = useTags();
+  const isMobile = useIsMobile();
   const [contactTags, setContactTags] = useState<Record<string, string[]>>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Cuántos filtros activos hay (para badge en mobile)
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (assignmentFilter !== 'all') n++;
+    if (filterMode !== 'all') n++;
+    if (selectedSessionFilter) n++;
+    return n;
+  }, [assignmentFilter, filterMode, selectedSessionFilter]);
 
   // Cargar etiquetas de contactos - lazy loading con debounce
   // Solo cargar cuando hay conversaciones visibles, no en cada cambio
@@ -162,80 +176,119 @@ const ConversationList: React.FC<ConversationListProps> = ({
     }
   };
 
+  // Bloque reutilizable de selectores
+  const filtersBlock = (
+    <>
+      {/* Filtro de Asignación */}
+      <Select value={assignmentFilter} onValueChange={(v: 'all' | 'mine' | 'unassigned') => onAssignmentFilterChange(v)}>
+        <SelectTrigger className="w-full mb-2 text-sm">
+          <SelectValue placeholder="Asignación" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todas las asignaciones</SelectItem>
+          <SelectItem value="mine">Mis conversaciones</SelectItem>
+          <SelectItem value="unassigned">Sin asignar</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Filtro de Modo */}
+      <Select value={filterMode} onValueChange={(value: FilterMode) => onFilterModeChange(value)}>
+        <SelectTrigger className="w-full mb-2 text-sm">
+          <SelectValue placeholder="Mostrar conversaciones" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todas las conversaciones</SelectItem>
+          <SelectItem value="unassigned">Sin embudo asignado</SelectItem>
+          <SelectItem value="funnel">Por embudo</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Selector de Sesión */}
+      {sessionOptions.length > 0 && (
+        <Select 
+          value={selectedSessionFilter || 'all'} 
+          onValueChange={value => onSessionFilterChange(value === 'all' ? null : value)}
+        >
+          <SelectTrigger className="w-full mb-2 text-sm">
+            <SelectValue placeholder="Todas las sesiones" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las sesiones</SelectItem>
+            {sessionOptions.map(session => (
+              <SelectItem key={session.id} value={session.id}>
+                <div className="flex items-center gap-2">
+                  {getSessionIcon(session.type)}
+                  <span>{session.name}</span>
+                  <span className="text-xs text-muted-foreground">({session.identifier.slice(-6)})</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* Selector de Workspace (solo cuando filterMode es 'funnel') */}
+      {filterMode === 'funnel' && workspaces.length > 0 && (
+        <Select value={selectedWorkspace?.id || ''} onValueChange={value => {
+          const workspace = workspaces.find(w => w.id === value);
+          onWorkspaceSelect(workspace || null);
+        }}>
+          <SelectTrigger className="w-full bg-primary text-primary-foreground border-2 border-primary hover:bg-primary/90 font-medium text-sm">
+            <SelectValue placeholder="Seleccionar espacio">
+              {selectedWorkspace?.name || 'Seleccionar espacio'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {workspaces.map(workspace => (
+              <SelectItem key={workspace.id} value={workspace.id}>{workspace.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </>
+  );
+
   return <div className="h-full border-r border-border flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border">
+      <div className="p-3 md:p-4 border-b border-border">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-semibold">Chats</h1>
-          {unreadCount > 0 && <Badge variant="destructive" className="text-xs">{unreadCount}</Badge>}
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold">Chats</h1>
+            {unreadCount > 0 && <Badge variant="destructive" className="text-xs">{unreadCount}</Badge>}
+          </div>
+          {isMobile && (
+            <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1.5 relative">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="text-xs">Filtros</span>
+                  {activeFilterCount > 0 && (
+                    <Badge variant="default" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] absolute -top-1 -right-1">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-xl max-h-[85vh] overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Filtros</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 space-y-2">
+                  {filtersBlock}
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
 
-        {/* Filtro de Asignación */}
-        <Select value={assignmentFilter} onValueChange={(v: 'all' | 'mine' | 'unassigned') => onAssignmentFilterChange(v)}>
-          <SelectTrigger className="w-full mb-2 text-sm">
-            <SelectValue placeholder="Asignación" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las asignaciones</SelectItem>
-            <SelectItem value="mine">Mis conversaciones</SelectItem>
-            <SelectItem value="unassigned">Sin asignar</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Filtros inline solo en desktop */}
+        {!isMobile && filtersBlock}
 
-        {/* Filtro de Modo */}
-        <Select value={filterMode} onValueChange={(value: FilterMode) => onFilterModeChange(value)}>
-          <SelectTrigger className="w-full mb-2 text-sm">
-            <SelectValue placeholder="Mostrar conversaciones" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las conversaciones</SelectItem>
-            <SelectItem value="unassigned">Sin embudo asignado</SelectItem>
-            <SelectItem value="funnel">Por embudo</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Selector de Sesión */}
-        {sessionOptions.length > 0 && (
-          <Select 
-            value={selectedSessionFilter || 'all'} 
-            onValueChange={value => onSessionFilterChange(value === 'all' ? null : value)}
-          >
-            <SelectTrigger className="w-full mb-2 text-sm">
-              <SelectValue placeholder="Todas las sesiones" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las sesiones</SelectItem>
-              {sessionOptions.map(session => (
-                <SelectItem key={session.id} value={session.id}>
-                  <div className="flex items-center gap-2">
-                    {getSessionIcon(session.type)}
-                    <span>{session.name}</span>
-                    <span className="text-xs text-muted-foreground">({session.identifier.slice(-6)})</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {/* Selector de Workspace (solo cuando filterMode es 'funnel') */}
-        {filterMode === 'funnel' && workspaces.length > 0 && (
-          <Select value={selectedWorkspace?.id || ''} onValueChange={value => {
-            const workspace = workspaces.find(w => w.id === value);
-            onWorkspaceSelect(workspace || null);
-          }}>
-            <SelectTrigger className="w-full bg-primary text-primary-foreground border-2 border-primary hover:bg-primary/90 font-medium text-sm">
-              <SelectValue placeholder="Seleccionar espacio">
-                {selectedWorkspace?.name || 'Seleccionar espacio'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {workspaces.map(workspace => (
-                <SelectItem key={workspace.id} value={workspace.id}>{workspace.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        {/* Barra de búsqueda */}
+        <div className="relative mt-2">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar conversaciones..." value={searchTerm} onChange={e => onSearchChange(e.target.value)} className="pl-10" />
+        </div>
       </div>
 
       {/* Filtro de Embudos (solo cuando filterMode es 'funnel') */}
@@ -243,11 +296,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
         <EmbudosFilter embudos={embudos} selectedEmbudo={selectedEmbudo} onEmbudoSelect={onEmbudoSelect} />
       )}
 
-      {/* Barra de búsqueda */}
-      <div className="relative p-4 pt-2 pb-2">
-        <Search className="absolute left-7 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar conversaciones..." value={searchTerm} onChange={e => onSearchChange(e.target.value)} className="pl-10" />
-      </div>
 
       {/* Lista de conversaciones */}
       <ScrollArea className="flex-1">
@@ -304,13 +352,13 @@ const ConversationItem = memo<ConversationItemProps>(({
     <div 
       onClick={onSelect} 
       className={cn(
-        "p-4 cursor-pointer hover:bg-muted/50 transition-colors", 
+        "p-3 md:p-4 cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted", 
         isSelected && "bg-muted"
       )}
     >
       <div className="flex items-center gap-3">
         <div className="relative">
-          <Avatar className="h-12 w-12">
+          <Avatar className="h-11 w-11 md:h-12 md:w-12">
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials(conversation.pushname)}
             </AvatarFallback>
@@ -323,20 +371,20 @@ const ConversationItem = memo<ConversationItemProps>(({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-medium truncate">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="text-sm md:text-base font-medium truncate">
                 {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
               </h3>
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[11px] md:text-xs text-muted-foreground shrink-0">
               {conversation.last_message_time && formatTime(conversation.last_message_time)}
             </span>
           </div>
 
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
-              {tags.slice(0, 3).map((tag) => (
+              {tags.slice(0, 2).map((tag) => (
                 <Badge 
                   key={tag} 
                   variant="outline" 
@@ -349,9 +397,9 @@ const ConversationItem = memo<ConversationItemProps>(({
                   {tag}
                 </Badge>
               ))}
-              {tags.length > 3 && (
+              {tags.length > 2 && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                  +{tags.length - 3}
+                  +{tags.length - 2}
                 </Badge>
               )}
             </div>

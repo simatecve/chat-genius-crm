@@ -5,12 +5,14 @@ import ConversationList from '@/components/conversations/ConversationList';
 import ChatArea from '@/components/conversations/ChatArea';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ContactInfoPanel } from '@/components/conversations/ContactInfoPanel';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useConversations, useMessages, useSearchConversations } from '@/hooks/useConversations';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
 import { useTwilioConnections } from '@/hooks/useTwilioConnections';
 import { useTelegramConnections } from '@/hooks/useTelegramConnections';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Database } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
 import { embudoServices, EmbudoResponse } from '@/services/embudoServices';
@@ -32,6 +34,7 @@ const Conversations = () => {
   const { user } = useAuth();
   const { effectiveUserId } = useEffectiveUserId();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [newMessage, setNewMessage] = useState('');
@@ -430,32 +433,91 @@ const Conversations = () => {
     }
   };
 
+  // Common props
+  const conversationListProps = {
+    conversations: displayConversations,
+    selectedConversation,
+    onSelectConversation: handleSelectConversation,
+    searchTerm,
+    onSearchChange: setSearchTerm,
+    isLoading,
+    unreadCount,
+    workspaces,
+    selectedWorkspace,
+    onWorkspaceSelect: setSelectedWorkspace,
+    embudos,
+    selectedEmbudo,
+    onEmbudoSelect: setSelectedEmbudo,
+    filterMode,
+    onFilterModeChange: setFilterMode,
+    sessionOptions,
+    selectedSessionFilter,
+    onSessionFilterChange: setSelectedSessionFilter,
+    assignmentFilter,
+    onAssignmentFilterChange: setAssignmentFilter,
+  };
+
+  const originalSessionStatus: 'active' | 'disconnected' | 'deleted' =
+    selectedConversation?.channel_type === 'whatsapp'
+      ? isSessionActiveByPhone(selectedConversation.whatsapp_number)
+        ? 'active'
+        : 'disconnected'
+      : selectedConversation?.channel_type === 'twilio'
+        ? isConnectionActive(selectedConversation.twilio_connection_id)
+          ? 'active'
+          : 'disconnected'
+        : 'active';
+
+  // ===== Mobile drill-down layout =====
+  if (isMobile) {
+    return (
+      <div className="flex h-full bg-background">
+        {!selectedConversation ? (
+          <div className="w-full h-full">
+            <ConversationList {...conversationListProps} />
+          </div>
+        ) : (
+          <div className="w-full h-full flex flex-col min-h-0">
+            <ChatArea
+              conversation={selectedConversation}
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              isSending={isSending}
+              onToggleInfoPanel={() => setShowInfoPanel(true)}
+              whatsappConnections={activeConnections}
+              selectedSession={selectedWhatsAppSession}
+              onSessionChange={setSelectedWhatsAppSession}
+              twilioConnections={twilioConnections}
+              selectedTwilioConnection={selectedTwilioConnection}
+              onTwilioConnectionChange={setSelectedTwilioConnection}
+              originalSessionStatus={originalSessionStatus}
+              onBack={() => setSelectedConversation(null)}
+            />
+            <Sheet open={showInfoPanel} onOpenChange={setShowInfoPanel}>
+              <SheetContent side="right" className="w-[92vw] sm:w-[420px] p-0 overflow-y-auto">
+                <SheetHeader className="px-4 py-3 border-b border-border">
+                  <SheetTitle>Información del contacto</SheetTitle>
+                </SheetHeader>
+                <ContactInfoPanel
+                  conversationId={selectedConversation.id}
+                  contactName={selectedConversation.contact_name || selectedConversation.pushname || 'Contacto'}
+                  phoneNumber={selectedConversation.phone_number}
+                  whatsappNumber={selectedConversation.whatsapp_number}
+                />
+              </SheetContent>
+            </Sheet>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ===== Desktop layout (sin cambios) =====
   return (
     <div className="flex h-full bg-background">
       <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize={23} minSize={15} maxSize={40}>
-          <ConversationList
-            conversations={displayConversations}
-            selectedConversation={selectedConversation}
-            onSelectConversation={handleSelectConversation}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            isLoading={isLoading}
-            unreadCount={unreadCount}
-            workspaces={workspaces}
-            selectedWorkspace={selectedWorkspace}
-            onWorkspaceSelect={setSelectedWorkspace}
-            embudos={embudos}
-            selectedEmbudo={selectedEmbudo}
-            onEmbudoSelect={setSelectedEmbudo}
-            filterMode={filterMode}
-            onFilterModeChange={setFilterMode}
-            sessionOptions={sessionOptions}
-            selectedSessionFilter={selectedSessionFilter}
-            onSessionFilterChange={setSelectedSessionFilter}
-            assignmentFilter={assignmentFilter}
-            onAssignmentFilterChange={setAssignmentFilter}
-          />
+          <ConversationList {...conversationListProps} />
         </ResizablePanel>
 
         <ResizableHandle withHandle />
@@ -473,17 +535,7 @@ const Conversations = () => {
             twilioConnections={twilioConnections}
             selectedTwilioConnection={selectedTwilioConnection}
             onTwilioConnectionChange={setSelectedTwilioConnection}
-            originalSessionStatus={
-              selectedConversation?.channel_type === 'whatsapp'
-                ? isSessionActiveByPhone(selectedConversation.whatsapp_number)
-                  ? 'active'
-                  : 'disconnected'
-                : selectedConversation?.channel_type === 'twilio'
-                  ? isConnectionActive(selectedConversation.twilio_connection_id)
-                    ? 'active'
-                    : 'disconnected'
-                  : 'active'
-            }
+            originalSessionStatus={originalSessionStatus}
           />
         </ResizablePanel>
 

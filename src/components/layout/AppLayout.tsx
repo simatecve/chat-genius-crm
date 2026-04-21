@@ -7,9 +7,10 @@ import { AlertTriangle, X } from 'lucide-react';
 
 interface AppLayoutProps {
   children: React.ReactNode;
+  noPadding?: boolean;
 }
 
-const AppLayout = ({ children }: AppLayoutProps) => {
+const AppLayout = ({ children, noPadding = false }: AppLayoutProps) => {
   const { isImpersonating, profile } = useProfile();
 
   const exitImpersonation = () => {
@@ -42,7 +43,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
         )}
         <Header />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className={`flex-1 overflow-y-auto ${noPadding ? 'p-0' : 'p-3 md:p-6'}`}>
           {children}
         </main>
       </div>

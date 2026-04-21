@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
-import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare, Loader2, Phone } from 'lucide-react';
+import { MoreVertical, Send, Paperclip, Smile, X, BotOff, Bot, Zap, UserCircle, MessageSquare, Loader2, Phone, ArrowLeft, FolderKanban } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,6 +23,7 @@ import { WhatsAppConnection } from '@/hooks/useWhatsAppConnections';
 import { TwilioConnection } from '@/hooks/useTwilioConnections';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -40,6 +41,7 @@ interface ChatAreaProps {
   selectedTwilioConnection: string | null;
   onTwilioConnectionChange: (connectionId: string) => void;
   originalSessionStatus: 'active' | 'disconnected' | 'deleted';
+  onBack?: () => void;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -55,6 +57,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   selectedTwilioConnection,
   onTwilioConnectionChange,
   originalSessionStatus,
+  onBack,
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -75,6 +78,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   );
   const { autoStopEnabled } = useBotAutoStop();
   const { isCajero } = useProfile();
+  const isMobile = useIsMobile();
 
   // Función para enmascarar números de teléfono
   const maskPhoneNumber = (phone: string | null) => {
@@ -266,19 +270,30 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="h-full min-h-0 flex flex-col bg-background">
       {/* Header del chat */}
-      <div className="p-3 border-b border-border bg-card">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
+      <div className="p-2.5 md:p-3 border-b border-border bg-card">
+        <div className="flex items-center gap-2 md:gap-3">
+          {isMobile && onBack && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              className="h-9 w-9 p-0 shrink-0"
+              aria-label="Volver"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <Avatar className="h-9 w-9 md:h-10 md:w-10 shrink-0">
             <AvatarFallback className="bg-primary text-primary-foreground">
               {getInitials(conversation.pushname)}
             </AvatarFallback>
           </Avatar>
           
-          <div className="flex-1">
-            <h2 className="font-medium">
+          <div className="flex-1 min-w-0">
+            <h2 className="font-medium text-sm md:text-base truncate leading-tight">
               {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.phone_number) : conversation.phone_number)}
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[11px] md:text-sm text-muted-foreground truncate leading-tight">
               {isCajero ? maskPhoneNumber(conversation.phone_number) : conversation.phone_number}
             </p>
             {/* Mostrar sesión Twilio si aplica */}
@@ -288,8 +303,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               );
               return currentTwilioConnection ? (
                 <div className="flex items-center gap-1 mt-0.5">
-                  <Phone className="h-3 w-3 text-red-500" />
-                  <span className="text-xs text-red-500">
+                  <Phone className="h-3 w-3 text-[hsl(var(--twilio-red))]" />
+                  <span className="text-[10px] md:text-xs text-[hsl(var(--twilio-red))] truncate">
                     {currentTwilioConnection.connection_name} • {currentTwilioConnection.phone_number}
                   </span>
                 </div>
@@ -297,30 +312,46 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             })()}
           </div>
           
-          <div className="flex items-center gap-2">
-            <AssignToKanban 
-              conversationPhone={conversation.whatsapp_number}
-              conversationName={conversation.pushname}
-              onLeadAssigned={(lead) => {
-                console.log('Lead asignado:', lead);
-              }}
-              iconOnly
-            />
+          <div className="flex items-center gap-1 md:gap-2 shrink-0">
+            {/* AssignToKanban: visible inline solo en desktop */}
+            {!isMobile && (
+              <AssignToKanban 
+                conversationPhone={conversation.whatsapp_number}
+                conversationName={conversation.pushname}
+                onLeadAssigned={(lead) => {
+                  console.log('Lead asignado:', lead);
+                }}
+                iconOnly
+              />
+            )}
             <Button 
               variant="ghost" 
               size="sm"
               onClick={onToggleInfoPanel}
+              className="h-9 w-9 md:h-9 md:w-auto p-0 md:px-3"
               title="Mostrar/Ocultar información del contacto"
             >
-              <UserCircle className="h-4 w-4" />
+              <UserCircle className="h-5 w-5 md:h-4 md:w-4" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <MoreVertical className="h-4 w-4" />
+                <Button variant="ghost" size="sm" className="h-9 w-9 md:h-9 md:w-auto p-0 md:px-3">
+                  <MoreVertical className="h-5 w-5 md:h-4 md:w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent align="end">
+                {/* En mobile, AssignToKanban aparece dentro del menú */}
+                {isMobile && (
+                  <div className="px-1 py-1">
+                    <AssignToKanban 
+                      conversationPhone={conversation.whatsapp_number}
+                      conversationName={conversation.pushname}
+                      onLeadAssigned={(lead) => {
+                        console.log('Lead asignado:', lead);
+                      }}
+                    />
+                  </div>
+                )}
                 <DropdownMenuItem 
                   onClick={toggleBotBlock}
                   disabled={isBotToggling}
@@ -424,7 +455,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* Área de mensajes */}
       <ScrollArea 
-        className="flex-1 min-h-0 p-4 bg-background"
+        className="flex-1 min-h-0 p-3 md:p-4 bg-background"
         ref={scrollAreaRef}
       >
         <div className="space-y-4">
