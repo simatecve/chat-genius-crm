@@ -20,6 +20,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useQueryClient } from '@tanstack/react-query';
 import { tagsServices, EtiquetaResponse } from '@/services/tagsServices';
 import { Badge } from '@/components/ui/badge';
+import { AssignedAgentSection } from './AssignedAgentSection';
 
 interface ContactInfoPanelProps {
   conversationId: string;
