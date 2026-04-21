@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
-import { Search, MessageCircle, Phone, Send } from 'lucide-react';
+import { Search, MessageCircle, Phone, Send, SlidersHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import EmbudosFilter from './EmbudosFilter';
@@ -12,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useProfile } from '@/hooks/useProfile';
 import { FilterMode, SessionOption } from '@/pages/Conversations';
 import { useTags } from '@/hooks/useTags';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
