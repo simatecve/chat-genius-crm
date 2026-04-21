@@ -554,7 +554,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
   return <DragDropContext onDragEnd={handleDragEnd}>
       <TooltipProvider>
-        <div className="flex gap-4 overflow-x-auto pb-4 px-1">
+        <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 md:pb-4 px-1 snap-x snap-mandatory md:snap-none scroll-smooth">
           {columns.map(column => {
           const columnLeads = getLeadsByColumn(column.id);
           const columnState = getColumnState?.(column.id);
@@ -649,11 +649,11 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
     }
     return () => observer.disconnect();
   }, [column.id, onLoadMore, columnState?.hasMore, columnState?.loading]);
-  return <div className="flex-shrink-0 w-64">
+  return <div className="flex-shrink-0 w-[85vw] max-w-[320px] md:w-64 snap-center md:snap-align-none">
       <Card className="h-full border-t-4 bg-card/50 backdrop-blur-sm" style={{
       borderTopColor: column.color
     }}>
-        <CardHeader className="pb-3 pt-4 px-4">
+        <CardHeader className="pb-2 pt-3 px-3 md:pb-3 md:pt-4 md:px-4">
           <div className="flex items-center justify-between">
             <Tooltip>
               <TooltipTrigger asChild>
