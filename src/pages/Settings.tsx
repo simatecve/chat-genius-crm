@@ -24,6 +24,8 @@ import TagsTab from '@/components/settings/TagsTab';
 import IADefaultTab from '@/components/settings/IADefaultTab';
 import CostEstimatorTab from '@/components/settings/CostEstimatorTab';
 import CasinoApiConfigTab from '@/components/settings/CasinoApiConfigTab';
+import AssignmentTab from '@/components/settings/AssignmentTab';
+import { UserCheck } from 'lucide-react';
 
 interface UserProfile {
   first_name: string | null;
@@ -262,6 +264,12 @@ const Settings = () => {
             <TabsTrigger value="tags" className="flex items-center space-x-2 flex-shrink-0">
               <Tag className="h-4 w-4" />
               <span>Etiquetas</span>
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="assignment" className="flex items-center space-x-2 flex-shrink-0">
+              <UserCheck className="h-4 w-4" />
+              <span>Asignación</span>
             </TabsTrigger>
           )}
           {isAdmin && (
@@ -572,6 +580,12 @@ const Settings = () => {
         {isAdmin && (
           <TabsContent value="cost-estimator" className="mt-6">
             <CostEstimatorTab userId={effectiveUserId} />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="assignment" className="mt-6">
+            <AssignmentTab />
           </TabsContent>
         )}
 

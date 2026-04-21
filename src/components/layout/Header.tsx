@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { dashboardService, ActiveConversation } from '@/services/dashboardService';
 import { useProfile } from '@/hooks/useProfile';
+import { AgentPresenceChip } from './AgentPresenceChip';
 export const Header = () => {
   const { signOut, user } = useAuth();
   const { profile } = useProfile();
@@ -69,6 +70,9 @@ export const Header = () => {
       <div className="flex items-center justify-between h-full px-6">
         {/* Right section - Actions */}
         <div className="flex items-center space-x-4 ml-auto">
+          {/* Presence chip (cajero only) */}
+          <AgentPresenceChip />
+
           {/* Notifications */}
           <DropdownMenu open={alertsOpen} onOpenChange={setAlertsOpen}>
             <DropdownMenuTrigger asChild>

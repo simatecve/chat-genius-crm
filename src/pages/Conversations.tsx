@@ -49,6 +49,7 @@ const Conversations = () => {
   // Nuevos estados para filtros
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [selectedSessionFilter, setSelectedSessionFilter] = useState<string | null>(null);
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
@@ -202,8 +203,15 @@ const Conversations = () => {
       }
     }
     // Si filterMode === 'all', no filtra por lead_id
-    
-    // 4. Ordenar por fecha de último mensaje descendente (más recientes primero)
+
+    // 4. Filtrar por asignación
+    if (assignmentFilter === 'mine' && user?.id) {
+      filtered = filtered.filter((c: any) => c.assigned_to === user.id);
+    } else if (assignmentFilter === 'unassigned') {
+      filtered = filtered.filter((c: any) => !c.assigned_to);
+    }
+
+    // 5. Ordenar por fecha de último mensaje descendente (más recientes primero)
     filtered = [...filtered].sort((a, b) => {
       const dateA = new Date(a.last_message_time || a.created_at || 0).getTime();
       const dateB = new Date(b.last_message_time || b.created_at || 0).getTime();
@@ -211,7 +219,7 @@ const Conversations = () => {
     });
     
     return filtered;
-  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds, filterMode, selectedSessionFilter, sessionOptions]);
+  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds, filterMode, selectedSessionFilter, sessionOptions, assignmentFilter, user?.id]);
 
   // Seleccionar conversación automáticamente desde navegación de embudos
   useEffect(() => {
@@ -445,6 +453,8 @@ const Conversations = () => {
             sessionOptions={sessionOptions}
             selectedSessionFilter={selectedSessionFilter}
             onSessionFilterChange={setSelectedSessionFilter}
+            assignmentFilter={assignmentFilter}
+            onAssignmentFilterChange={setAssignmentFilter}
           />
         </ResizablePanel>
 

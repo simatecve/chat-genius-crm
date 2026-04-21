@@ -49,6 +49,8 @@ interface ConversationListProps {
   sessionOptions?: SessionOption[];
   selectedSessionFilter?: string | null;
   onSessionFilterChange?: (sessionId: string | null) => void;
+  assignmentFilter?: 'all' | 'mine' | 'unassigned';
+  onAssignmentFilterChange?: (val: 'all' | 'mine' | 'unassigned') => void;
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -69,7 +71,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onFilterModeChange = () => {},
   sessionOptions = [],
   selectedSessionFilter = null,
-  onSessionFilterChange = () => {}
+  onSessionFilterChange = () => {},
+  assignmentFilter = 'all',
+  onAssignmentFilterChange = () => {}
 }) => {
   const { isCajero } = useProfile();
   const { etiquetas, getTagColor } = useTags();
@@ -165,6 +169,18 @@ const ConversationList: React.FC<ConversationListProps> = ({
           <h1 className="text-xl font-semibold">Chats</h1>
           {unreadCount > 0 && <Badge variant="destructive" className="text-xs">{unreadCount}</Badge>}
         </div>
+
+        {/* Filtro de Asignación */}
+        <Select value={assignmentFilter} onValueChange={(v: 'all' | 'mine' | 'unassigned') => onAssignmentFilterChange(v)}>
+          <SelectTrigger className="w-full mb-2 text-sm">
+            <SelectValue placeholder="Asignación" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las asignaciones</SelectItem>
+            <SelectItem value="mine">Mis conversaciones</SelectItem>
+            <SelectItem value="unassigned">Sin asignar</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Filtro de Modo */}
         <Select value={filterMode} onValueChange={(value: FilterMode) => onFilterModeChange(value)}>

@@ -20,6 +20,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useQueryClient } from '@tanstack/react-query';
 import { tagsServices, EtiquetaResponse } from '@/services/tagsServices';
 import { Badge } from '@/components/ui/badge';
+import { AssignedAgentSection } from './AssignedAgentSection';
 
 interface ContactInfoPanelProps {
   conversationId: string;
@@ -763,6 +764,9 @@ export const ContactInfoPanel: React.FC<ContactInfoPanelProps> = ({
             <Edit2 className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* AGENTE ASIGNADO */}
+        <AssignedAgentSection conversationId={conversationId} />
 
         {/* ETIQUETAS */}
         <Card className="p-3 bg-card border-border">
