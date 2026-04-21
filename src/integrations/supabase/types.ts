@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_presence: {
+        Row: {
+          account_owner_id: string
+          last_seen_at: string
+          manual_override: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_owner_id: string
+          last_seen_at?: string
+          manual_override?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_owner_id?: string
+          last_seen_at?: string
+          manual_override?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_agents: {
         Row: {
           channel_type: string | null
@@ -202,6 +229,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      assignment_settings: {
+        Row: {
+          account_owner_id: string
+          assign_strategy: string
+          auto_assign_enabled: boolean
+          created_at: string
+          include_unassigned_for_all: boolean
+          last_assigned_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_owner_id: string
+          assign_strategy?: string
+          auto_assign_enabled?: boolean
+          created_at?: string
+          include_unassigned_for_all?: boolean
+          last_assigned_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_owner_id?: string
+          assign_strategy?: string
+          auto_assign_enabled?: boolean
+          created_at?: string
+          include_unassigned_for_all?: boolean
+          last_assigned_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       audit_logs: {
         Row: {
@@ -706,6 +763,9 @@ export type Database = {
       }
       conversations: {
         Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          assigned_to: string | null
           casino_user_created: boolean | null
           casino_username: string | null
           channel_type: string | null
@@ -730,6 +790,9 @@ export type Database = {
           whatsapp_number: string | null
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
           casino_user_created?: boolean | null
           casino_username?: string | null
           channel_type?: string | null
@@ -754,6 +817,9 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to?: string | null
           casino_user_created?: boolean | null
           casino_username?: string | null
           channel_type?: string | null
@@ -2620,6 +2686,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auto_assign_conversation: {
+        Args: { p_conversation_id: string }
+        Returns: string
+      }
       check_message_exists_by_waha_id: {
         Args: { p_waha_id: string }
         Returns: boolean
