@@ -23,6 +23,7 @@ import { WhatsAppConnection } from '@/hooks/useWhatsAppConnections';
 import { TwilioConnection } from '@/hooks/useTwilioConnections';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
