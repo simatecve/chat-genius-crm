@@ -83,9 +83,15 @@ export const getConsumptionAlertSettings = async (userId: string): Promise<Consu
 };
 
 export const saveConsumptionAlertSettings = async (settings: ConsumptionAlertSettings) => {
-  const { data, error } = await (supabase as any)
-    .from('consumption_alert_settings')
-    .upsert(settings, { onConflict: 'account_owner_id,target_user_id' })
+  const query = (supabase as any).from('consumption_alert_settings');
+  if (settings.id) {
+    const { data, error } = await query.update(settings).eq('id', settings.id).select('*').single();
+    if (error) throw error;
+    return data as ConsumptionAlertSettings;
+  }
+
+  const { data, error } = await query
+    .insert(settings)
     .select('*')
     .single();
 
@@ -233,17 +239,19 @@ export const evaluateConsumptionAlerts = ({
 
 export const storeConsumptionAlerts = async (alerts: AlertDraft[]) => {
   if (alerts.length === 0) return [];
-  const { data, error } = await (supabase as any)
-    .from('consumption_alert_history')
-    .upsert(alerts.map(alert => ({ ...alert, is_read: false })), {
-      onConflict: 'account_owner_id,alert_type,target_user_id,period_start,period_end',
-      ignoreDuplicates: true
-    })
-    .select('*');
+  const saved: ConsumptionAlertHistory[] = [];
+  for (const alert of alerts) {
+    const { data, error } = await (supabase as any)
+      .from('consumption_alert_history')
+      .insert({ ...alert, is_read: false })
+      .select('*')
+      .single();
 
-  if (error) {
-    console.warn('No se pudieron guardar alertas de consumo:', error.message);
-    return [];
+    if (error && error.code !== '23505') {
+      console.warn('No se pudo guardar alerta de consumo:', error.message);
+    }
+    if (data) saved.push(data);
   }
-  return data || [];
+
+  return saved;
 };
