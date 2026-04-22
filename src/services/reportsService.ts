@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { CHANNEL_MESSAGE_COSTS, getRecommendedChannel } from '@/lib/channelCosts';
 
 export type ChannelType = 'whatsapp' | 'twilio' | 'telegram' | 'webchat';
 
@@ -51,11 +52,7 @@ export interface SessionCounts {
   webchat: number;
 }
 
-export const MESSAGE_COSTS = {
-  internal: 0.00445 * 1.60,
-  twilio: 0.064,
-  whatsappApi: 0.064 * 0.70
-};
+export const MESSAGE_COSTS = CHANNEL_MESSAGE_COSTS;
 
 export interface ChannelProfitabilityStats {
   twilioMessages: number;
@@ -67,9 +64,12 @@ export interface ChannelProfitabilityStats {
   externalCost: number;
   totalSavings: number;
   dailySavings: number;
+  weeklySavings: number;
+  monthlyProjectedSavings: number;
+  savingsPercentage: number;
   mostExpensiveChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
   mostProfitableChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
-  recommendedChannel: 'WhatsApp API' | 'Twilio' | 'Sin consumo';
+  recommendedChannel: string;
 }
 
 export interface AgentPerformanceStats {
@@ -79,6 +79,11 @@ export interface AgentPerformanceStats {
   messagesSent: number;
   assignedConversations: number;
   unreadAssigned: number;
+  closedConversations: number;
+  dailyActivity: number;
+  averageResponseMinutes: number;
+  pendingRate: number;
+  performanceScore: number;
   lastActivityAt: string | null;
 }
 
@@ -96,6 +101,23 @@ export interface SystemHealthStats {
   pendingConversations: number;
   offlineAssignedConversations: number;
   lastMessageAt: string | null;
+  recentSendErrors: number;
+  aiActive: number;
+  aiTotal: number;
+  realtimeStatus: 'Funcionando' | 'Revisar';
+  recommendedChannel: string;
+}
+
+export interface MonthlyChannelCostSnapshot {
+  id: string;
+  month: string;
+  twilio_messages: number;
+  whatsapp_api_messages: number;
+  twilio_cost: number;
+  whatsapp_api_cost: number;
+  internal_cost: number;
+  external_cost: number;
+  total_savings: number;
 }
 
 // Get all session counts for all channel types (for badges)
