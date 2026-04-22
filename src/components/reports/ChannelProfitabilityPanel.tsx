@@ -36,6 +36,10 @@ export const ChannelProfitabilityPanel: React.FC<ChannelProfitabilityPanelProps>
     { title: 'Ahorro Total', value: formatCurrency(stats.totalSavings), detail: `${formatCurrency(stats.dailySavings)} por día`, icon: TrendingDown },
   ];
 
+  const projectedTwilioCost = stats.totalMessages * 0.064;
+  const projectedWhatsappApiCost = stats.totalMessages * (0.064 * 0.70);
+  const projectedMigrationSavings = Math.max(projectedTwilioCost - projectedWhatsappApiCost, 0);
+
   return (
     <Card className="border-primary/30 bg-primary/5">
       <CardHeader className="space-y-3">
@@ -85,6 +89,23 @@ export const ChannelProfitabilityPanel: React.FC<ChannelProfitabilityPanelProps>
             Twilio <ArrowRight className="h-4 w-4" /> WhatsApp API
           </div>
         </div>
+
+        {stats.totalMessages > 0 && (
+          <div className="grid gap-3 rounded-lg border bg-background p-4 md:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Simulación todo por Twilio</p>
+              <p className="text-lg font-semibold">{formatCurrency(projectedTwilioCost)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Simulación todo por WhatsApp API</p>
+              <p className="text-lg font-semibold text-primary">{formatCurrency(projectedWhatsappApiCost)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Ahorro potencial migrando</p>
+              <p className="text-lg font-semibold text-primary">{formatCurrency(projectedMigrationSavings)}</p>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

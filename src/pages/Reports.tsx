@@ -9,6 +9,8 @@ import { MessagesByDayChart } from '@/components/reports/MessagesByDayChart';
 import { HourlyDistributionChart } from '@/components/reports/HourlyDistributionChart';
 import { NewConversationsChart } from '@/components/reports/NewConversationsChart';
 import { ChannelProfitabilityPanel } from '@/components/reports/ChannelProfitabilityPanel';
+import { AgentPerformanceRanking } from '@/components/reports/AgentPerformanceRanking';
+import { SystemHealthCenter } from '@/components/reports/SystemHealthCenter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -25,6 +27,8 @@ const Reports: React.FC = () => {
     newConversationsDaily,
     sessionCounts,
     profitabilityStats,
+    agentPerformanceStats,
+    systemHealthStats,
     sessionsLoading,
     statsLoading,
     dailyLoading,
@@ -32,6 +36,8 @@ const Reports: React.FC = () => {
     newConvsLoading,
     countsLoading,
     profitabilityLoading,
+    agentPerformanceLoading,
+    systemHealthLoading,
     selectSession,
     selectChannelType,
     updateDateRange,
@@ -123,6 +129,17 @@ const Reports: React.FC = () => {
         stats={profitabilityStats}
         isLoading={profitabilityLoading}
       />
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <AgentPerformanceRanking
+          agents={agentPerformanceStats}
+          isLoading={agentPerformanceLoading}
+        />
+        <SystemHealthCenter
+          stats={systemHealthStats}
+          isLoading={systemHealthLoading}
+        />
+      </div>
 
       {/* Charts - Always visible */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

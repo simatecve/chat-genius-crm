@@ -51,7 +51,7 @@ export interface SessionCounts {
   webchat: number;
 }
 
-const MESSAGE_COSTS = {
+export const MESSAGE_COSTS = {
   internal: 0.00445 * 1.60,
   twilio: 0.064,
   whatsappApi: 0.064 * 0.70
@@ -70,6 +70,32 @@ export interface ChannelProfitabilityStats {
   mostExpensiveChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
   mostProfitableChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
   recommendedChannel: 'WhatsApp API' | 'Twilio' | 'Sin consumo';
+}
+
+export interface AgentPerformanceStats {
+  id: string;
+  name: string;
+  email: string;
+  messagesSent: number;
+  assignedConversations: number;
+  unreadAssigned: number;
+  lastActivityAt: string | null;
+}
+
+export interface SystemHealthStats {
+  whatsappTotal: number;
+  whatsappActive: number;
+  whatsappApiTotal: number;
+  whatsappApiActive: number;
+  twilioTotal: number;
+  twilioActive: number;
+  telegramTotal: number;
+  telegramActive: number;
+  webchatTotal: number;
+  webchatActive: number;
+  pendingConversations: number;
+  offlineAssignedConversations: number;
+  lastMessageAt: string | null;
 }
 
 // Get all session counts for all channel types (for badges)
@@ -190,6 +216,93 @@ export const getChannelProfitabilityStats = async (
     mostExpensiveChannel: totalMessages === 0 ? 'Sin consumo' : twilioCost >= whatsappApiCost ? 'Twilio' : 'WhatsApp API',
     mostProfitableChannel: totalMessages === 0 ? 'Sin consumo' : whatsappApiMessages > 0 ? 'WhatsApp API' : 'Twilio',
     recommendedChannel: totalMessages === 0 ? 'Sin consumo' : 'WhatsApp API'
+  };
+};
+
+export const getAgentPerformanceStats = async (
+  userId: string,
+  dateRange: DateRange
+): Promise<AgentPerformanceStats[]> => {
+  const [{ data: profiles, error: profilesError }, { data: assignedConversations, error: conversationsError }, { data: outboundMessages, error: messagesError }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, first_name, last_name, email')
+      .or(`id.eq.${userId},parent_user_id.eq.${userId}`),
+    supabase
+      .from('conversations')
+      .select('id, assigned_to, unread_count, last_message_time')
+      .eq('user_id', userId)
+      .not('assigned_to', 'is', null),
+    supabase
+      .from('messages')
+      .select('responded_by, created_at')
+      .eq('user_id', userId)
+      .eq('direction', 'outbound')
+      .gte('created_at', dateRange.startDate.toISOString())
+      .lte('created_at', dateRange.endDate.toISOString())
+      .not('responded_by', 'is', null)
+  ]);
+
+  if (profilesError) throw profilesError;
+  if (conversationsError) throw conversationsError;
+  if (messagesError) throw messagesError;
+
+  return (profiles || []).map(profile => {
+    const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+    const agentConversations = (assignedConversations || []).filter(conversation => conversation.assigned_to === profile.id);
+    const agentMessages = (outboundMessages || []).filter(message => message.responded_by === profile.id);
+    const lastMessageAt = agentMessages
+      .map(message => message.created_at)
+      .filter(Boolean)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
+
+    return {
+      id: profile.id,
+      name: fullName || profile.email || 'Agente',
+      email: profile.email || '',
+      messagesSent: agentMessages.length,
+      assignedConversations: agentConversations.length,
+      unreadAssigned: agentConversations.filter(conversation => (conversation.unread_count || 0) > 0).length,
+      lastActivityAt: lastMessageAt
+    };
+  }).sort((a, b) => b.messagesSent - a.messagesSent || b.assignedConversations - a.assignedConversations);
+};
+
+export const getSystemHealthStats = async (userId: string): Promise<SystemHealthStats> => {
+  const [whatsappResult, twilioResult, telegramResult, webchatResult, conversationsResult, messagesResult] = await Promise.all([
+    supabase.from('whatsapp_connections').select('status, connection_subtype').eq('user_id', userId),
+    supabase.from('twilio_connections').select('status').eq('user_id', userId),
+    supabase.from('telegram_bots').select('status').eq('user_id', userId),
+    supabase.from('web_chatbots').select('is_active').eq('user_id', userId),
+    supabase.from('conversations').select('assigned_to, unread_count').eq('user_id', userId),
+    supabase.from('messages').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+  ]);
+
+  if (whatsappResult.error) throw whatsappResult.error;
+  if (twilioResult.error) throw twilioResult.error;
+  if (telegramResult.error) throw telegramResult.error;
+  if (webchatResult.error) throw webchatResult.error;
+  if (conversationsResult.error) throw conversationsResult.error;
+  if (messagesResult.error) throw messagesResult.error;
+
+  const whatsappConnections = whatsappResult.data || [];
+  const apiConnections = whatsappConnections.filter(connection => connection.connection_subtype === 'api');
+  const conversations = conversationsResult.data || [];
+
+  return {
+    whatsappTotal: whatsappConnections.length,
+    whatsappActive: whatsappConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length,
+    whatsappApiTotal: apiConnections.length,
+    whatsappApiActive: apiConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length,
+    twilioTotal: twilioResult.data?.length || 0,
+    twilioActive: (twilioResult.data || []).filter(connection => ['connected', 'active'].includes(connection.status || '')).length,
+    telegramTotal: telegramResult.data?.length || 0,
+    telegramActive: (telegramResult.data || []).filter(bot => ['connected', 'active'].includes(bot.status || '')).length,
+    webchatTotal: webchatResult.data?.length || 0,
+    webchatActive: (webchatResult.data || []).filter(chatbot => chatbot.is_active).length,
+    pendingConversations: conversations.filter(conversation => (conversation.unread_count || 0) > 0).length,
+    offlineAssignedConversations: 0,
+    lastMessageAt: messagesResult.data?.[0]?.created_at || null
   };
 };
 
