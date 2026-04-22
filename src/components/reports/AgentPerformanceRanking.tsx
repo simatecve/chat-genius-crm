@@ -42,10 +42,13 @@ export const AgentPerformanceRanking: React.FC<AgentPerformanceRankingProps> = (
                 <p className="text-xs text-muted-foreground truncate">Última actividad: {formatDate(agent.lastActivityAt)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3 text-right text-sm">
+            <div className="grid grid-cols-3 gap-3 text-right text-sm md:grid-cols-6">
               <div><p className="font-semibold">{agent.messagesSent}</p><p className="text-xs text-muted-foreground">Mensajes</p></div>
               <div><p className="font-semibold">{agent.assignedConversations}</p><p className="text-xs text-muted-foreground">Asignadas</p></div>
               <div><p className="font-semibold text-primary">{agent.unreadAssigned}</p><p className="text-xs text-muted-foreground">Pendientes</p></div>
+              <div><p className="font-semibold">{agent.closedConversations}</p><p className="text-xs text-muted-foreground">Cerradas</p></div>
+              <div><p className="font-semibold">{agent.averageResponseMinutes.toFixed(0)}m</p><p className="text-xs text-muted-foreground">Respuesta</p></div>
+              <div><p className="font-semibold text-primary">{agent.performanceScore}</p><p className="text-xs text-muted-foreground">Score</p></div>
             </div>
           </div>
         ))}
