@@ -16,7 +16,7 @@ interface CostEstimatorTabProps {
 }
 
 const COSTS = {
-  internal: 0.00445,
+  internal: 0.00712, // Aumentado 60% (0.00445 * 1.6)
   twilio: 0.0079,
   whatsappAverage: 0.0126,
   whatsappApi: 0.0126 * 0.60
