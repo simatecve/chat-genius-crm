@@ -17,7 +17,7 @@ interface CostEstimatorTabProps {
 
 const COSTS = {
   internal: 0.00712, // Aumentado 60% (0.00445 * 1.6)
-  twilio: 0.0079,
+  twilio: 0.064,
   whatsappAverage: 0.0126,
   whatsappApi: 0.0126 * 0.60
 };
@@ -226,6 +226,7 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           <CardContent>
             <p className="text-2xl font-semibold">{formatCurrency(twilioCost)}</p>
             <p className="text-sm text-muted-foreground">Costo real estimado por {messageCounts.twilio.toLocaleString()} mensajes Twilio</p>
+            <p className="text-xs text-muted-foreground mt-2">Promedio real actualizado: $0.064 USD por mensaje</p>
           </CardContent>
         </Card>
 
