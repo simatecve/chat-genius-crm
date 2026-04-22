@@ -22,6 +22,8 @@ const COSTS = {
   whatsappApi: 0.0126 * 0.60
 };
 
+const emptyChannelCounts = { twilio: 0, whatsappApi: 0 };
+
 const createPresetRange = (preset: 'today' | '7days' | '30days' | 'thisMonth'): DateRange => {
   const now = new Date();
   if (preset === 'today') {
@@ -37,28 +39,76 @@ const createPresetRange = (preset: 'today' | '7days' | '30days' | 'thisMonth'): 
 };
 
 const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
-  const [messageCount, setMessageCount] = useState<number>(0);
+  const [messageCounts, setMessageCounts] = useState(emptyChannelCounts);
   const [isLoadingReal, setIsLoadingReal] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>(() => createPresetRange('30days'));
   const { toast } = useToast();
 
-  const loadRealMessageCount = async (showToast = false) => {
-    setIsLoadingReal(true);
-    try {
+  const countMessagesForConversations = async (conversationIds: string[]) => {
+    if (conversationIds.length === 0) return 0;
+
+    let total = 0;
+    for (let index = 0; index < conversationIds.length; index += 500) {
+      const batch = conversationIds.slice(index, index + 500);
       const { count, error } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .in('conversation_id', batch)
         .gte('created_at', dateRange.startDate.toISOString())
         .lte('created_at', dateRange.endDate.toISOString());
 
       if (error) throw error;
+      total += count || 0;
+    }
 
-      setMessageCount(count || 0);
+    return total;
+  };
+
+  const loadRealMessageCount = async (showToast = false) => {
+    setIsLoadingReal(true);
+    try {
+      const [{ data: twilioConversations, error: twilioError }, { data: apiConnections, error: apiConnectionsError }] = await Promise.all([
+        supabase
+          .from('conversations')
+          .select('id')
+          .eq('user_id', userId)
+          .or('channel_type.eq.twilio,twilio_connection_id.not.is.null'),
+        supabase
+          .from('whatsapp_connections')
+          .select('phone_number, connection_subtype')
+          .eq('user_id', userId)
+          .eq('connection_subtype', 'api')
+      ]);
+
+      if (twilioError) throw twilioError;
+      if (apiConnectionsError) throw apiConnectionsError;
+
+      const apiPhoneNumbers = (apiConnections || []).map(connection => connection.phone_number).filter(Boolean);
+      let apiConversationIds: string[] = [];
+
+      if (apiPhoneNumbers.length > 0) {
+        const { data: apiConversations, error: apiConversationsError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('channel_type', 'whatsapp')
+          .in('whatsapp_number', apiPhoneNumbers);
+
+        if (apiConversationsError) throw apiConversationsError;
+        apiConversationIds = (apiConversations || []).map(conversation => conversation.id);
+      }
+
+      const [twilioCount, whatsappApiCount] = await Promise.all([
+        countMessagesForConversations((twilioConversations || []).map(conversation => conversation.id)),
+        countMessagesForConversations(apiConversationIds)
+      ]);
+
+      setMessageCounts({ twilio: twilioCount, whatsappApi: whatsappApiCount });
       if (showToast) {
         toast({
           title: 'Datos actualizados',
-          description: `Se encontraron ${(count || 0).toLocaleString()} mensajes en este rango`,
+          description: `Twilio: ${twilioCount.toLocaleString()} mensajes · WhatsApp API: ${whatsappApiCount.toLocaleString()} mensajes`,
         });
       }
     } catch (error) {
@@ -85,12 +135,13 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
     setDateRange({ startDate: startOfDay(range.startDate), endDate: endOfDay(range.endDate) });
   };
 
-  const internalCost = messageCount * COSTS.internal;
-  const twilioCost = messageCount * COSTS.twilio;
-  const whatsappApiCost = messageCount * COSTS.whatsappApi;
+  const totalMessageCount = messageCounts.twilio + messageCounts.whatsappApi;
+  const internalCost = totalMessageCount * COSTS.internal;
+  const twilioCost = messageCounts.twilio * COSTS.twilio;
+  const whatsappApiCost = messageCounts.whatsappApi * COSTS.whatsappApi;
 
-  const calculateSavings = (cost: number) => cost - internalCost;
-  const calculateSavingsPercentage = (cost: number) => cost > 0 ? (calculateSavings(cost) / cost) * 100 : 0;
+  const calculateSavings = (cost: number, count: number) => cost - (count * COSTS.internal);
+  const calculateSavingsPercentage = (cost: number, count: number) => cost > 0 ? (calculateSavings(cost, count) / cost) * 100 : 0;
 
   const formatCurrency = (value: number) => `$${value.toFixed(2)} USD`;
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
@@ -114,20 +165,31 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
               onPresetSelect={(preset) => setDateRange(createPresetRange(preset))}
             />
             <p className="text-sm text-muted-foreground">
-              Consumo calculado del {rangeLabel}. Se encontraron {messageCount.toLocaleString()} mensajes en este rango.
+              Consumo calculado del {rangeLabel}. Twilio: {messageCounts.twilio.toLocaleString()} mensajes · WhatsApp API: {messageCounts.whatsappApi.toLocaleString()} mensajes.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="messageCount">Cantidad de mensajes</Label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+            <div className="space-y-2">
+              <Label htmlFor="twilioMessageCount">Mensajes Twilio</Label>
               <Input
-                id="messageCount"
+                id="twilioMessageCount"
                 type="number"
                 min={0}
-                value={messageCount}
-                onChange={(e) => setMessageCount(Math.max(0, parseInt(e.target.value) || 0))}
-                placeholder="Ingresa la cantidad de mensajes"
+                value={messageCounts.twilio}
+                onChange={(e) => setMessageCounts(prev => ({ ...prev, twilio: Math.max(0, parseInt(e.target.value) || 0) }))}
+                placeholder="Mensajes Twilio"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="whatsappApiMessageCount">Mensajes WhatsApp API</Label>
+              <Input
+                id="whatsappApiMessageCount"
+                type="number"
+                min={0}
+                value={messageCounts.whatsappApi}
+                onChange={(e) => setMessageCounts(prev => ({ ...prev, whatsappApi: Math.max(0, parseInt(e.target.value) || 0) }))}
+                placeholder="Mensajes WhatsApp API"
               />
             </div>
             <Button
@@ -153,7 +215,7 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-primary">{formatCurrency(internalCost)}</p>
-            <p className="text-sm text-muted-foreground mt-1">Costo aproximado por {messageCount.toLocaleString()} mensajes</p>
+            <p className="text-sm text-muted-foreground mt-1">Costo aproximado por {totalMessageCount.toLocaleString()} mensajes reales</p>
           </CardContent>
         </Card>
 
@@ -163,7 +225,7 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold">{formatCurrency(twilioCost)}</p>
-            <p className="text-sm text-muted-foreground">Costo real estimado por mensajes Twilio</p>
+            <p className="text-sm text-muted-foreground">Costo real estimado por {messageCounts.twilio.toLocaleString()} mensajes Twilio</p>
           </CardContent>
         </Card>
 
@@ -176,12 +238,12 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold">{formatCurrency(whatsappApiCost)}</p>
-            <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal</p>
+            <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal · {messageCounts.whatsappApi.toLocaleString()} mensajes</p>
           </CardContent>
         </Card>
       </div>
 
-      {messageCount > 0 && (
+      {totalMessageCount > 0 && (
         <Card className="border-primary/30 bg-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
@@ -193,13 +255,13 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-3 rounded-lg bg-background border">
                 <p className="text-sm text-muted-foreground">vs Twilio</p>
-                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(twilioCost))} ahorro</p>
-                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(twilioCost))}</p>
+                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(twilioCost, messageCounts.twilio))} ahorro</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(twilioCost, messageCounts.twilio))}</p>
               </div>
               <div className="p-3 rounded-lg bg-background border border-accent/40">
                 <p className="text-sm text-muted-foreground">vs WhatsApp API</p>
-                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappApiCost))} ahorro</p>
-                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappApiCost))}</p>
+                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappApiCost, messageCounts.whatsappApi))} ahorro</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappApiCost, messageCounts.whatsappApi))}</p>
               </div>
             </div>
           </CardContent>
