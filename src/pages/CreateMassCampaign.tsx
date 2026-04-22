@@ -17,6 +17,7 @@ import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
 import { useTelegramConnections } from '@/hooks/useTelegramConnections';
 import { useTwilioConnections } from '@/hooks/useTwilioConnections';
 import { useTwilioUsage } from '@/hooks/useTwilioUsage';
+import { CHANNEL_MESSAGE_COSTS, formatUsd, getRecommendedChannel } from '@/lib/channelCosts';
 interface AttachmentFile {
   file: File;
   mimeType: string;
@@ -48,6 +49,7 @@ export default function CreateMassCampaign() {
   const [editWithAi, setEditWithAi] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  const [estimatedRecipients, setEstimatedRecipients] = useState(0);
   
   // Hooks para las conexiones
   const { activeConnections: whatsappConnections } = useWhatsAppConnections();
@@ -58,6 +60,21 @@ export default function CreateMassCampaign() {
   useEffect(() => {
     loadData();
   }, [user]);
+
+  useEffect(() => {
+    const loadRecipientCount = async () => {
+      if (!selectedContactList) {
+        setEstimatedRecipients(0);
+        return;
+      }
+      const { count } = await supabase
+        .from('contact_list_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('contact_list_id', selectedContactList);
+      setEstimatedRecipients(count || 0);
+    };
+    loadRecipientCount();
+  }, [selectedContactList]);
 
   // Cargar campaña existente si hay ID
   useEffect(() => {
@@ -370,6 +387,20 @@ export default function CreateMassCampaign() {
 
   const audioAttachments = attachments.filter(a => a.isAudio);
   const otherAttachments = attachments.filter(a => !a.isAudio);
+  const selectedChannelCost = channelType === 'twilio' ? CHANNEL_MESSAGE_COSTS.twilio : channelType === 'whatsapp' ? CHANNEL_MESSAGE_COSTS.whatsappApi : CHANNEL_MESSAGE_COSTS.internal;
+  const estimatedCampaignCost = estimatedRecipients * selectedChannelCost;
+  const estimatedTwilioCost = estimatedRecipients * CHANNEL_MESSAGE_COSTS.twilio;
+  const estimatedWhatsappApiCost = estimatedRecipients * CHANNEL_MESSAGE_COSTS.whatsappApi;
+  const projectedCampaignSavings = Math.max(estimatedTwilioCost - estimatedWhatsappApiCost, 0);
+  const recommendedCampaignChannel = getRecommendedChannel({
+    twilioCost: estimatedTwilioCost,
+    whatsappApiCost: estimatedWhatsappApiCost,
+    whatsappApiActive: whatsappConnections.length > 0,
+    whatsappQrActive: whatsappConnections.length > 0,
+    twilioActive: twilioConnections.length > 0,
+    telegramActive: telegramConnections.length > 0,
+    campaignSize: estimatedRecipients,
+  });
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -521,6 +552,21 @@ export default function CreateMassCampaign() {
             </Select>
           </div>
         </div>
+
+        {/* Personalizar con IA */}
+        {estimatedRecipients > 0 && (
+          <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div><p className="text-sm text-muted-foreground">Destinatarios</p><p className="text-xl font-bold">{estimatedRecipients}</p></div>
+              <div><p className="text-sm text-muted-foreground">Costo estimado</p><p className="text-xl font-bold">{formatUsd(estimatedCampaignCost)}</p></div>
+              <div><p className="text-sm text-muted-foreground">Ahorro usando API</p><p className="text-xl font-bold text-primary">{formatUsd(projectedCampaignSavings)}</p></div>
+              <div><p className="text-sm text-muted-foreground">Canal recomendado</p><p className="text-xl font-bold text-primary">{recommendedCampaignChannel}</p></div>
+            </div>
+            {channelType === 'twilio' && estimatedCampaignCost > 150 && (
+              <Alert variant="destructive" className="mt-3"><AlertTriangle className="h-4 w-4" /><AlertDescription>Esta campaña proyecta un costo alto en Twilio. Considera WhatsApp API.</AlertDescription></Alert>
+            )}
+          </div>
+        )}
 
         {/* Personalizar con IA */}
         <div className="mb-4">
