@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,23 +15,11 @@ interface CostEstimatorTabProps {
   userId: string;
 }
 
-type RegionKey = 'northAmerica' | 'mexico' | 'latinAmerica' | 'europe';
-
 const COSTS = {
   internal: 0.00445,
-  whatsapp: {
-    northAmerica: 0.0046,
-    mexico: 0.0098,
-    latinAmerica: 0.0130,
-    europe: 0.0230
-  }
-};
-
-const REGION_LABELS: Record<RegionKey, { title: string; subtitle: string }> = {
-  northAmerica: { title: 'Norteamérica', subtitle: 'Estados Unidos, Canadá' },
-  mexico: { title: 'México', subtitle: 'México' },
-  latinAmerica: { title: 'Latinoamérica', subtitle: 'Argentina, Brasil, Colombia, etc.' },
-  europe: { title: 'España/Europa', subtitle: 'España, Alemania, Francia, etc.' }
+  twilio: 0.0079,
+  whatsappAverage: 0.0126,
+  whatsappApi: 0.0126 * 0.60
 };
 
 const createPresetRange = (preset: 'today' | '7days' | '30days' | 'thisMonth'): DateRange => {
@@ -53,13 +41,6 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
   const [isLoadingReal, setIsLoadingReal] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>(() => createPresetRange('30days'));
   const { toast } = useToast();
-
-  const whatsappApiRates = useMemo(() => ({
-    northAmerica: COSTS.whatsapp.northAmerica * 0.60,
-    mexico: COSTS.whatsapp.mexico * 0.60,
-    latinAmerica: COSTS.whatsapp.latinAmerica * 0.60,
-    europe: COSTS.whatsapp.europe * 0.60
-  }), []);
 
   const loadRealMessageCount = async (showToast = false) => {
     setIsLoadingReal(true);
@@ -105,18 +86,8 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
   };
 
   const internalCost = messageCount * COSTS.internal;
-  const whatsappCosts = {
-    northAmerica: messageCount * COSTS.whatsapp.northAmerica,
-    mexico: messageCount * COSTS.whatsapp.mexico,
-    latinAmerica: messageCount * COSTS.whatsapp.latinAmerica,
-    europe: messageCount * COSTS.whatsapp.europe
-  };
-  const whatsappApiCosts = {
-    northAmerica: messageCount * whatsappApiRates.northAmerica,
-    mexico: messageCount * whatsappApiRates.mexico,
-    latinAmerica: messageCount * whatsappApiRates.latinAmerica,
-    europe: messageCount * whatsappApiRates.europe
-  };
+  const twilioCost = messageCount * COSTS.twilio;
+  const whatsappApiCost = messageCount * COSTS.whatsappApi;
 
   const calculateSavings = (cost: number) => cost - internalCost;
   const calculateSavingsPercentage = (cost: number) => cost > 0 ? (calculateSavings(cost) / cost) * 100 : 0;
