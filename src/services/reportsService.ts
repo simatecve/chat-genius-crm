@@ -263,7 +263,7 @@ export const getAgentPerformanceStats = async (
       .or(`id.eq.${userId},parent_user_id.eq.${userId}`),
     supabase
       .from('conversations')
-      .select('id, assigned_to, unread_count, last_message_time')
+      .select('id, assigned_to, unread_count, last_message_time, status, created_at')
       .eq('user_id', userId)
       .not('assigned_to', 'is', null),
     supabase
@@ -289,16 +289,34 @@ export const getAgentPerformanceStats = async (
       .filter(Boolean)
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 
+    const unreadAssigned = agentConversations.filter(conversation => (conversation.unread_count || 0) > 0).length;
+    const assignedConversationsCount = agentConversations.length;
+    const averageResponseMinutes = agentConversations.length > 0
+      ? agentConversations.reduce((sum, conversation) => {
+          const start = new Date(conversation.created_at || conversation.last_message_time || Date.now()).getTime();
+          const end = new Date(conversation.last_message_time || conversation.created_at || Date.now()).getTime();
+          return sum + Math.max(0, (end - start) / 60000);
+        }, 0) / agentConversations.length
+      : 0;
+    const pendingRate = assignedConversationsCount > 0 ? (unreadAssigned / assignedConversationsCount) * 100 : 0;
+    const closedConversations = agentConversations.filter(conversation => ['closed', 'cerrado', 'resolved'].includes((conversation.status || '').toLowerCase())).length;
+    const performanceScore = Math.max(0, (agentMessages.length * 2) + (closedConversations * 5) - (unreadAssigned * 3));
+
     return {
       id: profile.id,
       name: fullName || profile.email || 'Agente',
       email: profile.email || '',
       messagesSent: agentMessages.length,
-      assignedConversations: agentConversations.length,
-      unreadAssigned: agentConversations.filter(conversation => (conversation.unread_count || 0) > 0).length,
+      assignedConversations: assignedConversationsCount,
+      unreadAssigned,
+      closedConversations,
+      dailyActivity: agentMessages.length,
+      averageResponseMinutes,
+      pendingRate,
+      performanceScore,
       lastActivityAt: lastMessageAt
     };
-  }).sort((a, b) => b.messagesSent - a.messagesSent || b.assignedConversations - a.assignedConversations);
+  }).sort((a, b) => b.performanceScore - a.performanceScore || b.messagesSent - a.messagesSent);
 };
 
 export const getSystemHealthStats = async (userId: string): Promise<SystemHealthStats> => {
