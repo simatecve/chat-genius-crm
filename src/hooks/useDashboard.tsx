@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { dashboardService, DashboardStats, RecentLead, ActiveConversation, MessagesByHour, ConversationStats, HeatmapData } from '@/services/dashboardService';
 import { useAuth } from './useAuth';
 import { getChannelProfitabilityStats, type ChannelProfitabilityStats, type DateRange } from '@/services/reportsService';
+import { useConsumptionAlerts } from '@/hooks/useConsumptionAlerts';
 
 const createDateRangeForPeriod = (period: 'today' | 'week' | 'month' | 'year'): DateRange => {
   const endDate = new Date();
@@ -125,6 +126,9 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     refetchInterval: 5 * 60 * 1000,
   });
 
+  const dateRange = createDateRangeForPeriod(period);
+  const consumptionAlerts = useConsumptionAlerts({ profitability: profitabilityStats, dateRange, evaluate: true });
+
   return {
     stats: stats || {
       totalLeads: 0,
@@ -152,6 +156,9 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     conversationsByHour: conversationsByHour || [],
     heatmapData: heatmapData || [],
     profitabilityStats: profitabilityStats || emptyProfitabilityStats,
+    consumptionAlertHistory: consumptionAlerts.history,
+    markConsumptionAlertRead: consumptionAlerts.markRead,
+    consumptionAlertsLoading: consumptionAlerts.isLoading,
     profitabilityLoading,
     isLoading: statsLoading || leadsLoading || conversationsLoading || messagesLoading || conversationsByHourLoading || heatmapLoading || profitabilityLoading,
     error: statsError || leadsError || conversationsError || messagesError || conversationsByHourError || heatmapError || profitabilityError

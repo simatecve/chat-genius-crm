@@ -21,6 +21,8 @@ import {
   getOperationalAlerts,
   upsertCurrentMonthlyChannelCostSnapshot
 } from '@/services/reportsService';
+import { useConsumptionAlerts } from '@/hooks/useConsumptionAlerts';
+import { getLeadChannelRecommendations } from '@/services/channelRecommendationService';
 
 export const useReports = () => {
   const { user } = useAuth();
@@ -81,6 +83,18 @@ export const useReports = () => {
     () => getOperationalAlerts(profitabilityStats, agentPerformanceStats, systemHealthStats),
     [profitabilityStats, agentPerformanceStats, systemHealthStats]
   );
+
+  const consumptionAlerts = useConsumptionAlerts({ profitability: profitabilityStats, agents: agentPerformanceStats, dateRange, evaluate: true });
+
+  const {
+    data: leadChannelRecommendations = [],
+    isLoading: leadChannelRecommendationsLoading
+  } = useQuery({
+    queryKey: ['lead-channel-recommendations', user?.id, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getLeadChannelRecommendations(user?.id || ''),
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5
+  });
 
   const {
     data: monthlyCostSnapshots = [],
@@ -264,6 +278,8 @@ export const useReports = () => {
     agentPerformanceStats,
     systemHealthStats,
     operationalAlerts,
+    consumptionAlertHistory: consumptionAlerts.history,
+    leadChannelRecommendations,
     monthlyCostSnapshots,
 
     // Loading states
@@ -277,6 +293,7 @@ export const useReports = () => {
     profitabilityLoading,
     agentPerformanceLoading,
     systemHealthLoading,
+    leadChannelRecommendationsLoading,
     monthlyCostSnapshotsLoading,
 
     // Errors

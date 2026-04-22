@@ -17,12 +17,13 @@ import WorkspaceManagement from '@/components/WorkspaceManagement';
 import SessionsManager from '@/components/sessions/SessionsManager';
 import QuickReplies from '@/components/QuickReplies';
 import UserManagement from '@/components/UserManagement';
-import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon, Tag, Brain, Calculator } from 'lucide-react';
+import { User, Lock, Phone, Building, Mail, Save, Eye, EyeOff, Settings as SettingsIcon, Key, Bot, Briefcase, Smartphone, MessageSquare, Users as UsersIcon, Tag, Brain, Calculator, BellRing } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useBotAutoStop } from '@/hooks/useBotAutoStop';
 import TagsTab from '@/components/settings/TagsTab';
 import IADefaultTab from '@/components/settings/IADefaultTab';
 import CostEstimatorTab from '@/components/settings/CostEstimatorTab';
+import ConsumptionAlertsTab from '@/components/settings/ConsumptionAlertsTab';
 import CasinoApiConfigTab from '@/components/settings/CasinoApiConfigTab';
 import AssignmentTab from '@/components/settings/AssignmentTab';
 import { UserCheck } from 'lucide-react';
@@ -276,6 +277,12 @@ const Settings = () => {
             <TabsTrigger value="cost-estimator" className="flex items-center space-x-2 flex-shrink-0">
               <Calculator className="h-4 w-4" />
               <span>Costos</span>
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger value="consumption-alerts" className="flex items-center space-x-2 flex-shrink-0">
+              <BellRing className="h-4 w-4" />
+              <span>Alertas de consumo</span>
             </TabsTrigger>
           )}
           {isAdmin && (
@@ -580,6 +587,12 @@ const Settings = () => {
         {isAdmin && (
           <TabsContent value="cost-estimator" className="mt-6">
             <CostEstimatorTab userId={effectiveUserId} />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="consumption-alerts" className="mt-6">
+            <ConsumptionAlertsTab />
           </TabsContent>
         )}
 
