@@ -109,6 +109,11 @@ const Leads = () => {
   const [filteredLeads, setFilteredLeads] = useState<LeadWithColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dateFilterType, setDateFilterType] = useState<FunnelDateFilterType>('last_message');
+  const [dateRange, setDateRange] = useState<DateRange>(() => createFunnelPresetRange('30days'));
+  const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
+  const [conversationIdsWithMessages, setConversationIdsWithMessages] = useState<Set<string>>(new Set());
+  const [isLoadingMessageRange, setIsLoadingMessageRange] = useState(false);
 
   // Obtener IDs de columnas y columna por defecto
   const columnIds = useMemo(() => columns.map(c => c.id), [columns]);
@@ -122,6 +127,10 @@ const Leads = () => {
     const workspace = workspaces.find(w => w.id === selectedWorkspace);
     return workspace?.channel_type || null;
   }, [workspaces, selectedWorkspace]);
+
+  const dateRangeLabel = useMemo(() => (
+    `${format(dateRange.startDate, 'dd MMM yyyy', { locale: es })} al ${format(dateRange.endDate, 'dd MMM yyyy', { locale: es })}`
+  ), [dateRange]);
 
   // Hook de paginación infinita
   const {
