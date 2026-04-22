@@ -204,6 +204,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
         <SelectContent>
           <SelectItem value="all">Todas las conversaciones</SelectItem>
           <SelectItem value="pending">Sin responder</SelectItem>
+          <SelectItem value="stale">Sin respuesta +30 min</SelectItem>
+          <SelectItem value="offline">Asignadas offline</SelectItem>
+          <SelectItem value="bot_off">IA apagada / sin humano</SelectItem>
+          <SelectItem value="urgent">Urgentes comprobante</SelectItem>
           <SelectItem value="unassigned">Sin embudo asignado</SelectItem>
           <SelectItem value="funnel">Por embudo</SelectItem>
         </SelectContent>
