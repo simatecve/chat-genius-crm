@@ -514,6 +514,114 @@ export type Database = {
           },
         ]
       }
+      consumption_alert_history: {
+        Row: {
+          account_owner_id: string
+          alert_type: string
+          created_at: string
+          description: string
+          id: string
+          is_read: boolean
+          metadata: Json
+          metric_value: number
+          period_end: string
+          period_start: string
+          recommended_action: string
+          severity: string
+          target_user_id: string | null
+          threshold_value: number
+          title: string
+        }
+        Insert: {
+          account_owner_id: string
+          alert_type: string
+          created_at?: string
+          description: string
+          id?: string
+          is_read?: boolean
+          metadata?: Json
+          metric_value?: number
+          period_end: string
+          period_start: string
+          recommended_action: string
+          severity?: string
+          target_user_id?: string | null
+          threshold_value?: number
+          title: string
+        }
+        Update: {
+          account_owner_id?: string
+          alert_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_read?: boolean
+          metadata?: Json
+          metric_value?: number
+          period_end?: string
+          period_start?: string
+          recommended_action?: string
+          severity?: string
+          target_user_id?: string | null
+          threshold_value?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      consumption_alert_settings: {
+        Row: {
+          account_owner_id: string
+          agent_monthly_message_threshold: number
+          created_at: string
+          default_severity: string
+          enable_agent_volume_alert: boolean
+          enable_low_savings_alert: boolean
+          enable_twilio_cost_alert: boolean
+          enable_whatsapp_api_unusual_alert: boolean
+          id: string
+          minimum_savings_percent: number
+          target_user_id: string | null
+          twilio_monthly_cost_threshold: number
+          twilio_monthly_message_threshold: number
+          updated_at: string
+          whatsapp_api_unusual_growth_percent: number
+        }
+        Insert: {
+          account_owner_id: string
+          agent_monthly_message_threshold?: number
+          created_at?: string
+          default_severity?: string
+          enable_agent_volume_alert?: boolean
+          enable_low_savings_alert?: boolean
+          enable_twilio_cost_alert?: boolean
+          enable_whatsapp_api_unusual_alert?: boolean
+          id?: string
+          minimum_savings_percent?: number
+          target_user_id?: string | null
+          twilio_monthly_cost_threshold?: number
+          twilio_monthly_message_threshold?: number
+          updated_at?: string
+          whatsapp_api_unusual_growth_percent?: number
+        }
+        Update: {
+          account_owner_id?: string
+          agent_monthly_message_threshold?: number
+          created_at?: string
+          default_severity?: string
+          enable_agent_volume_alert?: boolean
+          enable_low_savings_alert?: boolean
+          enable_twilio_cost_alert?: boolean
+          enable_whatsapp_api_unusual_alert?: boolean
+          id?: string
+          minimum_savings_percent?: number
+          target_user_id?: string | null
+          twilio_monthly_cost_threshold?: number
+          twilio_monthly_message_threshold?: number
+          updated_at?: string
+          whatsapp_api_unusual_growth_percent?: number
+        }
+        Relationships: []
+      }
       contact_details: {
         Row: {
           agent_id: string | null
