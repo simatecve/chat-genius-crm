@@ -181,7 +181,7 @@ export const getChannelProfitabilityStats = async (
   userId: string,
   dateRange: DateRange
 ): Promise<ChannelProfitabilityStats> => {
-  const [{ data: twilioConversations, error: twilioError }, { data: apiConnections, error: apiConnectionsError }] = await Promise.all([
+  const [{ data: twilioConversations, error: twilioError }, { data: apiConnections, error: apiConnectionsError }, { data: activeConnections }] = await Promise.all([
     supabase
       .from('conversations')
       .select('id')
@@ -191,7 +191,11 @@ export const getChannelProfitabilityStats = async (
       .from('whatsapp_connections')
       .select('phone_number, connection_subtype')
       .eq('user_id', userId)
-      .eq('connection_subtype', 'api')
+      .eq('connection_subtype', 'api'),
+    supabase
+      .from('whatsapp_connections')
+      .select('status, connection_subtype')
+      .eq('user_id', userId)
   ]);
 
   if (twilioError) throw twilioError;
@@ -224,6 +228,10 @@ export const getChannelProfitabilityStats = async (
   const externalCost = twilioCost + whatsappApiCost;
   const totalSavings = Math.max(externalCost - internalCost, 0);
   const days = Math.max(1, Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24)));
+  const active = activeConnections || [];
+  const whatsappApiActive = active.some(connection => connection.connection_subtype === 'api' && ['WORKING', 'connected', 'active'].includes(connection.status || ''));
+  const whatsappQrActive = active.some(connection => connection.connection_subtype !== 'api' && ['WORKING', 'connected', 'active'].includes(connection.status || ''));
+  const savingsPercentage = externalCost > 0 ? (totalSavings / externalCost) * 100 : 0;
 
   return {
     twilioMessages,
@@ -235,9 +243,12 @@ export const getChannelProfitabilityStats = async (
     externalCost,
     totalSavings,
     dailySavings: totalSavings / days,
+    weeklySavings: (totalSavings / days) * 7,
+    monthlyProjectedSavings: (totalSavings / days) * 30,
+    savingsPercentage,
     mostExpensiveChannel: totalMessages === 0 ? 'Sin consumo' : twilioCost >= whatsappApiCost ? 'Twilio' : 'WhatsApp API',
     mostProfitableChannel: totalMessages === 0 ? 'Sin consumo' : whatsappApiMessages > 0 ? 'WhatsApp API' : 'Twilio',
-    recommendedChannel: totalMessages === 0 ? 'Sin consumo' : 'WhatsApp API'
+    recommendedChannel: totalMessages === 0 ? 'Sin consumo' : getRecommendedChannel({ twilioCost, whatsappApiCost, whatsappApiActive, whatsappQrActive, twilioActive: twilioMessages > 0 })
   };
 };
 
