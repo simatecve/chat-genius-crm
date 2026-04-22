@@ -1269,18 +1269,89 @@ const Leads = () => {
         </div>
       </div>
 
-      {/* Search Filter */}
-      
+      {/* Search and date filters */}
+      <Card className="border-border bg-card">
+        <CardContent className="p-3 md:p-4">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_auto_auto] lg:items-end">
+            <div className="space-y-2">
+              <Label htmlFor="lead-search" className="text-xs font-medium text-muted-foreground">Buscar</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="lead-search"
+                  value={searchFilter}
+                  onChange={(event) => setSearchFilter(event.target.value)}
+                  placeholder="Nombre o teléfono"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">Tipo de fecha</Label>
+              <Select value={dateFilterType} onValueChange={(value) => setDateFilterType(value as FunnelDateFilterType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(dateFilterLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">Rango</Label>
+              <DateRangeSelector
+                dateRange={dateRange}
+                onRangeChange={(range) => setDateRange({ startDate: startOfDay(range.startDate), endDate: endOfDay(range.endDate) })}
+                onPresetSelect={(preset) => setDateRange(createFunnelPresetRange(preset))}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={dateFilterEnabled ? 'default' : 'outline'}
+                onClick={() => setDateFilterEnabled(true)}
+                className="flex-1 lg:flex-none"
+              >
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Fechas
+              </Button>
+              {(dateFilterEnabled || searchFilter) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDateFilterEnabled(false);
+                    setSearchFilter('');
+                    setConversationIdsWithMessages(new Set());
+                  }}
+                  className="flex-1 lg:flex-none"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Limpiar
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filter Results Info */}
-      {searchFilter && <div className="flex items-center justify-between bg-primary/10 p-3 rounded-lg border border-primary/20">
+      {(searchFilter || dateFilterEnabled) && <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-primary" />
+            {dateFilterEnabled ? <CalendarDays className="h-4 w-4 text-primary" /> : <Search className="h-4 w-4 text-primary" />}
             <span className="text-sm text-foreground">
-              Mostrando {filteredLeads.length} de {leads.length} embudos que coinciden con "{searchFilter}"
+              Mostrando {filteredLeads.length} de {paginatedLeads.length} conversaciones
+              {dateFilterEnabled ? ` por ${dateFilterLabels[dateFilterType].toLowerCase()} entre ${dateRangeLabel}` : ''}
+              {searchFilter ? ` que coinciden con "${searchFilter}"` : ''}
             </span>
+            {isLoadingMessageRange && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           </div>
-          {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No se encontraron resultados</span>}
+          {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No hay conversaciones en este rango de fechas</span>}
         </div>}
 
       <KanbanBoard columns={columns} leads={filteredLeads} onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} onConvertToContactList={openConvertDialog} onManageMessageTriggers={openMessageTriggersDialog} onOpenConversation={handleLeadClick} onLoadMore={loadMore} getColumnState={getColumnState} />
