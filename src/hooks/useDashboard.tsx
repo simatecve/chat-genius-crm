@@ -138,7 +138,13 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
       conversionRate: 0,
       yearlyNewProspects: 0,
       yearlyRecurringClients: 0,
-      yearlyTotal: 0
+      yearlyTotal: 0,
+      newConversationsToday: 0,
+      humanResponses: 0,
+      aiResponses: 0,
+      averageResponseMinutes: 0,
+      activeAgents: 0,
+      mostActiveFunnel: 'Sin actividad'
     },
     recentLeads: recentLeads || [],
     activeConversations: activeConversations || [],
