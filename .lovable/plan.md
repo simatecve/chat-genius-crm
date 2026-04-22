@@ -1,415 +1,338 @@
 
-# Auditoría del plan aplicado y plan para completar lo pendiente
+# Plan para agregar Alertas de consumo, recomendaciones por lead y costos por cajero
 
-## Estado general
+## Objetivo
 
-El plan fue aplicado parcialmente. Ya existen varias piezas importantes en Reportes, Dashboard y Chats, pero todavía faltan partes avanzadas para que el sistema cumpla el plan completo al 100%.
+Agregar una capa operativa de control de costos para que cada cuenta pueda:
 
-## Checklist del plan original
+- Configurar umbrales mensuales de consumo.
+- Ver historial de alertas disparadas.
+- Recibir recomendaciones de acción en el Dashboard.
+- Recomendar el mejor canal según tipo de lead.
+- Detectar cajeros/agentes con consumo excesivo.
 
-### 1. Panel de rentabilidad por canal
-Estado: aplicado casi completo.
+## 1. Nueva pantalla en Configuración > Alertas de consumo
 
-Ya existe:
-- `src/components/reports/ChannelProfitabilityPanel.tsx`
-- `getChannelProfitabilityStats` en `src/services/reportsService.ts`
-- Integración en `src/pages/Reports.tsx`
-- Mensajes Twilio.
-- Mensajes WhatsApp API.
+Agregar una nueva pestaña dentro de `Configuración` llamada **Alertas de consumo**.
+
+Permitirá configurar:
+
+- Umbral mensual de costo Twilio.
+- Umbral mensual de mensajes Twilio.
+- Umbral de consumo inusual de WhatsApp API.
+- Umbral máximo de mensajes por cajero/agente.
+- Porcentaje mínimo esperado de ahorro.
+- Activar/desactivar cada alerta.
+- Definir severidad: informativa, advertencia o crítica.
+
+Ejemplo de configuración:
+
+```text
+Twilio costo mensual máximo: $150 USD
+WhatsApp API consumo inusual: +40% vs período anterior
+Mensajes por cajero máximo: 500 por mes
+Ahorro mínimo esperado: 35%
+```
+
+Archivos principales:
+
+- `src/pages/Settings.tsx`
+- `src/components/settings/ConsumptionAlertsTab.tsx`
+- `src/services/consumptionAlertsService.ts`
+- `src/hooks/useConsumptionAlerts.ts`
+
+## 2. Base de datos para configuración e historial
+
+Crear migración Supabase con dos tablas nuevas.
+
+### Tabla `consumption_alert_settings`
+
+Guardará los umbrales por cuenta y, opcionalmente, por usuario/cajero.
+
+Campos:
+
+```text
+id
+account_owner_id
+target_user_id nullable
+twilio_monthly_cost_threshold
+twilio_monthly_message_threshold
+whatsapp_api_unusual_growth_percent
+agent_monthly_message_threshold
+minimum_savings_percent
+enable_twilio_cost_alert
+enable_whatsapp_api_unusual_alert
+enable_agent_volume_alert
+enable_low_savings_alert
+created_at
+updated_at
+```
+
+### Tabla `consumption_alert_history`
+
+Guardará cada alerta disparada y la recomendación generada.
+
+Campos:
+
+```text
+id
+account_owner_id
+target_user_id nullable
+alert_type
+severity
+title
+description
+recommended_action
+metric_value
+threshold_value
+period_start
+period_end
+metadata jsonb
+is_read
+created_at
+```
+
+RLS:
+
+```text
+account_owner_id = get_account_owner_id(auth.uid())
+```
+
+Esto mantiene la arquitectura actual de Superadmin > Client/Admin > Cajero y evita mezclar datos entre cuentas.
+
+## 3. Motor de alertas inteligentes
+
+Crear una lógica central que evalúe las métricas actuales contra los umbrales configurados.
+
+Alertas a generar:
+
+- Twilio supera costo mensual definido.
+- Twilio supera mensajes mensuales definidos.
+- WhatsApp API crece de forma inusual contra el período anterior.
+- Un cajero/agente supera el volumen mensual permitido.
+- El ahorro cae por debajo del mínimo esperado.
+- Errores de envío recientes requieren revisión.
+
+Cada alerta incluirá:
+
+```text
+Título
+Descripción
+Severidad
+Métrica actual
+Umbral configurado
+Recomendación concreta
+Fecha
+Usuario/cajero relacionado si aplica
+```
+
+Ejemplo:
+
+```text
+Alerta: Twilio lleva $185.00 USD este mes.
+Recomendación: migrar tráfico a WhatsApp API para ahorrar aproximadamente 30%.
+```
+
+Archivos:
+
+- `src/services/consumptionAlertsService.ts`
+- `src/services/reportsService.ts`
+- `src/hooks/useConsumptionAlerts.ts`
+
+## 4. Historial de alertas y recomendaciones en Dashboard
+
+Agregar un panel en el Dashboard llamado **Alertas y recomendaciones**.
+
+Mostrará:
+
+- Últimas alertas disparadas.
+- Severidad.
+- Acción recomendada.
+- Fecha.
+- Cajero relacionado, si aplica.
+- Botón para marcar como leída.
+- Estado “sin alertas críticas” cuando todo está normal.
+
+También reutilizará las alertas operativas existentes, pero ahora quedarán guardadas en historial y no solo calculadas en memoria.
+
+Archivos:
+
+- `src/components/dashboard/Dashboard.tsx`
+- `src/hooks/useDashboard.tsx`
+- `src/services/dashboardService.ts`
+- `src/components/dashboard/ConsumptionAlertsPanel.tsx`
+
+## 5. Recomendador de canal por tipo de lead
+
+Crear reglas de recomendación usando:
+
+- Tipo de lead:
+  - Nuevo.
+  - Caliente.
+  - En seguimiento.
+- Scoring derivado.
+- Costos Twilio vs WhatsApp API.
+- Disponibilidad de canales.
+- Período seleccionado en reportes.
+- Actividad reciente del lead.
+
+Como no hay un campo único de scoring visible actualmente, se implementará un scoring derivado con señales existentes:
+
+```text
+Lead nuevo:
+- creado recientemente
+- columna o etiqueta contiene “nuevo”
+
+Lead caliente:
+- columna/etiqueta contiene “caliente”, “interesado”, “calificado”
+- conversación reciente
+- comprobante detectado
+- alta actividad
+
+Lead en seguimiento:
+- columna/etiqueta contiene “seguimiento”
+- última respuesta antigua
+- pendiente de contacto
+```
+
+Recomendaciones ejemplo:
+
+```text
+Lead nuevo:
+Canal recomendado: WhatsApp API
+Motivo: menor costo para volumen alto.
+
+Lead caliente:
+Canal recomendado: WhatsApp QR o canal activo más confiable
+Motivo: priorizar respuesta rápida y continuidad.
+
+Lead en seguimiento:
+Canal recomendado: WhatsApp API
+Motivo: bajo costo para recontacto masivo.
+```
+
+Archivos:
+
+- `src/lib/channelCosts.ts`
+- `src/services/channelRecommendationService.ts`
+- `src/services/reportsService.ts`
+- `src/components/reports/LeadChannelRecommendationPanel.tsx`
+- Opcionalmente integración visual en `src/pages/Leads.tsx` o panel de Reportes.
+
+## 6. Panel de consumo y costos por cajero/agente
+
+Ampliar el ranking de cajeros para mostrar costos estimados.
+
+Métricas por agente:
+
+- Mensajes enviados.
+- Mensajes Twilio estimados.
+- Mensajes WhatsApp API estimados.
 - Costo Twilio.
 - Costo WhatsApp API.
-- Costo Nuestro Sistema.
-- Ahorro total.
-- Ahorro diario.
-- Canal más caro.
-- Canal más rentable.
-- Canal recomendado.
-- Simulación Twilio vs WhatsApp API.
-
-Ajuste pendiente recomendado:
-- Centralizar las tarifas para que `CostEstimatorTab.tsx`, Reportes y Dashboard usen una sola fuente de verdad y no valores duplicados.
-
----
-
-### 2. Alertas inteligentes de consumo
-Estado: aplicado parcialmente.
-
-Ya existe:
-- Alerta cuando Twilio supera `$150 USD` en Reportes.
-- Alerta similar en Dashboard.
-
-Falta:
-- Alerta por consumo inusual de WhatsApp API.
-- Alerta por cajero/agente con demasiados mensajes.
-- Alerta por campaña con costo alto.
-- Alerta cuando el ahorro baja.
-- Panel unificado de alertas.
-
----
-
-### 3. Recomendador automático de canal
-Estado: aplicado básico.
-
-Ya existe:
-- Recomendación básica hacia WhatsApp API por ser 30% menor que Twilio.
-
-Falta:
-- Recomendar según disponibilidad real:
-  - Si Twilio está caro, sugerir WhatsApp API.
-  - Si WhatsApp QR está desconectado, sugerir API.
-  - Si WhatsApp API no está activo, sugerir canal alternativo.
-  - Si Telegram/WebChat están activos, mostrarlos como respaldo.
-- Mostrar recomendación en campañas.
-- Mostrar recomendación en conversaciones.
-- Mostrar recomendación en configuración de costos.
-
----
-
-### 4. Dashboard ejecutivo mejorado
-Estado: aplicado parcialmente.
-
-Ya existe:
-- Resumen ejecutivo de costos.
-- Costo externo.
-- Costo Nuestro Sistema.
+- Costo interno “Nuestro Sistema”.
+- Costo total estimado.
 - Ahorro estimado.
-- Canal recomendado.
-- Mensajes Twilio y WhatsApp API.
+- Porcentaje sobre el total del equipo.
+- Recomendación si envía demasiado.
 
-Falta:
-- Conversaciones nuevas del día como métrica ejecutiva clara.
-- Conversaciones respondidas por humanos.
-- Conversaciones respondidas por IA.
-- Tiempo promedio de respuesta.
-- Cajeros activos.
-- Embudos con más actividad.
-
----
-
-### 5. Ranking de cajeros/agentes
-Estado: aplicado parcialmente.
-
-Ya existe:
-- `AgentPerformanceRanking.tsx`
-- Mensajes enviados.
-- Conversaciones asignadas.
-- Conversaciones pendientes.
-- Última actividad.
-
-Falta:
-- Tiempo promedio de respuesta.
-- Conversaciones cerradas.
-- Clientes asignados.
-- Actividad diaria.
-- Ranking por productividad real, no solo por mensajes enviados.
-
----
-
-### 6. Control de conversaciones sin responder
-Estado: aplicado parcialmente.
-
-Ya existe:
-- Filtro “Sin responder” en Chats.
-- Filtrado por `unread_count > 0`.
-- Banner informativo.
-
-Falta:
-- Conversaciones sin respuesta después de X minutos.
-- Conversaciones asignadas a cajeros offline.
-- Conversaciones con IA apagada y sin humano activo.
-- Filtros más específicos dentro de la bandeja.
-
----
-
-### 7. Automatización de seguimiento
-Estado: no aplicado todavía.
-
-Existe base previa:
-- Disparadores por columna.
-- Mensajes programados.
-- Logs de mensajes automatizados.
-
-Falta implementar reglas nuevas:
-- Si cliente no responde en 24 horas, programar seguimiento.
-- Si conversación queda demasiado tiempo en una columna, avisar o enviar mensaje.
-- Si se detecta intención de carga de fichas, marcar como urgente.
-- Si el cliente envía comprobante, priorizar conversación.
-
----
-
-### 8. Historial de costos por mes
-Estado: no aplicado todavía.
-
-Falta:
-- Crear tabla de snapshots mensuales.
-- Guardar por mes:
-  - Mensajes Twilio.
-  - Mensajes WhatsApp API.
-  - Costo Twilio.
-  - Costo WhatsApp API.
-  - Costo Nuestro Sistema.
-  - Ahorro generado.
-- Mostrar historial en Reportes.
-
----
-
-### 9. Mejoras en campañas masivas
-Estado: aplicado parcialmente por funcionalidades existentes, pero no por costos.
-
-Ya existe:
-- Reporte de enviados, fallidos y pendientes.
-- Advertencia por límite de Twilio.
-
-Falta:
-- Estimación de costo antes de enviar.
-- Canal recomendado según precio.
-- Simulación de gasto.
-- Proyección de ahorro usando WhatsApp API.
-- Pausar campaña si el costo supera un límite configurado.
-
----
-
-### 10. Centro de salud del sistema
-Estado: aplicado parcialmente.
-
-Ya existe:
-- `SystemHealthCenter.tsx`
-- Estado de WhatsApp QR.
-- Estado de WhatsApp API.
-- Estado de Twilio.
-- Estado de Telegram.
-- Estado de WebChat.
-- Último mensaje.
-- Conversaciones pendientes.
-
-Falta:
-- Errores recientes de envío.
-- Canales con problemas reales.
-- Estado de IA.
-- Estado de Realtime.
-- Calcular correctamente conversaciones asignadas a cajeros offline; ahora está en `0` fijo.
-- Mostrar recomendación operativa por canal.
-
----
-
-# Plan para completar el 100% del roadmap
-
-## Fase 1: Unificar tarifas y mejorar rentabilidad
-
-1. Crear constantes compartidas de costos en una sola ubicación:
-   - Twilio: `0.064`
-   - WhatsApp API: `0.064 * 0.70`
-   - Nuestro Sistema: `0.00445 * 1.60`
-
-2. Reutilizar esas tarifas en:
-   - `CostEstimatorTab.tsx`
-   - `reportsService.ts`
-   - `Dashboard.tsx`
-   - campañas masivas.
-
-3. Mejorar `ChannelProfitabilityPanel` para mostrar:
-   - ahorro por día,
-   - ahorro por semana,
-   - ahorro por mes proyectado,
-   - porcentaje de ahorro,
-   - alerta cuando el ahorro baja.
-
-## Fase 2: Completar alertas inteligentes
-
-Agregar un bloque de alertas operativas en Reportes y Dashboard:
-
-- Twilio alto:
-  - si supera `$150 USD`.
-- WhatsApp API inusual:
-  - si crece más de cierto porcentaje frente al promedio del período.
-- Cajero con exceso de mensajes:
-  - si un agente supera un umbral configurable.
-- Campaña costosa:
-  - si una campaña proyecta gasto alto.
-- Ahorro bajo:
-  - si el ahorro esperado cae debajo de un porcentaje mínimo.
-
-## Fase 3: Recomendador automático de canal real
-
-Crear una función central:
+Ejemplo:
 
 ```text
-getRecommendedChannel({
-  twilioCost,
-  whatsappApiCost,
-  whatsappQrActive,
-  whatsappApiActive,
-  twilioActive,
-  telegramActive,
-  campaignSize
-})
+Cajero: Juan
+Mensajes: 742
+Twilio: 510 mensajes · $32.64 USD
+WhatsApp API: 232 mensajes · $10.39 USD
+Costo interno: $5.28 USD
+Recomendación: derivar más tráfico a WhatsApp API.
 ```
 
-Usarla en:
-- Reportes.
-- Dashboard.
-- Configuración > Costos.
-- Crear campaña masiva.
-- Conversaciones.
+Archivos:
 
-La recomendación ya no será siempre “WhatsApp API”; dependerá de costo y disponibilidad real.
-
-## Fase 4: Completar Dashboard ejecutivo
-
-Agregar métricas nuevas al Dashboard:
-
-- Conversaciones nuevas hoy.
-- Respondidas por humano.
-- Respondidas por IA.
-- Tiempo promedio de respuesta.
-- Mensajes por canal.
-- Cajeros activos.
-- Embudos con más actividad.
-- Alertas operativas principales.
-
-Esto requerirá extender `dashboardService.ts` y `useDashboard.tsx`.
-
-## Fase 5: Completar ranking de cajeros
-
-Ampliar `AgentPerformanceRanking` con:
-
-- Tiempo promedio de respuesta.
-- Conversaciones cerradas.
-- Clientes asignados.
-- Actividad diaria.
-- Porcentaje de pendientes.
-- Ordenamiento por rendimiento compuesto.
-
-Usar:
-- `messages.responded_by`
-- `messages.created_at`
-- `conversations.assigned_to`
-- `conversations.unread_count`
-- `agent_presence`
-
-## Fase 6: Mejorar bandeja de conversaciones sin responder
-
-Agregar filtros adicionales en Chats:
-
-- Sin responder.
-- Sin respuesta hace más de X minutos.
-- Asignadas a cajero offline.
-- IA apagada y sin humano activo.
-- Urgentes por comprobante detectado.
-
-Esto extenderá:
-- `src/pages/Conversations.tsx`
-- `src/components/conversations/ConversationList.tsx`
-
-## Fase 7: Automatización de seguimiento
-
-Implementar reglas automáticas usando la base existente de disparadores y mensajes programados:
-
-- Seguimiento después de 24h sin respuesta.
-- Aviso si lead queda demasiado tiempo en una columna.
-- Priorización si detecta carga/fichas.
-- Priorización si detecta comprobante.
-
-No se eliminará data histórica.
-
-Si requiere ejecución automática periódica, se agregará una Edge Function programada de Supabase para revisar reglas pendientes.
-
-## Fase 8: Historial mensual de costos
-
-Crear una tabla nueva de snapshots mensuales:
-
-```text
-monthly_channel_cost_snapshots
-- id
-- user_id
-- month
-- twilio_messages
-- whatsapp_api_messages
-- twilio_cost
-- whatsapp_api_cost
-- internal_cost
-- external_cost
-- total_savings
-- created_at
-```
-
-Agregar RLS usando `get_account_owner_id()`.
-
-Agregar vista en Reportes:
-- historial mensual,
-- evolución de ahorro,
-- comparación mes contra mes.
-
-## Fase 9: Campañas con simulador de costo
-
-En `CreateMassCampaign.tsx` agregar:
-
-- estimación de costo antes de guardar/enviar,
-- costo según canal seleccionado,
-- comparación Twilio vs WhatsApp API,
-- canal recomendado,
-- ahorro proyectado,
-- alerta si Twilio sale caro,
-- límite opcional para pausar campaña por costo.
-
-En el resumen de campaña agregar:
-- costo estimado,
-- costo real según enviados,
-- ahorro estimado,
-- fallidos y pendientes ya existentes.
-
-## Fase 10: Centro de salud completo
-
-Mejorar `SystemHealthCenter` para incluir:
-
-- conversaciones asignadas a cajeros offline calculadas correctamente,
-- errores recientes de envío desde campañas/mensajes/logs,
-- estado IA por sesiones activas,
-- estado Realtime informativo,
-- recomendación por canal,
-- semáforos más precisos.
-
-## Archivos principales a tocar
-
-- `src/services/reportsService.ts`
-- `src/services/dashboardService.ts`
-- `src/hooks/useReports.ts`
-- `src/hooks/useDashboard.tsx`
-- `src/components/reports/ChannelProfitabilityPanel.tsx`
 - `src/components/reports/AgentPerformanceRanking.tsx`
-- `src/components/reports/SystemHealthCenter.tsx`
-- `src/components/dashboard/Dashboard.tsx`
-- `src/pages/Conversations.tsx`
-- `src/components/conversations/ConversationList.tsx`
-- `src/pages/CreateMassCampaign.tsx`
-- `src/components/campaigns/CampaignSendSummaryModal.tsx`
-- `src/components/settings/CostEstimatorTab.tsx`
+- `src/components/reports/AgentCostPanel.tsx`
+- `src/services/reportsService.ts`
+- `src/hooks/useReports.ts`
 
-## Cambios de base de datos necesarios
+## 7. Reportes: integración con período seleccionado
 
-Para completar todo el plan sí hará falta una migración para:
+Los nuevos cálculos respetarán el rango seleccionado en Reportes:
 
-1. Historial mensual de costos.
-2. Opcionalmente configuración de umbrales de alertas.
-3. Opcionalmente reglas avanzadas de seguimiento.
+- Hoy.
+- 7 días.
+- 30 días.
+- Este mes.
+- Rango personalizado.
 
-Las políticas RLS deberán respetar la estructura actual:
+Se usarán las tarifas centralizadas actuales:
 
 ```text
-user_id = get_account_owner_id(auth.uid())
+Twilio: $0.064
+WhatsApp API: 30% menos que Twilio
+Nuestro Sistema: 0.00445 * 1.60
 ```
 
-## Resultado esperado final
+Esto evita duplicar tarifas en diferentes componentes.
 
-El sistema quedará con:
+## 8. Flujo de guardado de alertas
 
-- Reporte real de rentabilidad por canal.
-- Alertas inteligentes completas.
-- Recomendador automático basado en costo y disponibilidad.
-- Dashboard ejecutivo operativo.
-- Ranking real de cajeros.
-- Control avanzado de conversaciones sin responder.
-- Automatizaciones de seguimiento.
-- Historial mensual de costos.
-- Campañas con simulador de costo y ahorro.
-- Centro de salud del sistema más confiable.
+Cuando el Dashboard o Reportes calculen una alerta:
+
+1. Se revisa la configuración activa del usuario.
+2. Se compara la métrica contra el umbral.
+3. Si supera el umbral, se genera recomendación.
+4. Se guarda en `consumption_alert_history`.
+5. Se evita duplicar la misma alerta dentro del mismo período.
+6. Se muestra en Dashboard.
+
+Para evitar spam de alertas, se usará una clave lógica por período:
+
+```text
+account_owner_id + alert_type + target_user_id + period_start + period_end
+```
+
+## 9. Permisos y seguridad
+
+- Solo usuarios admin/client podrán editar umbrales.
+- Cajeros podrán ver alertas si tienen permisos de dashboard/reportes.
+- Las tablas usarán RLS con `get_account_owner_id(auth.uid())`.
+- No se guardarán roles en `profiles`.
+- No se usará `service_role` en frontend.
+- No se modificará manualmente `src/integrations/supabase/types.ts`.
+
+## 10. Orden de implementación
+
+1. Crear migración con tablas de configuración e historial.
+2. Crear servicio de configuración de alertas.
+3. Crear pestaña `Alertas de consumo` en Configuración.
+4. Crear motor de evaluación de alertas.
+5. Guardar historial evitando duplicados.
+6. Agregar panel de alertas/recomendaciones al Dashboard.
+7. Crear recomendador de canal por tipo de lead.
+8. Agregar panel de recomendaciones por lead en Reportes.
+9. Ampliar ranking de cajeros con costos estimados.
+10. Validar que todo compile correctamente.
+
+## Resultado esperado
+
+El sistema quedará con una sección completa de control de consumo:
+
+```text
+Configuración > Alertas de consumo
+- Twilio máximo mensual: $150 USD
+- WhatsApp API consumo inusual: +40%
+- Cajero máximo mensual: 500 mensajes
+
+Dashboard
+- Twilio lleva $185 USD este mes
+- Recomendación: migrar tráfico a WhatsApp API
+- Cajero Juan envió 742 mensajes
+- Recomendación: revisar asignación o derivar campañas
+
+Reportes
+- Costo por cajero
+- Ahorro por agente
+- Canal recomendado por tipo de lead
+```
+
+Esto completa la parte avanzada del roadmap: alertas configurables, historial operativo, recomendaciones accionables y control de consumo por usuario.
