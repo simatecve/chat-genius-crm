@@ -51,6 +51,27 @@ export interface SessionCounts {
   webchat: number;
 }
 
+const MESSAGE_COSTS = {
+  internal: 0.00445 * 1.60,
+  twilio: 0.064,
+  whatsappApi: 0.064 * 0.70
+};
+
+export interface ChannelProfitabilityStats {
+  twilioMessages: number;
+  whatsappApiMessages: number;
+  totalMessages: number;
+  twilioCost: number;
+  whatsappApiCost: number;
+  internalCost: number;
+  externalCost: number;
+  totalSavings: number;
+  dailySavings: number;
+  mostExpensiveChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
+  mostProfitableChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
+  recommendedChannel: 'WhatsApp API' | 'Twilio' | 'Sin consumo';
+}
+
 // Get all session counts for all channel types (for badges)
 export const getAllSessionCounts = async (userId: string): Promise<SessionCounts> => {
   const [whatsappResult, twilioResult, telegramResult, webchatResult] = await Promise.all([
@@ -80,6 +101,95 @@ export const getAllSessionCounts = async (userId: string): Promise<SessionCounts
     twilio: twilioResult.count || 0,
     telegram: telegramResult.count || 0,
     webchat: webchatResult.count || 0
+  };
+};
+
+const countMessagesForConversationIds = async (
+  userId: string,
+  conversationIds: string[],
+  dateRange: DateRange
+): Promise<number> => {
+  if (conversationIds.length === 0) return 0;
+
+  let total = 0;
+  for (let index = 0; index < conversationIds.length; index += 500) {
+    const batch = conversationIds.slice(index, index + 500);
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .in('conversation_id', batch)
+      .gte('created_at', dateRange.startDate.toISOString())
+      .lte('created_at', dateRange.endDate.toISOString());
+
+    if (error) throw error;
+    total += count || 0;
+  }
+
+  return total;
+};
+
+export const getChannelProfitabilityStats = async (
+  userId: string,
+  dateRange: DateRange
+): Promise<ChannelProfitabilityStats> => {
+  const [{ data: twilioConversations, error: twilioError }, { data: apiConnections, error: apiConnectionsError }] = await Promise.all([
+    supabase
+      .from('conversations')
+      .select('id')
+      .eq('user_id', userId)
+      .or('channel_type.eq.twilio,twilio_connection_id.not.is.null'),
+    supabase
+      .from('whatsapp_connections')
+      .select('phone_number, connection_subtype')
+      .eq('user_id', userId)
+      .eq('connection_subtype', 'api')
+  ]);
+
+  if (twilioError) throw twilioError;
+  if (apiConnectionsError) throw apiConnectionsError;
+
+  const apiPhoneNumbers = (apiConnections || []).map(connection => connection.phone_number).filter(Boolean);
+  let whatsappApiConversationIds: string[] = [];
+
+  if (apiPhoneNumbers.length > 0) {
+    const { data: apiConversations, error: apiConversationsError } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('channel_type', 'whatsapp')
+      .in('whatsapp_number', apiPhoneNumbers);
+
+    if (apiConversationsError) throw apiConversationsError;
+    whatsappApiConversationIds = (apiConversations || []).map(conversation => conversation.id);
+  }
+
+  const [twilioMessages, whatsappApiMessages] = await Promise.all([
+    countMessagesForConversationIds(userId, (twilioConversations || []).map(conversation => conversation.id), dateRange),
+    countMessagesForConversationIds(userId, whatsappApiConversationIds, dateRange)
+  ]);
+
+  const totalMessages = twilioMessages + whatsappApiMessages;
+  const twilioCost = twilioMessages * MESSAGE_COSTS.twilio;
+  const whatsappApiCost = whatsappApiMessages * MESSAGE_COSTS.whatsappApi;
+  const internalCost = totalMessages * MESSAGE_COSTS.internal;
+  const externalCost = twilioCost + whatsappApiCost;
+  const totalSavings = Math.max(externalCost - internalCost, 0);
+  const days = Math.max(1, Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+  return {
+    twilioMessages,
+    whatsappApiMessages,
+    totalMessages,
+    twilioCost,
+    whatsappApiCost,
+    internalCost,
+    externalCost,
+    totalSavings,
+    dailySavings: totalSavings / days,
+    mostExpensiveChannel: totalMessages === 0 ? 'Sin consumo' : twilioCost >= whatsappApiCost ? 'Twilio' : 'WhatsApp API',
+    mostProfitableChannel: totalMessages === 0 ? 'Sin consumo' : whatsappApiMessages > 0 ? 'WhatsApp API' : 'Twilio',
+    recommendedChannel: totalMessages === 0 ? 'Sin consumo' : 'WhatsApp API'
   };
 };
 
