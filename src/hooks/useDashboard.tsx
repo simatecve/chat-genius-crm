@@ -1,6 +1,44 @@
 import { useQuery } from '@tanstack/react-query';
 import { dashboardService, DashboardStats, RecentLead, ActiveConversation, MessagesByHour, ConversationStats, HeatmapData } from '@/services/dashboardService';
 import { useAuth } from './useAuth';
+import { getChannelProfitabilityStats, type ChannelProfitabilityStats, type DateRange } from '@/services/reportsService';
+
+const createDateRangeForPeriod = (period: 'today' | 'week' | 'month' | 'year'): DateRange => {
+  const endDate = new Date();
+  const startDate = new Date();
+
+  switch (period) {
+    case 'today':
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case 'week':
+      startDate.setDate(startDate.getDate() - 7);
+      break;
+    case 'month':
+      startDate.setMonth(startDate.getMonth() - 1);
+      break;
+    case 'year':
+      startDate.setFullYear(startDate.getFullYear() - 1);
+      break;
+  }
+
+  return { startDate, endDate };
+};
+
+const emptyProfitabilityStats: ChannelProfitabilityStats = {
+  twilioMessages: 0,
+  whatsappApiMessages: 0,
+  totalMessages: 0,
+  twilioCost: 0,
+  whatsappApiCost: 0,
+  internalCost: 0,
+  externalCost: 0,
+  totalSavings: 0,
+  dailySavings: 0,
+  mostExpensiveChannel: 'Sin consumo',
+  mostProfitableChannel: 'Sin consumo',
+  recommendedChannel: 'Sin consumo'
+};
 
 export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'today') => {
   const { user } = useAuth();
@@ -72,6 +110,18 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     refetchInterval: 5 * 60 * 1000,
   });
 
+  const {
+    data: profitabilityStats,
+    isLoading: profitabilityLoading,
+    error: profitabilityError
+  } = useQuery({
+    queryKey: ['dashboard-profitability', user?.id, period],
+    queryFn: () => user ? getChannelProfitabilityStats(user.id, createDateRangeForPeriod(period)) : null,
+    enabled: !!user,
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
   return {
     stats: stats || {
       totalLeads: 0,
@@ -92,7 +142,9 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
     messagesByHour: messagesByHour || [],
     conversationsByHour: conversationsByHour || [],
     heatmapData: heatmapData || [],
-    isLoading: statsLoading || leadsLoading || conversationsLoading || messagesLoading || conversationsByHourLoading || heatmapLoading,
-    error: statsError || leadsError || conversationsError || messagesError || conversationsByHourError || heatmapError
+    profitabilityStats: profitabilityStats || emptyProfitabilityStats,
+    profitabilityLoading,
+    isLoading: statsLoading || leadsLoading || conversationsLoading || messagesLoading || conversationsByHourLoading || heatmapLoading || profitabilityLoading,
+    error: statsError || leadsError || conversationsError || messagesError || conversationsByHourError || heatmapError || profitabilityError
   };
 };
