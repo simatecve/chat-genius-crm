@@ -16,7 +16,10 @@ import {
   getNewConversationsByDateForChannel,
   getChannelProfitabilityStats,
   getAgentPerformanceStats,
-  getSystemHealthStats
+  getSystemHealthStats,
+  getMonthlyChannelCostSnapshots,
+  getOperationalAlerts,
+  upsertCurrentMonthlyChannelCostSnapshot
 } from '@/services/reportsService';
 
 export const useReports = () => {
@@ -72,6 +75,25 @@ export const useReports = () => {
     queryFn: () => getSystemHealthStats(user?.id || ''),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 2
+  });
+
+  const operationalAlerts = useMemo(
+    () => getOperationalAlerts(profitabilityStats, agentPerformanceStats, systemHealthStats),
+    [profitabilityStats, agentPerformanceStats, systemHealthStats]
+  );
+
+  const {
+    data: monthlyCostSnapshots = [],
+    isLoading: monthlyCostSnapshotsLoading
+  } = useQuery({
+    queryKey: ['report-monthly-cost-snapshots', user?.id, profitabilityStats?.totalMessages],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      if (profitabilityStats) await upsertCurrentMonthlyChannelCostSnapshot(user.id, profitabilityStats);
+      return getMonthlyChannelCostSnapshots(user.id);
+    },
+    enabled: !!user?.id && !!profitabilityStats,
+    staleTime: 1000 * 60 * 5
   });
 
   // Fetch sessions for selected channel type
@@ -241,6 +263,8 @@ export const useReports = () => {
     profitabilityStats,
     agentPerformanceStats,
     systemHealthStats,
+    operationalAlerts,
+    monthlyCostSnapshots,
 
     // Loading states
     isLoading: sessionsLoading || statsLoading || dailyLoading || hourlyLoading || newConvsLoading,
@@ -253,6 +277,7 @@ export const useReports = () => {
     profitabilityLoading,
     agentPerformanceLoading,
     systemHealthLoading,
+    monthlyCostSnapshotsLoading,
 
     // Errors
     error: sessionsError || statsError,
