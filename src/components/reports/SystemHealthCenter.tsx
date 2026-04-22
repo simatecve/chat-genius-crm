@@ -62,6 +62,22 @@ export const SystemHealthCenter: React.FC<SystemHealthCenterProps> = ({ stats, i
             <p className="text-sm text-muted-foreground">Último mensaje</p>
             <p className="mt-1 text-sm font-medium">{lastMessage}</p>
           </div>
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <p className="text-sm text-muted-foreground">Errores de envío</p>
+            <p className="mt-1 text-2xl font-bold">{stats.recentSendErrors}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <p className="text-sm text-muted-foreground">IA activa</p>
+            <p className="mt-1 text-2xl font-bold">{stats.aiActive}/{stats.aiTotal}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <p className="text-sm text-muted-foreground">Realtime</p>
+            <p className="mt-1 text-sm font-medium">{stats.realtimeStatus}</p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-primary/5 p-3 text-sm">
+          Canal recomendado operativo: <span className="font-semibold text-primary">{stats.recommendedChannel}</span>
         </div>
 
         {stats.pendingConversations > 0 && (
