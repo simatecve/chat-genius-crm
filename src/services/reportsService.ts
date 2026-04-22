@@ -84,6 +84,14 @@ export interface AgentPerformanceStats {
   averageResponseMinutes: number;
   pendingRate: number;
   performanceScore: number;
+  twilioMessages: number;
+  whatsappApiMessages: number;
+  twilioCost: number;
+  whatsappApiCost: number;
+  internalCost: number;
+  estimatedTotalCost: number;
+  estimatedSavings: number;
+  recommendation: string;
   lastActivityAt: string | null;
 }
 
@@ -275,7 +283,7 @@ export const getAgentPerformanceStats = async (
       .not('assigned_to', 'is', null),
     supabase
       .from('messages')
-      .select('responded_by, created_at')
+      .select('responded_by, created_at, conversation_id, conversations(channel_type, twilio_connection_id, whatsapp_number)')
       .eq('user_id', userId)
       .eq('direction', 'outbound')
       .gte('created_at', dateRange.startDate.toISOString())
@@ -308,6 +316,13 @@ export const getAgentPerformanceStats = async (
     const pendingRate = assignedConversationsCount > 0 ? (unreadAssigned / assignedConversationsCount) * 100 : 0;
     const closedConversations = agentConversations.filter(conversation => ['closed', 'cerrado', 'resolved'].includes((conversation.status || '').toLowerCase())).length;
     const performanceScore = Math.max(0, (agentMessages.length * 2) + (closedConversations * 5) - (unreadAssigned * 3));
+    const twilioMessages = agentMessages.filter((message: any) => message.conversations?.channel_type === 'twilio' || message.conversations?.twilio_connection_id).length;
+    const whatsappApiMessages = Math.max(agentMessages.length - twilioMessages, 0);
+    const twilioCost = twilioMessages * MESSAGE_COSTS.twilio;
+    const whatsappApiCost = whatsappApiMessages * MESSAGE_COSTS.whatsappApi;
+    const internalCost = agentMessages.length * MESSAGE_COSTS.internal;
+    const estimatedTotalCost = twilioCost + whatsappApiCost + internalCost;
+    const estimatedSavings = Math.max((agentMessages.length * MESSAGE_COSTS.twilio) - (whatsappApiCost + internalCost), 0);
 
     return {
       id: profile.id,
@@ -321,6 +336,14 @@ export const getAgentPerformanceStats = async (
       averageResponseMinutes,
       pendingRate,
       performanceScore,
+      twilioMessages,
+      whatsappApiMessages,
+      twilioCost,
+      whatsappApiCost,
+      internalCost,
+      estimatedTotalCost,
+      estimatedSavings,
+      recommendation: agentMessages.length > 500 ? 'Volumen en exceso: derivar tráfico repetitivo a WhatsApp API y revisar asignación.' : 'Consumo dentro del rango operativo.',
       lastActivityAt: lastMessageAt
     };
   }).sort((a, b) => b.performanceScore - a.performanceScore || b.messagesSent - a.messagesSent);
