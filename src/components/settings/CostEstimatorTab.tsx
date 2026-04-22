@@ -22,7 +22,7 @@ const COSTS = {
   internal: BASE_INTERNAL_COST * 1.60,
   twilio: 0.064,
   whatsappAverage: WHATSAPP_REFERENCE_COST,
-  whatsappApi: WHATSAPP_REFERENCE_COST * 0.60
+  whatsappApi: 0.064 * 0.70
 };
 
 const emptyChannelCounts = { twilio: 0, whatsappApi: 0 };
@@ -243,7 +243,7 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold">{formatCurrency(whatsappApiCost)}</p>
-            <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal · {messageCounts.whatsappApi.toLocaleString()} mensajes</p>
+            <p className="text-sm text-muted-foreground">30% menos que Twilio · {messageCounts.whatsappApi.toLocaleString()} mensajes</p>
             <p className="text-xs text-muted-foreground mt-2">Tarifa referencial: ${COSTS.whatsappApi.toFixed(4)} USD por mensaje</p>
           </CardContent>
         </Card>
