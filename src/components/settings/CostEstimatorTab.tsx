@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,23 +15,11 @@ interface CostEstimatorTabProps {
   userId: string;
 }
 
-type RegionKey = 'northAmerica' | 'mexico' | 'latinAmerica' | 'europe';
-
 const COSTS = {
   internal: 0.00445,
-  whatsapp: {
-    northAmerica: 0.0046,
-    mexico: 0.0098,
-    latinAmerica: 0.0130,
-    europe: 0.0230
-  }
-};
-
-const REGION_LABELS: Record<RegionKey, { title: string; subtitle: string }> = {
-  northAmerica: { title: 'Norteamérica', subtitle: 'Estados Unidos, Canadá' },
-  mexico: { title: 'México', subtitle: 'México' },
-  latinAmerica: { title: 'Latinoamérica', subtitle: 'Argentina, Brasil, Colombia, etc.' },
-  europe: { title: 'España/Europa', subtitle: 'España, Alemania, Francia, etc.' }
+  twilio: 0.0079,
+  whatsappAverage: 0.0126,
+  whatsappApi: 0.0126 * 0.60
 };
 
 const createPresetRange = (preset: 'today' | '7days' | '30days' | 'thisMonth'): DateRange => {
@@ -53,13 +41,6 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
   const [isLoadingReal, setIsLoadingReal] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>(() => createPresetRange('30days'));
   const { toast } = useToast();
-
-  const whatsappApiRates = useMemo(() => ({
-    northAmerica: COSTS.whatsapp.northAmerica * 0.60,
-    mexico: COSTS.whatsapp.mexico * 0.60,
-    latinAmerica: COSTS.whatsapp.latinAmerica * 0.60,
-    europe: COSTS.whatsapp.europe * 0.60
-  }), []);
 
   const loadRealMessageCount = async (showToast = false) => {
     setIsLoadingReal(true);
@@ -105,18 +86,8 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
   };
 
   const internalCost = messageCount * COSTS.internal;
-  const whatsappCosts = {
-    northAmerica: messageCount * COSTS.whatsapp.northAmerica,
-    mexico: messageCount * COSTS.whatsapp.mexico,
-    latinAmerica: messageCount * COSTS.whatsapp.latinAmerica,
-    europe: messageCount * COSTS.whatsapp.europe
-  };
-  const whatsappApiCosts = {
-    northAmerica: messageCount * whatsappApiRates.northAmerica,
-    mexico: messageCount * whatsappApiRates.mexico,
-    latinAmerica: messageCount * whatsappApiRates.latinAmerica,
-    europe: messageCount * whatsappApiRates.europe
-  };
+  const twilioCost = messageCount * COSTS.twilio;
+  const whatsappApiCost = messageCount * COSTS.whatsappApi;
 
   const calculateSavings = (cost: number) => cost - internalCost;
   const calculateSavingsPercentage = (cost: number) => cost > 0 ? (calculateSavings(cost) / cost) * 100 : 0;
@@ -186,32 +157,28 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           </CardContent>
         </Card>
 
-        {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-          <Card key={`whatsapp-${region}`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">WhatsApp - {REGION_LABELS[region].title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{formatCurrency(whatsappCosts[region])}</p>
-              <p className="text-sm text-muted-foreground">{REGION_LABELS[region].subtitle}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Twilio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">{formatCurrency(twilioCost)}</p>
+            <p className="text-sm text-muted-foreground">Costo real estimado por mensajes Twilio</p>
+          </CardContent>
+        </Card>
 
-        {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-          <Card key={`api-${region}`} className="border-accent/50 bg-accent/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Plug className="h-5 w-5 text-accent-foreground" />
-                WhatsApp API - {REGION_LABELS[region].title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{formatCurrency(whatsappApiCosts[region])}</p>
-              <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal</p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="border-accent/50 bg-accent/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Plug className="h-5 w-5 text-accent-foreground" />
+              WhatsApp API
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">{formatCurrency(whatsappApiCost)}</p>
+            <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal</p>
+          </CardContent>
+        </Card>
       </div>
 
       {messageCount > 0 && (
@@ -223,21 +190,17 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-                <div key={`saving-wa-${region}`} className="p-3 rounded-lg bg-background border">
-                  <p className="text-sm text-muted-foreground">vs WhatsApp {REGION_LABELS[region].title}</p>
-                  <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappCosts[region]))} ahorro</p>
-                  <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappCosts[region]))}</p>
-                </div>
-              ))}
-              {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-                <div key={`saving-api-${region}`} className="p-3 rounded-lg bg-background border border-accent/40">
-                  <p className="text-sm text-muted-foreground">vs WhatsApp API {REGION_LABELS[region].title}</p>
-                  <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappApiCosts[region]))} ahorro</p>
-                  <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappApiCosts[region]))}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-3 rounded-lg bg-background border">
+                <p className="text-sm text-muted-foreground">vs Twilio</p>
+                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(twilioCost))} ahorro</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(twilioCost))}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background border border-accent/40">
+                <p className="text-sm text-muted-foreground">vs WhatsApp API</p>
+                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappApiCost))} ahorro</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappApiCost))}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
