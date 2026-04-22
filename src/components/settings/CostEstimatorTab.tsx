@@ -157,32 +157,28 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           </CardContent>
         </Card>
 
-        {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-          <Card key={`whatsapp-${region}`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">WhatsApp - {REGION_LABELS[region].title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{formatCurrency(whatsappCosts[region])}</p>
-              <p className="text-sm text-muted-foreground">{REGION_LABELS[region].subtitle}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Twilio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">{formatCurrency(twilioCost)}</p>
+            <p className="text-sm text-muted-foreground">Costo real estimado por mensajes Twilio</p>
+          </CardContent>
+        </Card>
 
-        {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-          <Card key={`api-${region}`} className="border-accent/50 bg-accent/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Plug className="h-5 w-5 text-accent-foreground" />
-                WhatsApp API - {REGION_LABELS[region].title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{formatCurrency(whatsappApiCosts[region])}</p>
-              <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal</p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="border-accent/50 bg-accent/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Plug className="h-5 w-5 text-accent-foreground" />
+              WhatsApp API
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold">{formatCurrency(whatsappApiCost)}</p>
+            <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal</p>
+          </CardContent>
+        </Card>
       </div>
 
       {messageCount > 0 && (
@@ -194,21 +190,17 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-                <div key={`saving-wa-${region}`} className="p-3 rounded-lg bg-background border">
-                  <p className="text-sm text-muted-foreground">vs WhatsApp {REGION_LABELS[region].title}</p>
-                  <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappCosts[region]))} ahorro</p>
-                  <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappCosts[region]))}</p>
-                </div>
-              ))}
-              {(Object.keys(REGION_LABELS) as RegionKey[]).map((region) => (
-                <div key={`saving-api-${region}`} className="p-3 rounded-lg bg-background border border-accent/40">
-                  <p className="text-sm text-muted-foreground">vs WhatsApp API {REGION_LABELS[region].title}</p>
-                  <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappApiCosts[region]))} ahorro</p>
-                  <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappApiCosts[region]))}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-3 rounded-lg bg-background border">
+                <p className="text-sm text-muted-foreground">vs Twilio</p>
+                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(twilioCost))} ahorro</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(twilioCost))}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background border border-accent/40">
+                <p className="text-sm text-muted-foreground">vs WhatsApp API</p>
+                <p className="text-lg font-semibold text-primary">{formatPercentage(calculateSavingsPercentage(whatsappApiCost))} ahorro</p>
+                <p className="text-sm text-muted-foreground">{formatCurrency(calculateSavings(whatsappApiCost))}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
