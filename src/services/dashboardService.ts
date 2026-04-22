@@ -125,7 +125,7 @@ export const dashboardService = {
         supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
         supabase.from('messages').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('direction', 'outbound').eq('is_bot', false),
         supabase.from('messages').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('direction', 'outbound').eq('is_bot', true),
-        supabase.from('agent_presence').select('id', { count: 'exact', head: true }).eq('account_owner_id', userId).gte('last_seen_at', new Date(Date.now() - 90_000).toISOString()),
+        supabase.from('agent_presence').select('user_id', { count: 'exact', head: true }).eq('account_owner_id', userId).gte('last_seen_at', new Date(Date.now() - 90_000).toISOString()),
         supabase.from('leads').select('column_id, lead_columns(name)').eq('user_id', userId).limit(1000)
       ]);
 
