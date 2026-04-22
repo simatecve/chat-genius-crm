@@ -14,7 +14,9 @@ import {
   getHourlyStatsForChannel,
   getNewConversationsByDate,
   getNewConversationsByDateForChannel,
-  getChannelProfitabilityStats
+  getChannelProfitabilityStats,
+  getAgentPerformanceStats,
+  getSystemHealthStats
 } from '@/services/reportsService';
 
 export const useReports = () => {
@@ -48,6 +50,26 @@ export const useReports = () => {
   } = useQuery({
     queryKey: ['report-profitability', user?.id, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
     queryFn: () => getChannelProfitabilityStats(user?.id || '', dateRange),
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 2
+  });
+
+  const {
+    data: agentPerformanceStats = [],
+    isLoading: agentPerformanceLoading
+  } = useQuery({
+    queryKey: ['report-agent-performance', user?.id, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getAgentPerformanceStats(user?.id || '', dateRange),
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 2
+  });
+
+  const {
+    data: systemHealthStats,
+    isLoading: systemHealthLoading
+  } = useQuery({
+    queryKey: ['report-system-health', user?.id],
+    queryFn: () => getSystemHealthStats(user?.id || ''),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 2
   });
@@ -217,6 +239,8 @@ export const useReports = () => {
     newConversationsDaily,
     sessionCounts,
     profitabilityStats,
+    agentPerformanceStats,
+    systemHealthStats,
 
     // Loading states
     isLoading: sessionsLoading || statsLoading || dailyLoading || hourlyLoading || newConvsLoading,
@@ -227,6 +251,8 @@ export const useReports = () => {
     newConvsLoading,
     countsLoading,
     profitabilityLoading,
+    agentPerformanceLoading,
+    systemHealthLoading,
 
     // Errors
     error: sessionsError || statsError,
