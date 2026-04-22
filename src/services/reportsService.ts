@@ -320,13 +320,16 @@ export const getAgentPerformanceStats = async (
 };
 
 export const getSystemHealthStats = async (userId: string): Promise<SystemHealthStats> => {
-  const [whatsappResult, twilioResult, telegramResult, webchatResult, conversationsResult, messagesResult] = await Promise.all([
+  const [whatsappResult, twilioResult, telegramResult, webchatResult, conversationsResult, messagesResult, presenceResult, errorResult, aiResult] = await Promise.all([
     supabase.from('whatsapp_connections').select('status, connection_subtype').eq('user_id', userId),
     supabase.from('twilio_connections').select('status').eq('user_id', userId),
     supabase.from('telegram_bots').select('status').eq('user_id', userId),
     supabase.from('web_chatbots').select('is_active').eq('user_id', userId),
     supabase.from('conversations').select('assigned_to, unread_count').eq('user_id', userId),
-    supabase.from('messages').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+    supabase.from('messages').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1),
+    supabase.from('agent_presence').select('user_id, status, manual_override, last_seen_at').eq('account_owner_id', userId),
+    supabase.from('campaign_sends').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'failed'),
+    supabase.from('ai_agents').select('is_active').eq('user_id', userId)
   ]);
 
   if (whatsappResult.error) throw whatsappResult.error;
@@ -339,21 +342,33 @@ export const getSystemHealthStats = async (userId: string): Promise<SystemHealth
   const whatsappConnections = whatsappResult.data || [];
   const apiConnections = whatsappConnections.filter(connection => connection.connection_subtype === 'api');
   const conversations = conversationsResult.data || [];
+  const activeAgentIds = new Set((presenceResult.data || [])
+    .filter(agent => new Date(agent.last_seen_at || 0).getTime() > Date.now() - 90_000 && !['busy', 'offline'].includes(agent.manual_override || agent.status || 'offline'))
+    .map(agent => agent.user_id));
+  const whatsappActive = whatsappConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length;
+  const whatsappApiActive = apiConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length;
+  const twilioActive = (twilioResult.data || []).filter(connection => ['connected', 'active'].includes(connection.status || '')).length;
+  const telegramActive = (telegramResult.data || []).filter(bot => ['connected', 'active'].includes(bot.status || '')).length;
 
   return {
     whatsappTotal: whatsappConnections.length,
-    whatsappActive: whatsappConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length,
+    whatsappActive,
     whatsappApiTotal: apiConnections.length,
-    whatsappApiActive: apiConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length,
+    whatsappApiActive,
     twilioTotal: twilioResult.data?.length || 0,
-    twilioActive: (twilioResult.data || []).filter(connection => ['connected', 'active'].includes(connection.status || '')).length,
+    twilioActive,
     telegramTotal: telegramResult.data?.length || 0,
-    telegramActive: (telegramResult.data || []).filter(bot => ['connected', 'active'].includes(bot.status || '')).length,
+    telegramActive,
     webchatTotal: webchatResult.data?.length || 0,
     webchatActive: (webchatResult.data || []).filter(chatbot => chatbot.is_active).length,
     pendingConversations: conversations.filter(conversation => (conversation.unread_count || 0) > 0).length,
-    offlineAssignedConversations: 0,
-    lastMessageAt: messagesResult.data?.[0]?.created_at || null
+    offlineAssignedConversations: conversations.filter(conversation => conversation.assigned_to && !activeAgentIds.has(conversation.assigned_to)).length,
+    lastMessageAt: messagesResult.data?.[0]?.created_at || null,
+    recentSendErrors: errorResult.count || 0,
+    aiActive: (aiResult.data || []).filter(agent => agent.is_active).length,
+    aiTotal: aiResult.data?.length || 0,
+    realtimeStatus: messagesResult.error ? 'Revisar' : 'Funcionando',
+    recommendedChannel: getRecommendedChannel({ whatsappQrActive: whatsappActive > whatsappApiActive, whatsappApiActive: whatsappApiActive > 0, twilioActive: twilioActive > 0, telegramActive: telegramActive > 0 })
   };
 };
 
