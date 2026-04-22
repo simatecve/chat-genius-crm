@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/hooks/useDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConsumptionAlertsPanel } from '@/components/dashboard/ConsumptionAlertsPanel';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -35,7 +36,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')
 
 export const Dashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
-  const { stats, recentLeads, activeConversations, messagesByHour, conversationsByHour, heatmapData, profitabilityStats, isLoading } = useDashboard(selectedPeriod);
+  const { stats, recentLeads, activeConversations, messagesByHour, conversationsByHour, heatmapData, profitabilityStats, consumptionAlertHistory, markConsumptionAlertRead, consumptionAlertsLoading, isLoading } = useDashboard(selectedPeriod);
 
   const periodMap: { [key: string]: 'today' | 'week' | 'month' | 'year' } = {
     'Hoy': 'today',
@@ -278,6 +279,12 @@ export const Dashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      <ConsumptionAlertsPanel
+        alerts={consumptionAlertHistory}
+        isLoading={consumptionAlertsLoading}
+        onMarkRead={markConsumptionAlertRead}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Conversaciones nuevas hoy</p><p className="mt-2 text-2xl font-bold">{stats.newConversationsToday}</p></CardContent></Card>
