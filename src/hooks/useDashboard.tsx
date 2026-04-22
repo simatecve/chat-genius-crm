@@ -35,6 +35,9 @@ const emptyProfitabilityStats: ChannelProfitabilityStats = {
   externalCost: 0,
   totalSavings: 0,
   dailySavings: 0,
+  weeklySavings: 0,
+  monthlyProjectedSavings: 0,
+  savingsPercentage: 0,
   mostExpensiveChannel: 'Sin consumo',
   mostProfitableChannel: 'Sin consumo',
   recommendedChannel: 'Sin consumo'
