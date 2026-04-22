@@ -120,6 +120,13 @@ export interface MonthlyChannelCostSnapshot {
   total_savings: number;
 }
 
+export interface OperationalAlert {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'info' | 'warning' | 'critical';
+}
+
 // Get all session counts for all channel types (for badges)
 export const getAllSessionCounts = async (userId: string): Promise<SessionCounts> => {
   const [whatsappResult, twilioResult, telegramResult, webchatResult] = await Promise.all([
@@ -370,6 +377,62 @@ export const getSystemHealthStats = async (userId: string): Promise<SystemHealth
     realtimeStatus: messagesResult.error ? 'Revisar' : 'Funcionando',
     recommendedChannel: getRecommendedChannel({ whatsappQrActive: whatsappActive > whatsappApiActive, whatsappApiActive: whatsappApiActive > 0, twilioActive: twilioActive > 0, telegramActive: telegramActive > 0 })
   };
+};
+
+export const getMonthlyChannelCostSnapshots = async (userId: string): Promise<MonthlyChannelCostSnapshot[]> => {
+  const { data, error } = await (supabase as any)
+    .from('monthly_channel_cost_snapshots')
+    .select('id, month, twilio_messages, whatsapp_api_messages, twilio_cost, whatsapp_api_cost, internal_cost, external_cost, total_savings')
+    .eq('user_id', userId)
+    .order('month', { ascending: false })
+    .limit(12);
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const upsertCurrentMonthlyChannelCostSnapshot = async (userId: string, stats: ChannelProfitabilityStats) => {
+  const month = new Date();
+  month.setDate(1);
+  const monthKey = month.toISOString().slice(0, 10);
+
+  const { error } = await (supabase as any)
+    .from('monthly_channel_cost_snapshots')
+    .upsert({
+      user_id: userId,
+      month: monthKey,
+      twilio_messages: stats.twilioMessages,
+      whatsapp_api_messages: stats.whatsappApiMessages,
+      twilio_cost: stats.twilioCost,
+      whatsapp_api_cost: stats.whatsappApiCost,
+      internal_cost: stats.internalCost,
+      external_cost: stats.externalCost,
+      total_savings: stats.totalSavings,
+    }, { onConflict: 'user_id,month' });
+
+  if (error) throw error;
+};
+
+export const getOperationalAlerts = (
+  profitability?: ChannelProfitabilityStats,
+  agents: AgentPerformanceStats[] = [],
+  health?: SystemHealthStats
+): OperationalAlert[] => {
+  const alerts: OperationalAlert[] = [];
+  if (profitability?.twilioCost && profitability.twilioCost > 150) {
+    alerts.push({ id: 'twilio-cost', title: 'Twilio con costo alto', description: `Twilio lleva $${profitability.twilioCost.toFixed(2)} USD.`, severity: 'critical' });
+  }
+  if (profitability && profitability.totalMessages > 0 && profitability.savingsPercentage < 35) {
+    alerts.push({ id: 'low-savings', title: 'Ahorro por debajo del objetivo', description: `El ahorro estimado está en ${profitability.savingsPercentage.toFixed(1)}%.`, severity: 'warning' });
+  }
+  const highVolumeAgent = agents.find(agent => agent.messagesSent > 500);
+  if (highVolumeAgent) {
+    alerts.push({ id: 'agent-volume', title: 'Cajero con volumen inusual', description: `${highVolumeAgent.name} envió ${highVolumeAgent.messagesSent} mensajes.`, severity: 'warning' });
+  }
+  if (health?.recentSendErrors && health.recentSendErrors > 0) {
+    alerts.push({ id: 'send-errors', title: 'Errores recientes de envío', description: `${health.recentSendErrors} envíos fallidos requieren revisión.`, severity: 'warning' });
+  }
+  return alerts;
 };
 
 // Helper function to get conversation IDs for a session
