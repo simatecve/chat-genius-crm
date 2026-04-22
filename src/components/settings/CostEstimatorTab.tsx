@@ -15,11 +15,14 @@ interface CostEstimatorTabProps {
   userId: string;
 }
 
+const BASE_INTERNAL_COST = 0.00445;
+const WHATSAPP_REFERENCE_COST = 0.0126;
+
 const COSTS = {
-  internal: 0.00712, // Aumentado 60% (0.00445 * 1.6)
+  internal: BASE_INTERNAL_COST * 1.60,
   twilio: 0.064,
-  whatsappAverage: 0.0126,
-  whatsappApi: 0.0126 * 0.60
+  whatsappAverage: WHATSAPP_REFERENCE_COST,
+  whatsappApi: WHATSAPP_REFERENCE_COST * 0.60
 };
 
 const emptyChannelCounts = { twilio: 0, whatsappApi: 0 };
@@ -216,6 +219,7 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           <CardContent>
             <p className="text-3xl font-bold text-primary">{formatCurrency(internalCost)}</p>
             <p className="text-sm text-muted-foreground mt-1">Costo aproximado por {totalMessageCount.toLocaleString()} mensajes reales</p>
+            <p className="text-xs text-muted-foreground mt-2">Tarifa referencial: ${COSTS.internal.toFixed(4)} USD por mensaje</p>
           </CardContent>
         </Card>
 
@@ -240,6 +244,7 @@ const CostEstimatorTab: React.FC<CostEstimatorTabProps> = ({ userId }) => {
           <CardContent>
             <p className="text-2xl font-semibold">{formatCurrency(whatsappApiCost)}</p>
             <p className="text-sm text-muted-foreground">40% menos que WhatsApp normal · {messageCounts.whatsappApi.toLocaleString()} mensajes</p>
+            <p className="text-xs text-muted-foreground mt-2">Tarifa referencial: ${COSTS.whatsappApi.toFixed(4)} USD por mensaje</p>
           </CardContent>
         </Card>
       </div>
