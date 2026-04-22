@@ -6,7 +6,10 @@ import {
   Send,
   ArrowDown,
   ArrowUp,
-  Clock
+  Clock,
+  AlertTriangle,
+  TrendingDown,
+  WalletCards
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,7 +35,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')
 
 export const Dashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
-  const { stats, recentLeads, activeConversations, messagesByHour, conversationsByHour, heatmapData, isLoading } = useDashboard(selectedPeriod);
+  const { stats, recentLeads, activeConversations, messagesByHour, conversationsByHour, heatmapData, profitabilityStats, isLoading } = useDashboard(selectedPeriod);
 
   const periodMap: { [key: string]: 'today' | 'week' | 'month' | 'year' } = {
     'Hoy': 'today',
@@ -92,6 +95,8 @@ export const Dashboard = () => {
     if (!phone) return 'Sin teléfono';
     return phone.startsWith('+') ? phone : `+${phone}`;
   };
+
+  const formatCurrency = (value: number) => `$${value.toFixed(2)} USD`;
 
   if (isLoading) {
     return (
@@ -221,6 +226,58 @@ export const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-primary" />
+              Resumen Ejecutivo de Costos
+            </CardTitle>
+            <Badge variant={profitabilityStats.recommendedChannel === 'WhatsApp API' ? 'default' : 'secondary'}>
+              Canal recomendado: {profitabilityStats.recommendedChannel}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border bg-background p-4">
+              <p className="text-sm text-muted-foreground">Costo externo</p>
+              <p className="mt-2 text-2xl font-bold">{formatCurrency(profitabilityStats.externalCost)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Twilio + WhatsApp API</p>
+            </div>
+            <div className="rounded-lg border bg-background p-4">
+              <p className="text-sm text-muted-foreground">Nuestro Sistema</p>
+              <p className="mt-2 text-2xl font-bold text-primary">{formatCurrency(profitabilityStats.internalCost)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Costo interno estimado</p>
+            </div>
+            <div className="rounded-lg border bg-background p-4">
+              <p className="text-sm text-muted-foreground">Ahorro estimado</p>
+              <p className="mt-2 text-2xl font-bold text-primary">{formatCurrency(profitabilityStats.totalSavings)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{formatCurrency(profitabilityStats.dailySavings)} por día</p>
+            </div>
+          </div>
+
+          {profitabilityStats.twilioCost > 150 && (
+            <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <p className="text-sm text-foreground">
+                Twilio lleva {formatCurrency(profitabilityStats.twilioCost)}. Conviene derivar tráfico a WhatsApp API para sostener una tarifa 30% menor.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 rounded-lg border bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Mensajes medidos: {profitabilityStats.totalMessages.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">Twilio: {profitabilityStats.twilioMessages.toLocaleString()} · WhatsApp API: {profitabilityStats.whatsappApiMessages.toLocaleString()}</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-primary">
+              <WalletCards className="h-4 w-4" /> {profitabilityStats.mostProfitableChannel}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts */}
       <Card className="bg-gradient-to-br from-card to-card/80">
