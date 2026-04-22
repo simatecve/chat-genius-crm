@@ -51,7 +51,7 @@ export interface SessionCounts {
   webchat: number;
 }
 
-const MESSAGE_COSTS = {
+export const MESSAGE_COSTS = {
   internal: 0.00445 * 1.60,
   twilio: 0.064,
   whatsappApi: 0.064 * 0.70
@@ -70,6 +70,32 @@ export interface ChannelProfitabilityStats {
   mostExpensiveChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
   mostProfitableChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
   recommendedChannel: 'WhatsApp API' | 'Twilio' | 'Sin consumo';
+}
+
+export interface AgentPerformanceStats {
+  id: string;
+  name: string;
+  email: string;
+  messagesSent: number;
+  assignedConversations: number;
+  unreadAssigned: number;
+  lastActivityAt: string | null;
+}
+
+export interface SystemHealthStats {
+  whatsappTotal: number;
+  whatsappActive: number;
+  whatsappApiTotal: number;
+  whatsappApiActive: number;
+  twilioTotal: number;
+  twilioActive: number;
+  telegramTotal: number;
+  telegramActive: number;
+  webchatTotal: number;
+  webchatActive: number;
+  pendingConversations: number;
+  offlineAssignedConversations: number;
+  lastMessageAt: string | null;
 }
 
 // Get all session counts for all channel types (for badges)
