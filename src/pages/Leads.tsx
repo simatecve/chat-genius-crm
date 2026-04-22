@@ -420,20 +420,81 @@ const Leads = () => {
   // Obtener leads desde el hook de paginación
   const paginatedLeads = useMemo(() => getAllLeads(), [getAllLeads]);
 
+  useEffect(() => {
+    const loadConversationIdsWithMessages = async () => {
+      if (!effectiveUserId || !dateFilterEnabled || dateFilterType !== 'messages_in_range') {
+        setConversationIdsWithMessages(new Set());
+        return;
+      }
+
+      setIsLoadingMessageRange(true);
+      try {
+        const ids = new Set<string>();
+        let from = 0;
+        const pageSize = 1000;
+        let keepLoading = true;
+
+        while (keepLoading) {
+          const { data, error } = await supabase
+            .from('messages')
+            .select('conversation_id')
+            .eq('user_id', effectiveUserId)
+            .gte('created_at', dateRange.startDate.toISOString())
+            .lte('created_at', dateRange.endDate.toISOString())
+            .range(from, from + pageSize - 1);
+
+          if (error) throw error;
+          (data || []).forEach(message => {
+            if (message.conversation_id) ids.add(message.conversation_id);
+          });
+          keepLoading = (data?.length || 0) === pageSize;
+          from += pageSize;
+        }
+
+        setConversationIdsWithMessages(ids);
+      } catch (error) {
+        console.error('Error loading conversation IDs by message range:', error);
+        setConversationIdsWithMessages(new Set());
+      } finally {
+        setIsLoadingMessageRange(false);
+      }
+    };
+
+    loadConversationIdsWithMessages();
+  }, [effectiveUserId, dateFilterEnabled, dateFilterType, dateRange.startDate, dateRange.endDate]);
+
   // Filtrar leads en tiempo real - usar siempre los leads paginados
   useEffect(() => {
-    if (!searchFilter.trim()) {
-      setFilteredLeads(paginatedLeads);
-    } else {
-      const filtered = paginatedLeads.filter(lead => {
+    const isInRange = (value?: string | null) => {
+      if (!value) return false;
+      const time = new Date(value).getTime();
+      return time >= dateRange.startDate.getTime() && time <= dateRange.endDate.getTime();
+    };
+
+    let filtered = paginatedLeads;
+
+    if (dateFilterEnabled) {
+      filtered = filtered.filter(lead => {
+        const conversation = lead.conversations?.[0];
+        if (dateFilterType === 'conversation_created') return isInRange(conversation?.created_at || lead.created_at);
+        if (dateFilterType === 'last_message') return isInRange(conversation?.last_message_time || lead.updated_at);
+        if (dateFilterType === 'last_inbound_message') return isInRange(conversation?.last_inbound_message_time || lead.last_inbound_message_time);
+        const conversationId = lead.originalConversationId || conversation?.id;
+        return Boolean(conversationId && conversationIdsWithMessages.has(conversationId));
+      });
+    }
+
+    if (searchFilter.trim()) {
+      filtered = filtered.filter(lead => {
         const searchTerm = searchFilter.toLowerCase();
         const nameMatch = lead.name?.toLowerCase().includes(searchTerm);
         const phoneMatch = lead.phone?.toLowerCase().includes(searchTerm);
         return nameMatch || phoneMatch;
       });
-      setFilteredLeads(filtered);
     }
-  }, [paginatedLeads, searchFilter]);
+
+    setFilteredLeads(filtered);
+  }, [paginatedLeads, searchFilter, dateFilterEnabled, dateFilterType, dateRange, conversationIdsWithMessages]);
   const loadData = async () => {
     try {
       setLoading(true);
