@@ -1,89 +1,254 @@
 
+# Plan actualizado: Costos WhatsApp API + filtros por rango de fechas
 
-# Plan: Optimización visual mobile — Embudos y Conversaciones
+## Objetivo
+Actualizar el plan anterior para que incluya:
 
-## Diagnóstico de problemas en mobile (≤768px)
+1. En la sección de **Costos**, agregar el costo de **WhatsApp API / clon WAHA** con mensajes **40% más baratos** que WhatsApp normal.
+2. Agregar un **filtro por fechas** en Costos para contar mensajes por rango y calcular consumos reales por período.
+3. Agregar en **Embudos** filtros por rango de fecha para buscar conversaciones:
+   - Por fecha de creación de la conversación.
+   - Por conversaciones que tuvieron mensajes dentro de un rango de fechas.
 
-**Conversations (`/conversations`)**:
-- 3 `ResizablePanel` siempre montados en paralelo → en mobile se aplastan a ~120px cada uno, ilegibles.
-- Lista, chat y panel de info compiten por el mismo ancho.
-- Header del chat con nombre + teléfono + sesión Twilio + 3 botones se desborda.
-- `ConversationList` muestra 3 selects apilados (asignación, modo, sesión) + workspace + embudos → ocupa media pantalla antes de ver chats.
-- `AppLayout` aplica `p-6` (24px) en mobile → desperdicia ancho útil.
+---
 
-**Leads / Embudos (`/leads`)**:
-- `KanbanBoard` con `flex gap-4 overflow-x-auto` y columnas de `w-64` (256px) → en mobile se ven 1.3 columnas, scroll horizontal incómodo.
-- `LeadCard` con avatar 40px + 3 filas de info → se ven bien pero el contenedor padre desperdicia espacio.
-- Tooltips de columna no funcionan con touch.
-- `AppLayout p-6` recorta el ancho del board.
+## 1. Sección Costos: WhatsApp API 40% más barato
 
-## Cambios propuestos
+Archivo principal:
+- `src/components/settings/CostEstimatorTab.tsx`
 
-### 1. `src/components/layout/AppLayout.tsx` — padding adaptativo
-- `<main>`: `p-3 md:p-6` (12px en mobile, 24px en desktop).
-- En rutas de pantalla completa (Conversations, Leads), reducir aún más: usar `p-0 md:p-6` cuando la página lo necesite. Solución simple: agregar prop `noPadding` opcional, o detectar por route en el contenedor de la página.
+Cambios:
+- Mantener los costos actuales de WhatsApp normal.
+- Agregar una nueva categoría `whatsappApi`, calculada automáticamente así:
 
-### 2. `src/pages/Conversations.tsx` — layout mobile en pestañas
-**Mobile (`useIsMobile()`)**: Reemplazar `ResizablePanelGroup` por una **vista de una sola columna con navegación tipo drill-down**:
-- Sin conversación seleccionada → mostrar solo `ConversationList` a pantalla completa.
-- Con conversación seleccionada → mostrar solo `ChatArea` con botón "← volver" en el header que limpia `selectedConversation`.
-- `ContactInfoPanel` se abre como `Sheet` (drawer lateral derecho) al tocar el botón `UserCircle` — nunca como panel fijo en mobile.
+```ts
+whatsappApi = whatsapp * 0.60
+```
 
-**Desktop**: Mantener layout actual con 3 paneles redimensionables.
+Ejemplo:
+- WhatsApp México actual: `0.0098`
+- WhatsApp API México: `0.00588`
 
-### 3. `src/components/conversations/ConversationList.tsx` — filtros colapsables
-- En mobile, **colapsar los selects** dentro de un botón "Filtros" que abre un `Sheet`/`Collapsible`. Solo se ven por defecto: título "Chats", badge de no leídos, y barra de búsqueda.
-- Reducir `p-4` del header a `p-3` en mobile.
-- `ConversationItem`: avatar `h-12 w-12` → `h-11 w-11` en mobile, `text-base` → `text-sm`, `p-4` → `p-3`.
-- Tags: limitar a 2 visibles en mobile (en vez de 3) + contador.
+Se mostrarán nuevas tarjetas:
+- WhatsApp API - Norteamérica
+- WhatsApp API - México
+- WhatsApp API - Latinoamérica
+- WhatsApp API - España/Europa
 
-### 4. `src/components/conversations/ChatArea.tsx` — header mobile compacto
-- En mobile añadir botón **"← volver"** al inicio del header (`onBack` prop pasada desde `Conversations`).
-- Compactar título: nombre en una línea con `truncate`, teléfono debajo en `text-[11px]`.
-- Mover el badge de sesión Twilio del header a una línea inferior solo cuando exista.
-- Botones del header: ocultar `AssignToKanban` y meterlo en el `DropdownMenu` (3 puntos) en mobile. Mantener visibles solo `UserCircle` (info) y `MoreVertical`.
-- Reducir `p-4` del área de mensajes a `p-3` en mobile.
-- Input de mensaje: aumentar `min-h` táctil a 44px y reducir gap entre íconos.
+Diseño:
+- Usar identidad visual de WhatsApp API:
+  - Icono `Plug`
+  - Color violeta
+  - Texto: `40% menos que WhatsApp normal`
 
-### 5. `src/components/conversations/ContactInfoPanel.tsx` — modo Sheet en mobile
-- Cuando se abra desde mobile, renderizarlo dentro de un `Sheet` lateral derecho a 90% de ancho con scroll vertical, no como tercer panel.
-- Implementación: el panel ya existe como componente, solo se cambia el wrapper en `Conversations.tsx`.
+También se ampliará la comparativa de ahorro para comparar:
+- Nuestro Sistema vs WhatsApp normal
+- Nuestro Sistema vs WhatsApp API
 
-### 6. `src/components/KanbanBoard.tsx` — vista mobile mejorada
-**Opción A — recomendada (snap horizontal "una columna a la vez")**:
-- En mobile cambiar columnas de `w-64` (256px) a `w-[85vw] max-w-[320px]`.
-- Agregar `snap-x snap-mandatory` al contenedor y `snap-center` a cada columna → al hacer swipe, cada columna se centra como si fueran "tarjetas".
-- Indicador de paginación abajo (puntitos): muestra en qué columna estás de N totales.
-- Reducir `gap-4` a `gap-3` en mobile, `pb-4` a `pb-2`.
-- Header de columna: reducir `pt-4 pb-3` a `pt-3 pb-2`, y `text-sm uppercase` a `text-xs uppercase`.
-- `LeadCard`: avatar `w-10 h-10` → `w-9 h-9`, padding `p-3` → `p-2.5`. Limitar tags visibles a 2 en mobile.
-- Tooltip del nombre de columna: convertirlo a click/long-press en mobile (`onClick` muestra un toast con conteo) para que sea accesible sin hover.
+---
 
-### 7. `src/components/conversations/EmbudosFilter.tsx` — chips touch-friendly
-- Reducir `px-5 py-2` a `px-4 py-1.5` en mobile para que entren más chips visibles.
-- Mantener scroll horizontal pero agregar `gap-1.5` (en vez de `gap-2`) y `pb-2` para que el último chip no se corte.
+## 2. Costos: filtro por fechas para contar mensajes y consumos
 
-## Lo que NO se toca
+Archivo principal:
+- `src/components/settings/CostEstimatorTab.tsx`
 
-- Lógica de negocio (envío de mensajes, asignación, embudos, real-time).
-- Comportamiento desktop — todo lo nuevo va detrás de `useIsMobile()`.
-- Estructura de datos, hooks, servicios.
-- Sidebar/Header (ya tienen su propio comportamiento mobile).
+Cambios:
+- Agregar selector de rango de fechas arriba del estimador:
+  - Hoy
+  - Últimos 7 días
+  - Últimos 30 días
+  - Este mes
+  - Rango personalizado
 
-## Detalles técnicos
+El conteo real de mensajes dejará de ser solo:
 
-- **Hook clave**: `useIsMobile()` (ya existe en `src/hooks/use-mobile.tsx`, breakpoint 768px).
-- **Componentes UI nuevos a usar**: `Sheet` (ya está en `ui/sheet.tsx`) para ContactInfoPanel y Filtros.
-- **Patrón de drill-down mobile** en Conversations: condicional sobre `isMobile && !selectedConversation` vs `isMobile && selectedConversation`. No requiere router nuevo, solo conditional render.
-- **Snap scroll**: `snap-x snap-mandatory` en el container y `snap-center shrink-0` en cada columna. Compatible con todos los navegadores modernos.
-- **Indicador de columna activa**: `IntersectionObserver` sobre las columnas visibles + state local con índice activo.
-- **Touch targets**: garantizar mínimo 40×40px en todos los botones interactivos en mobile (botones del header, chips de filtro, botones del lead card).
-- **Sin cambios a tipos TypeScript** salvo añadir `onBack?: () => void` opcional a `ChatAreaProps`.
+```ts
+messages where user_id = userId
+```
+
+Y pasará a usar filtros opcionales:
+
+```ts
+messages
+  .eq('user_id', userId)
+  .gte('created_at', startDate)
+  .lte('created_at', endDate)
+```
+
+Resultado:
+- El campo “Cantidad de mensajes” mostrará el total del rango seleccionado.
+- Las tarjetas de costo se recalcularán según ese rango.
+- El botón “Actualizar datos” contará mensajes del período activo.
+- Se agregará texto descriptivo, por ejemplo:
+  - `Consumo calculado del 01 Abr 2026 al 21 Abr 2026`
+  - `Se encontraron 12.450 mensajes en este rango`
+
+Detalles técnicos:
+- Usar `Calendar` de `src/components/ui/calendar.tsx`.
+- Agregar `pointer-events-auto` al calendario para asegurar que funcione bien dentro de popovers/dialogs.
+- Usar `date-fns` para formateo en español, siguiendo el patrón existente de `DateRangeSelector`.
+
+---
+
+## 3. Embudos: filtros por rango de fecha
+
+Archivos principales:
+- `src/pages/Leads.tsx`
+- `src/hooks/useInfiniteLeads.ts`
+
+Se agregará un bloque de filtros en la vista de Embudos, junto al workspace y búsqueda.
+
+Filtros nuevos:
+- Tipo de fecha:
+  - `Conversación creada`
+  - `Último mensaje`
+  - `Último mensaje recibido`
+  - `Mensajes dentro del rango`
+- Rango de fechas:
+  - Hoy
+  - Últimos 7 días
+  - Últimos 30 días
+  - Este mes
+  - Personalizado
+- Botón `Limpiar filtros`
+
+---
+
+## 4. Embudos: filtro por conversaciones creadas en rango
+
+Cuando el usuario seleccione “Conversación creada”, se filtrarán conversaciones/leads según:
+
+```ts
+conversations.created_at >= startDate
+conversations.created_at <= endDate
+```
+
+Aplica para:
+- Leads reales con conversación asociada.
+- Conversaciones huérfanas convertidas en leads virtuales.
+
+Uso esperado:
+- “Muéstrame conversaciones creadas esta semana”
+- “Muéstrame conversaciones nuevas de marzo”
+- “Muéstrame embudos con conversaciones iniciadas hoy”
+
+---
+
+## 5. Embudos: filtro por último mensaje / último mensaje recibido
+
+Cuando el usuario seleccione “Último mensaje”, se filtrará por:
+
+```ts
+conversations.last_message_time
+```
+
+Cuando seleccione “Último mensaje recibido”, se filtrará por:
+
+```ts
+conversations.last_inbound_message_time
+```
+
+Uso esperado:
+- “Conversaciones activas en los últimos 7 días”
+- “Clientes que escribieron hoy”
+- “Conversaciones sin actividad reciente quedan fuera del tablero filtrado”
+
+---
+
+## 6. Embudos: conversaciones con mensajes dentro del rango
+
+Para el filtro más preciso, “Mensajes dentro del rango”, se consultará la tabla `messages`.
+
+Lógica:
+1. Buscar mensajes del usuario en el rango:
+
+```ts
+messages
+  .eq('user_id', effectiveUserId)
+  .gte('created_at', startDate)
+  .lte('created_at', endDate)
+  .select('conversation_id')
+```
+
+2. Obtener IDs únicos de conversaciones.
+3. Filtrar el tablero para mostrar solo leads/conversaciones cuyo `conversation_id` esté en esa lista.
+
+Esto permite responder:
+- “Qué conversaciones tuvieron mensajes entre el lunes y el viernes”
+- “Qué clientes consumieron mensajes este mes”
+- “Qué embudos tuvieron actividad real en un rango”
+
+Importante:
+- Este filtro se hará con paginación/límites para evitar cargar miles de mensajes completos.
+- Solo se traerán IDs de conversaciones, no contenido de mensajes, para reducir consumo de datos.
+
+---
+
+## 7. UI en Embudos
+
+Cambios visuales:
+- Agregar botón o barra compacta de filtros:
+  - `Fechas`
+  - `Tipo: Último mensaje / Creación / Mensajes`
+  - `Limpiar`
+- En mobile, el filtro se mostrará compacto para no romper la vista optimizada de embudos.
+- Mostrar indicador cuando haya filtro activo:
+
+```text
+Mostrando 34 conversaciones con mensajes entre 01 Abr y 21 Abr
+```
+
+Si no hay resultados:
+```text
+No hay conversaciones en este rango de fechas
+```
+
+---
+
+## 8. Integración con búsqueda actual
+
+Actualmente Embudos filtra por:
+- Nombre
+- Teléfono
+
+Se mantendrá esa búsqueda y se combinará con el nuevo filtro de fechas.
+
+Orden lógico:
+1. Leads/conversaciones cargadas.
+2. Aplicar filtro por fecha.
+3. Aplicar búsqueda por nombre/teléfono.
+4. Mostrar resultado en `KanbanBoard`.
+
+---
+
+## 9. Sin cambios de base de datos
+
+No se crearán tablas nuevas.
+No se modificará la estructura de Supabase.
+No se tocarán políticas RLS.
+No se borrarán datos.
+
+Todo se implementa en frontend usando las tablas existentes:
+- `messages`
+- `conversations`
+- `leads`
+
+---
 
 ## Resultado esperado
 
-- Conversaciones: experiencia tipo WhatsApp mobile (lista → chat → info como drawer).
-- Embudos: una columna a la vez con swipe lateral natural, chips de embudo más compactos, tarjetas más densas.
-- Cero cambios visuales en desktop.
-- Mejor uso del ancho de pantalla en todas las vistas mobile (ahorro ~24-32px de padding).
+### En Costos
+Podrás ver:
+- Cuántos mensajes se consumieron en un rango.
+- Cuánto cuesta ese consumo en Nuestro Sistema.
+- Cuánto costaría en WhatsApp normal.
+- Cuánto costaría en WhatsApp API / clon WAHA con 40% de descuento.
 
+### En Embudos
+Podrás filtrar el tablero por:
+- Conversaciones creadas en un período.
+- Conversaciones con último mensaje en un período.
+- Conversaciones con último mensaje recibido en un período.
+- Conversaciones que tuvieron mensajes reales dentro de un rango.
+
+Esto permitirá analizar consumo y actividad por días, semanas, meses o rangos personalizados.
