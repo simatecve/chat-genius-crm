@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, memo, useMemo } from 'react';
-import { Search, MessageCircle, Phone, Send, SlidersHorizontal } from 'lucide-react';
+import { Search, MessageCircle, Phone, Send, SlidersHorizontal, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -92,6 +92,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
     if (selectedSessionFilter) n++;
     return n;
   }, [assignmentFilter, filterMode, selectedSessionFilter]);
+
+  const pendingCount = useMemo(
+    () => conversations.filter(conversation => (conversation.unread_count || 0) > 0).length,
+    [conversations]
+  );
 
   // Cargar etiquetas de contactos - lazy loading con debounce
   // Solo cargar cuando hay conversaciones visibles, no en cada cambio
@@ -198,6 +203,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todas las conversaciones</SelectItem>
+          <SelectItem value="pending">Sin responder</SelectItem>
           <SelectItem value="unassigned">Sin embudo asignado</SelectItem>
           <SelectItem value="funnel">Por embudo</SelectItem>
         </SelectContent>
@@ -289,6 +295,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar conversaciones..." value={searchTerm} onChange={e => onSearchChange(e.target.value)} className="pl-10" />
         </div>
+
+        {filterMode === 'pending' && (
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <AlertCircle className="h-4 w-4 text-primary" />
+            <span>{pendingCount} conversación{pendingCount === 1 ? '' : 'es'} con mensajes pendientes</span>
+          </div>
+        )}
       </div>
 
       {/* Filtro de Embudos (solo cuando filterMode es 'funnel') */}

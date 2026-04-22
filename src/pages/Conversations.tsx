@@ -21,7 +21,7 @@ import { toast } from '@/hooks/use-toast';
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
 
-export type FilterMode = 'all' | 'unassigned' | 'funnel';
+export type FilterMode = 'all' | 'unassigned' | 'funnel' | 'pending';
 
 export interface SessionOption {
   id: string;
@@ -195,9 +195,11 @@ const Conversations = () => {
       }
     }
     
-    // 3. Filtrar por modo de embudo
+    // 3. Filtrar por modo operativo/embudo
     if (filterMode === 'unassigned') {
       filtered = filtered.filter(conv => !conv.lead_id);
+    } else if (filterMode === 'pending') {
+      filtered = filtered.filter(conv => (conv.unread_count || 0) > 0);
     } else if (filterMode === 'funnel') {
       if (selectedEmbudo) {
         filtered = filtered.filter(conv => conv.lead_id && embudoLeadIds.includes(conv.lead_id));
@@ -205,7 +207,7 @@ const Conversations = () => {
         filtered = filtered.filter(conv => conv.lead_id && workspaceLeadIds.includes(conv.lead_id));
       }
     }
-    // Si filterMode === 'all', no filtra por lead_id
+    // Si filterMode === 'all', no filtra por lead_id ni pendientes
 
     // 4. Filtrar por asignación
     if (assignmentFilter === 'mine' && user?.id) {
