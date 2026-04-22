@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare, RefreshCw, Loader2, CalendarDays, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Tables } from '@/integrations/supabase/types';
@@ -21,6 +21,10 @@ import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 import ChatModal from '@/components/conversations/ChatModal';
 import { useMessages, useConversations } from '@/hooks/useConversations';
+import { DateRangeSelector } from '@/components/reports/DateRangeSelector';
+import type { DateRange } from '@/services/reportsService';
+import { endOfDay, format, startOfDay, startOfMonth, subDays } from 'date-fns';
+import { es } from 'date-fns/locale';
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 type Workspace = Tables<'workspaces'>;
@@ -28,6 +32,7 @@ interface ConversationSummary {
   id: string;
   phone_number: string;
   pushname: string | null;
+  created_at?: string | null;
   last_message: string | null;
   last_message_time: string | null;
   last_inbound_message_time?: string | null;
@@ -40,6 +45,22 @@ interface LeadWithColumn extends Lead {
   isVirtual?: boolean; // Flag para identificar leads creados desde conversaciones huérfanas
   originalConversationId?: string; // ID de la conversación original para leads virtuales
 }
+type FunnelDateFilterType = 'conversation_created' | 'last_message' | 'last_inbound_message' | 'messages_in_range';
+
+const createFunnelPresetRange = (preset: 'today' | '7days' | '30days' | 'thisMonth'): DateRange => {
+  const now = new Date();
+  if (preset === 'today') return { startDate: startOfDay(now), endDate: endOfDay(now) };
+  if (preset === '7days') return { startDate: startOfDay(subDays(now, 6)), endDate: endOfDay(now) };
+  if (preset === '30days') return { startDate: startOfDay(subDays(now, 29)), endDate: endOfDay(now) };
+  return { startDate: startOfDay(startOfMonth(now)), endDate: endOfDay(now) };
+};
+
+const dateFilterLabels: Record<FunnelDateFilterType, string> = {
+  conversation_created: 'Conversación creada',
+  last_message: 'Último mensaje',
+  last_inbound_message: 'Último mensaje recibido',
+  messages_in_range: 'Mensajes dentro del rango'
+};
 const Leads = () => {
   const {
     user
