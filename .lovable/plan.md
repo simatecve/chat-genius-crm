@@ -1,37 +1,114 @@
 
+# Plan: Recalcular costo promedio real de Twilio
 
-# Plan: Simplificar Costos — Solo Twilio y WhatsApp API (sin regiones)
+## Objetivo
+Actualizar la sección de **Costos** para que Twilio use un costo promedio real basado en el consumo de este mes:
 
-## Cambios en `src/components/settings/CostEstimatorTab.tsx`
+- Mensajes Twilio: `3.122`
+- Costo real aproximado: `200 USD`
+- Costo promedio por mensaje:
 
-### 1. Eliminar tarjetas por regiones
-Quitar el mapeo `(Object.keys(REGION_LABELS) as RegionKey[]).map()` para WhatsApp normal y WhatsApp API. Solo dejar la tarjeta "Nuestro Sistema".
+```text
+200 / 3122 = 0.06406 USD por mensaje
+```
 
-### 2. Agregar tarjeta de Twilio
-Si existe costo de Twilio configurado (buscar en constants o definirlo), mostrar una tarjeta única "Twilio" con su costo. Si no existe constante Twilio, usar el valor estándar aproximado.
+Actualmente Twilio está configurado en:
 
-### 3. Agregar tarjeta única de WhatsApp API
-Una sola tarjeta "WhatsApp API" con costo calculado como `COSTS.whatsapp * 0.60` (40% menos que el promedio de WhatsApp normal, o usar una media ponderada).
+```ts
+twilio: 0.0079
+```
 
-### 4. Simplificar comparativa de ahorro
-Reemplazar la grilla actual que muestra 8 comparaciones (4 regiones × 2 tipos) por solo 2 comparaciones:
-- vs Twilio
-- vs WhatsApp API (40% menos)
+Ese valor genera:
 
-### 5. Código a eliminar
-- `REGION_LABELS` y el tipo `RegionKey`
-- El mapeo de regiones en las tarjetas de costo
-- El mapeo de regiones en la comparativa de ahorro
-- `whatsappApiRates` por región, usar un solo valor
+```text
+3122 × 0.0079 = 24.66 USD
+```
 
-### 6. Costos a mantener
-- `COSTS.internal` (Nuestro Sistema)
-- `COSTS.twilio` (nuevo, o usar valor estándar)
-- `COSTS.whatsappApi` = `COSTS.whatsappPromedio * 0.60`
+Por eso el estimador queda muy por debajo del costo real.
+
+---
+
+## Cambio principal
+
+Archivo:
+- `src/components/settings/CostEstimatorTab.tsx`
+
+Actualizar la tarifa de Twilio:
+
+```ts
+twilio: 0.0079
+```
+
+por:
+
+```ts
+twilio: 0.064
+```
+
+Esto hará que para `3.122` mensajes el cálculo sea aproximadamente:
+
+```text
+3122 × 0.064 = 199.81 USD
+```
+
+---
+
+## Ajustes visuales en la sección de Costos
+
+En la tarjeta de **Twilio**, agregar una nota clara:
+
+```text
+Promedio real actualizado: $0.064 USD por mensaje
+```
+
+Y opcionalmente:
+
+```text
+Basado en consumo real mensual aproximado
+```
+
+Así queda claro que no es una tarifa oficial fija, sino un promedio operativo real.
+
+---
+
+## Impacto en los cálculos
+
+Se actualizarán automáticamente:
+
+1. Tarjeta **Twilio**
+   - Mostrará el costo estimado real usando `0.064 USD` por mensaje.
+
+2. Comparativa de ahorro
+   - El ahorro vs Twilio será mucho más alto y más cercano al costo real del mes.
+
+3. Costos separados por canal
+   - Se mantiene la separación actual:
+     - Mensajes Twilio × tarifa Twilio real promedio.
+     - Mensajes WhatsApp API × tarifa WhatsApp API.
+     - Nuestro Sistema × tarifa interna.
+
+---
+
+## No se modificará
+
+- No se cambiará el conteo de mensajes.
+- No se cambiará WhatsApp API.
+- No se cambiará la tarifa interna de “Nuestro Sistema”.
+- No se modificarán tablas ni políticas de Supabase.
+- No se tocarán embudos ni filtros de fechas.
 
 ## Resultado esperado
-- Solo 3 tarjetas de costo: Nuestro Sistema, Twilio, WhatsApp API
-- Comparativa de ahorro: solo vs Twilio y vs WhatsApp API
-- Sin desgloses por Norteamérica, México, Latinoamérica, Europa
-- Código más limpio y fácil de mantener
 
+Cuando Twilio tenga `3.122` mensajes, el estimador mostrará aproximadamente:
+
+```text
+Twilio: $199.81 USD
+```
+
+en lugar de:
+
+```text
+Twilio: $24.66 USD
+```
+
+Esto alinea el estimador con el costo real aproximado reportado.
