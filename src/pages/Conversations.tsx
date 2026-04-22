@@ -21,7 +21,7 @@ import { toast } from '@/hooks/use-toast';
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
 
-export type FilterMode = 'all' | 'unassigned' | 'funnel' | 'pending';
+export type FilterMode = 'all' | 'unassigned' | 'funnel' | 'pending' | 'stale' | 'offline' | 'bot_off' | 'urgent';
 
 export interface SessionOption {
   id: string;
@@ -53,6 +53,7 @@ const Conversations = () => {
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [selectedSessionFilter, setSelectedSessionFilter] = useState<string | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
+  const [onlineAgentIds, setOnlineAgentIds] = useState<string[]>([]);
 
   // Hooks para gestionar datos
   const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
@@ -160,6 +161,19 @@ const Conversations = () => {
   }, [selectedWorkspace]);
 
   useEffect(() => {
+    const loadPresence = async () => {
+      if (!effectiveUserId) return;
+      const { data } = await supabase
+        .from('agent_presence')
+        .select('user_id, status, manual_override, last_seen_at')
+        .eq('account_owner_id', effectiveUserId)
+        .gte('last_seen_at', new Date(Date.now() - 90_000).toISOString());
+      setOnlineAgentIds((data || []).filter(agent => !['busy', 'offline'].includes(agent.manual_override || agent.status || 'offline')).map(agent => agent.user_id));
+    };
+    loadPresence();
+  }, [effectiveUserId]);
+
+  useEffect(() => {
     const loadLeadsByEmbudo = async () => {
       if (!selectedEmbudo) {
         setEmbudoLeadIds([]);
@@ -200,6 +214,15 @@ const Conversations = () => {
       filtered = filtered.filter(conv => !conv.lead_id);
     } else if (filterMode === 'pending') {
       filtered = filtered.filter(conv => (conv.unread_count || 0) > 0);
+    } else if (filterMode === 'stale') {
+      const cutoff = Date.now() - 30 * 60 * 1000;
+      filtered = filtered.filter(conv => (conv.unread_count || 0) > 0 && new Date(conv.last_inbound_message_time || conv.last_message_time || conv.created_at || 0).getTime() < cutoff);
+    } else if (filterMode === 'offline') {
+      filtered = filtered.filter(conv => conv.assigned_to && !onlineAgentIds.includes(conv.assigned_to));
+    } else if (filterMode === 'bot_off') {
+      filtered = filtered.filter((conv: any) => (conv.unread_count || 0) > 0 && !onlineAgentIds.includes(conv.assigned_to || '') && conv.channel_type !== 'webchat');
+    } else if (filterMode === 'urgent') {
+      filtered = filtered.filter(conv => !!conv.payment_receipt_detected_at || (conv.last_message || '').toLowerCase().includes('comprobante'));
     } else if (filterMode === 'funnel') {
       if (selectedEmbudo) {
         filtered = filtered.filter(conv => conv.lead_id && embudoLeadIds.includes(conv.lead_id));
@@ -224,7 +247,7 @@ const Conversations = () => {
     });
     
     return filtered;
-  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds, filterMode, selectedSessionFilter, sessionOptions, assignmentFilter, user?.id]);
+  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds, filterMode, selectedSessionFilter, sessionOptions, assignmentFilter, user?.id, onlineAgentIds]);
 
   // Seleccionar conversación automáticamente desde navegación de embudos
   useEffect(() => {
