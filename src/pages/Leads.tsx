@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, MoreVertical, Building, Mail, Phone, DollarSign, Users, Search, ChevronDown, ArrowLeft, MessageSquare, RefreshCw, Loader2, CalendarDays, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Tables } from '@/integrations/supabase/types';
@@ -21,6 +21,10 @@ import KanbanBoard from '@/components/KanbanBoard';
 import { MessageTriggersDialog } from '@/components/MessageTriggersDialog';
 import ChatModal from '@/components/conversations/ChatModal';
 import { useMessages, useConversations } from '@/hooks/useConversations';
+import { DateRangeSelector } from '@/components/reports/DateRangeSelector';
+import type { DateRange } from '@/services/reportsService';
+import { endOfDay, format, startOfDay, startOfMonth, subDays } from 'date-fns';
+import { es } from 'date-fns/locale';
 type LeadColumn = Tables<'lead_columns'>;
 type Lead = Tables<'leads'>;
 type Workspace = Tables<'workspaces'>;
@@ -28,6 +32,7 @@ interface ConversationSummary {
   id: string;
   phone_number: string;
   pushname: string | null;
+  created_at?: string | null;
   last_message: string | null;
   last_message_time: string | null;
   last_inbound_message_time?: string | null;
@@ -40,6 +45,22 @@ interface LeadWithColumn extends Lead {
   isVirtual?: boolean; // Flag para identificar leads creados desde conversaciones huérfanas
   originalConversationId?: string; // ID de la conversación original para leads virtuales
 }
+type FunnelDateFilterType = 'conversation_created' | 'last_message' | 'last_inbound_message' | 'messages_in_range';
+
+const createFunnelPresetRange = (preset: 'today' | '7days' | '30days' | 'thisMonth'): DateRange => {
+  const now = new Date();
+  if (preset === 'today') return { startDate: startOfDay(now), endDate: endOfDay(now) };
+  if (preset === '7days') return { startDate: startOfDay(subDays(now, 6)), endDate: endOfDay(now) };
+  if (preset === '30days') return { startDate: startOfDay(subDays(now, 29)), endDate: endOfDay(now) };
+  return { startDate: startOfDay(startOfMonth(now)), endDate: endOfDay(now) };
+};
+
+const dateFilterLabels: Record<FunnelDateFilterType, string> = {
+  conversation_created: 'Conversación creada',
+  last_message: 'Último mensaje',
+  last_inbound_message: 'Último mensaje recibido',
+  messages_in_range: 'Mensajes dentro del rango'
+};
 const Leads = () => {
   const {
     user
@@ -88,6 +109,11 @@ const Leads = () => {
   const [filteredLeads, setFilteredLeads] = useState<LeadWithColumn[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dateFilterType, setDateFilterType] = useState<FunnelDateFilterType>('last_message');
+  const [dateRange, setDateRange] = useState<DateRange>(() => createFunnelPresetRange('30days'));
+  const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
+  const [conversationIdsWithMessages, setConversationIdsWithMessages] = useState<Set<string>>(new Set());
+  const [isLoadingMessageRange, setIsLoadingMessageRange] = useState(false);
 
   // Obtener IDs de columnas y columna por defecto
   const columnIds = useMemo(() => columns.map(c => c.id), [columns]);
@@ -101,6 +127,10 @@ const Leads = () => {
     const workspace = workspaces.find(w => w.id === selectedWorkspace);
     return workspace?.channel_type || null;
   }, [workspaces, selectedWorkspace]);
+
+  const dateRangeLabel = useMemo(() => (
+    `${format(dateRange.startDate, 'dd MMM yyyy', { locale: es })} al ${format(dateRange.endDate, 'dd MMM yyyy', { locale: es })}`
+  ), [dateRange]);
 
   // Hook de paginación infinita
   const {
@@ -390,20 +420,81 @@ const Leads = () => {
   // Obtener leads desde el hook de paginación
   const paginatedLeads = useMemo(() => getAllLeads(), [getAllLeads]);
 
+  useEffect(() => {
+    const loadConversationIdsWithMessages = async () => {
+      if (!effectiveUserId || !dateFilterEnabled || dateFilterType !== 'messages_in_range') {
+        setConversationIdsWithMessages(new Set());
+        return;
+      }
+
+      setIsLoadingMessageRange(true);
+      try {
+        const ids = new Set<string>();
+        let from = 0;
+        const pageSize = 1000;
+        let keepLoading = true;
+
+        while (keepLoading) {
+          const { data, error } = await supabase
+            .from('messages')
+            .select('conversation_id')
+            .eq('user_id', effectiveUserId)
+            .gte('created_at', dateRange.startDate.toISOString())
+            .lte('created_at', dateRange.endDate.toISOString())
+            .range(from, from + pageSize - 1);
+
+          if (error) throw error;
+          (data || []).forEach(message => {
+            if (message.conversation_id) ids.add(message.conversation_id);
+          });
+          keepLoading = (data?.length || 0) === pageSize;
+          from += pageSize;
+        }
+
+        setConversationIdsWithMessages(ids);
+      } catch (error) {
+        console.error('Error loading conversation IDs by message range:', error);
+        setConversationIdsWithMessages(new Set());
+      } finally {
+        setIsLoadingMessageRange(false);
+      }
+    };
+
+    loadConversationIdsWithMessages();
+  }, [effectiveUserId, dateFilterEnabled, dateFilterType, dateRange.startDate, dateRange.endDate]);
+
   // Filtrar leads en tiempo real - usar siempre los leads paginados
   useEffect(() => {
-    if (!searchFilter.trim()) {
-      setFilteredLeads(paginatedLeads);
-    } else {
-      const filtered = paginatedLeads.filter(lead => {
+    const isInRange = (value?: string | null) => {
+      if (!value) return false;
+      const time = new Date(value).getTime();
+      return time >= dateRange.startDate.getTime() && time <= dateRange.endDate.getTime();
+    };
+
+    let filtered = paginatedLeads;
+
+    if (dateFilterEnabled) {
+      filtered = filtered.filter(lead => {
+        const conversation = lead.conversations?.[0];
+        if (dateFilterType === 'conversation_created') return isInRange(conversation?.created_at || lead.created_at);
+        if (dateFilterType === 'last_message') return isInRange(conversation?.last_message_time || lead.updated_at);
+        if (dateFilterType === 'last_inbound_message') return isInRange(conversation?.last_inbound_message_time || lead.last_inbound_message_time);
+        const conversationId = lead.originalConversationId || conversation?.id;
+        return Boolean(conversationId && conversationIdsWithMessages.has(conversationId));
+      });
+    }
+
+    if (searchFilter.trim()) {
+      filtered = filtered.filter(lead => {
         const searchTerm = searchFilter.toLowerCase();
         const nameMatch = lead.name?.toLowerCase().includes(searchTerm);
         const phoneMatch = lead.phone?.toLowerCase().includes(searchTerm);
         return nameMatch || phoneMatch;
       });
-      setFilteredLeads(filtered);
     }
-  }, [paginatedLeads, searchFilter]);
+
+    setFilteredLeads(filtered);
+  }, [paginatedLeads, searchFilter, dateFilterEnabled, dateFilterType, dateRange, conversationIdsWithMessages]);
   const loadData = async () => {
     try {
       setLoading(true);
@@ -572,6 +663,7 @@ const Leads = () => {
           id,
           phone_number,
           pushname,
+          created_at,
           last_message,
           last_message_time,
           last_inbound_message_time,
@@ -693,6 +785,7 @@ const Leads = () => {
         id: conv.id,
         phone_number: conv.phone_number,
         pushname: conv.pushname,
+          created_at: conv.created_at,
         last_message: conv.last_message,
         last_message_time: conv.last_message_time,
         last_inbound_message_time: conv.last_inbound_message_time,
@@ -1176,18 +1269,89 @@ const Leads = () => {
         </div>
       </div>
 
-      {/* Search Filter */}
-      
+      {/* Search and date filters */}
+      <Card className="border-border bg-card">
+        <CardContent className="p-3 md:p-4">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_auto_auto] lg:items-end">
+            <div className="space-y-2">
+              <Label htmlFor="lead-search" className="text-xs font-medium text-muted-foreground">Buscar</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="lead-search"
+                  value={searchFilter}
+                  onChange={(event) => setSearchFilter(event.target.value)}
+                  placeholder="Nombre o teléfono"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">Tipo de fecha</Label>
+              <Select value={dateFilterType} onValueChange={(value) => setDateFilterType(value as FunnelDateFilterType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(dateFilterLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">Rango</Label>
+              <DateRangeSelector
+                dateRange={dateRange}
+                onRangeChange={(range) => setDateRange({ startDate: startOfDay(range.startDate), endDate: endOfDay(range.endDate) })}
+                onPresetSelect={(preset) => setDateRange(createFunnelPresetRange(preset))}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={dateFilterEnabled ? 'default' : 'outline'}
+                onClick={() => setDateFilterEnabled(true)}
+                className="flex-1 lg:flex-none"
+              >
+                <CalendarDays className="mr-2 h-4 w-4" />
+                Fechas
+              </Button>
+              {(dateFilterEnabled || searchFilter) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDateFilterEnabled(false);
+                    setSearchFilter('');
+                    setConversationIdsWithMessages(new Set());
+                  }}
+                  className="flex-1 lg:flex-none"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Limpiar
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filter Results Info */}
-      {searchFilter && <div className="flex items-center justify-between bg-primary/10 p-3 rounded-lg border border-primary/20">
+      {(searchFilter || dateFilterEnabled) && <div className="flex flex-col gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-primary" />
+            {dateFilterEnabled ? <CalendarDays className="h-4 w-4 text-primary" /> : <Search className="h-4 w-4 text-primary" />}
             <span className="text-sm text-foreground">
-              Mostrando {filteredLeads.length} de {leads.length} embudos que coinciden con "{searchFilter}"
+              Mostrando {filteredLeads.length} de {paginatedLeads.length} conversaciones
+              {dateFilterEnabled ? ` por ${dateFilterLabels[dateFilterType].toLowerCase()} entre ${dateRangeLabel}` : ''}
+              {searchFilter ? ` que coinciden con "${searchFilter}"` : ''}
             </span>
+            {isLoadingMessageRange && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           </div>
-          {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No se encontraron resultados</span>}
+          {filteredLeads.length === 0 && <span className="text-sm text-muted-foreground">No hay conversaciones en este rango de fechas</span>}
         </div>}
 
       <KanbanBoard columns={columns} leads={filteredLeads} onEditColumn={canEditFunnels ? openEditColumnDialog : undefined} onDeleteColumn={canDeleteFunnels ? handleDeleteColumn : undefined} onCreateLead={canCreateFunnels ? openCreateLeadDialog : undefined} onDeleteLead={canDeleteFunnels ? handleDeleteLead : undefined} onMoveLeadToColumn={canMoveContacts ? handleMoveLeadToColumn : undefined} onConvertToContactList={openConvertDialog} onManageMessageTriggers={openMessageTriggersDialog} onOpenConversation={handleLeadClick} onLoadMore={loadMore} getColumnState={getColumnState} />

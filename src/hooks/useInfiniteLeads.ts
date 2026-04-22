@@ -9,6 +9,7 @@ interface ConversationSummary {
   id: string;
   phone_number: string;
   pushname: string | null;
+  created_at?: string | null;
   last_message: string | null;
   last_message_time: string | null;
   last_inbound_message_time?: string | null;
@@ -96,6 +97,7 @@ export const useInfiniteLeads = ({
             id,
             phone_number,
             pushname,
+            created_at,
             last_message,
             last_message_time,
             last_inbound_message_time,
@@ -245,6 +247,7 @@ export const useInfiniteLeads = ({
           id: conv.id,
           phone_number: conv.phone_number,
           pushname: conv.pushname,
+          created_at: conv.created_at,
           last_message: conv.last_message,
           last_message_time: conv.last_message_time,
           last_inbound_message_time: conv.last_inbound_message_time,
