@@ -10,6 +10,8 @@ import { HourlyDistributionChart } from '@/components/reports/HourlyDistribution
 import { NewConversationsChart } from '@/components/reports/NewConversationsChart';
 import { ChannelProfitabilityPanel } from '@/components/reports/ChannelProfitabilityPanel';
 import { AgentPerformanceRanking } from '@/components/reports/AgentPerformanceRanking';
+import { AgentCostPanel } from '@/components/reports/AgentCostPanel';
+import { LeadChannelRecommendationPanel } from '@/components/reports/LeadChannelRecommendationPanel';
 import { SystemHealthCenter } from '@/components/reports/SystemHealthCenter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +33,8 @@ const Reports: React.FC = () => {
     agentPerformanceStats,
     systemHealthStats,
     operationalAlerts,
+    consumptionAlertHistory,
+    leadChannelRecommendations,
     monthlyCostSnapshots,
     sessionsLoading,
     statsLoading,
@@ -40,6 +44,7 @@ const Reports: React.FC = () => {
     countsLoading,
     profitabilityLoading,
     agentPerformanceLoading,
+    leadChannelRecommendationsLoading,
     systemHealthLoading,
     selectSession,
     selectChannelType,
@@ -133,11 +138,17 @@ const Reports: React.FC = () => {
         isLoading={profitabilityLoading}
       />
 
-      {operationalAlerts.length > 0 && (
+      <LeadChannelRecommendationPanel
+        recommendations={leadChannelRecommendations}
+        isLoading={leadChannelRecommendationsLoading}
+      />
+
+      {(operationalAlerts.length > 0 || consumptionAlertHistory.length > 0) && (
         <Card className="border-destructive/30 bg-destructive/5">
           <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-destructive" />Alertas inteligentes</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {operationalAlerts.map(alert => <div key={alert.id} className="rounded-lg border bg-background p-3"><Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>{alert.severity}</Badge><p className="mt-2 font-medium">{alert.title}</p><p className="text-sm text-muted-foreground">{alert.description}</p></div>)}
+            {consumptionAlertHistory.slice(0, 4).map(alert => <div key={alert.id} className="rounded-lg border bg-background p-3"><Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>{alert.severity}</Badge><p className="mt-2 font-medium">{alert.title}</p><p className="text-sm text-muted-foreground">{alert.recommended_action}</p></div>)}
           </CardContent>
         </Card>
       )}
@@ -153,6 +164,10 @@ const Reports: React.FC = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <AgentPerformanceRanking
+          agents={agentPerformanceStats}
+          isLoading={agentPerformanceLoading}
+        />
+        <AgentCostPanel
           agents={agentPerformanceStats}
           isLoading={agentPerformanceLoading}
         />
