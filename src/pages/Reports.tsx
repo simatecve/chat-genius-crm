@@ -8,6 +8,7 @@ import { StatsCards } from '@/components/reports/StatsCards';
 import { MessagesByDayChart } from '@/components/reports/MessagesByDayChart';
 import { HourlyDistributionChart } from '@/components/reports/HourlyDistributionChart';
 import { NewConversationsChart } from '@/components/reports/NewConversationsChart';
+import { ChannelProfitabilityPanel } from '@/components/reports/ChannelProfitabilityPanel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -23,12 +24,14 @@ const Reports: React.FC = () => {
     hourlyStats,
     newConversationsDaily,
     sessionCounts,
+    profitabilityStats,
     sessionsLoading,
     statsLoading,
     dailyLoading,
     hourlyLoading,
     newConvsLoading,
     countsLoading,
+    profitabilityLoading,
     selectSession,
     selectChannelType,
     updateDateRange,
@@ -115,6 +118,11 @@ const Reports: React.FC = () => {
 
       {/* Stats Cards - Always visible */}
       <StatsCards stats={stats} isLoading={statsLoading} />
+
+      <ChannelProfitabilityPanel
+        stats={profitabilityStats}
+        isLoading={profitabilityLoading}
+      />
 
       {/* Charts - Always visible */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
