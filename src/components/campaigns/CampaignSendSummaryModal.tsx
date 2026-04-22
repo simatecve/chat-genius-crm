@@ -20,6 +20,7 @@ import {
 import { Loader2, CheckCircle, XCircle, Clock, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { CHANNEL_MESSAGE_COSTS, formatUsd } from '@/lib/channelCosts';
 
 interface CampaignSend {
   id: string;
@@ -79,6 +80,9 @@ export function CampaignSendSummaryModal({
     failed: sends.filter((s) => s.status === 'failed').length,
     pending: sends.filter((s) => s.status === 'pending' || s.status === 'queued').length,
   };
+  const estimatedRealCost = stats.sent * CHANNEL_MESSAGE_COSTS.internal;
+  const estimatedTwilioCost = stats.sent * CHANNEL_MESSAGE_COSTS.twilio;
+  const estimatedSavings = Math.max(estimatedTwilioCost - estimatedRealCost, 0);
 
   const filteredSends = sends.filter((send) => {
     if (activeTab === 'all') return true;
@@ -163,6 +167,12 @@ export function CampaignSendSummaryModal({
                 <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
                 <p className="text-xs text-muted-foreground">Pendientes</p>
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="bg-muted/50 rounded-lg p-3"><p className="text-xs text-muted-foreground">Costo real estimado</p><p className="text-lg font-bold text-foreground">{formatUsd(estimatedRealCost)}</p></div>
+              <div className="bg-muted/50 rounded-lg p-3"><p className="text-xs text-muted-foreground">Costo si fuera Twilio</p><p className="text-lg font-bold text-foreground">{formatUsd(estimatedTwilioCost)}</p></div>
+              <div className="bg-primary/10 rounded-lg p-3"><p className="text-xs text-muted-foreground">Ahorro estimado</p><p className="text-lg font-bold text-primary">{formatUsd(estimatedSavings)}</p></div>
             </div>
 
             {/* Tabs */}

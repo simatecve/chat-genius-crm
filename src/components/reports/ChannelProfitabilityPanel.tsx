@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowRight, BadgeDollarSign, CircleDollarSign, TrendingD
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CHANNEL_MESSAGE_COSTS } from '@/lib/channelCosts';
 import type { ChannelProfitabilityStats } from '@/services/reportsService';
 
 interface ChannelProfitabilityPanelProps {
@@ -30,14 +31,14 @@ export const ChannelProfitabilityPanel: React.FC<ChannelProfitabilityPanelProps>
   if (!stats) return null;
 
   const cards = [
-    { title: 'Costo Twilio', value: formatCurrency(stats.twilioCost), detail: `${stats.twilioMessages.toLocaleString()} mensajes · ${formatRate(0.064)}/msg`, icon: CircleDollarSign },
-    { title: 'Costo WhatsApp API', value: formatCurrency(stats.whatsappApiCost), detail: `${stats.whatsappApiMessages.toLocaleString()} mensajes · ${formatRate(0.064 * 0.70)}/msg`, icon: WalletCards },
-    { title: 'Nuestro Sistema', value: formatCurrency(stats.internalCost), detail: `${stats.totalMessages.toLocaleString()} mensajes · ${formatRate(0.00445 * 1.60)}/msg`, icon: BadgeDollarSign },
-    { title: 'Ahorro Total', value: formatCurrency(stats.totalSavings), detail: `${formatCurrency(stats.dailySavings)} por día`, icon: TrendingDown },
+    { title: 'Costo Twilio', value: formatCurrency(stats.twilioCost), detail: `${stats.twilioMessages.toLocaleString()} mensajes · ${formatRate(CHANNEL_MESSAGE_COSTS.twilio)}/msg`, icon: CircleDollarSign },
+    { title: 'Costo WhatsApp API', value: formatCurrency(stats.whatsappApiCost), detail: `${stats.whatsappApiMessages.toLocaleString()} mensajes · ${formatRate(CHANNEL_MESSAGE_COSTS.whatsappApi)}/msg`, icon: WalletCards },
+    { title: 'Nuestro Sistema', value: formatCurrency(stats.internalCost), detail: `${stats.totalMessages.toLocaleString()} mensajes · ${formatRate(CHANNEL_MESSAGE_COSTS.internal)}/msg`, icon: BadgeDollarSign },
+    { title: 'Ahorro Total', value: formatCurrency(stats.totalSavings), detail: `${stats.savingsPercentage.toFixed(1)}% de ahorro`, icon: TrendingDown },
   ];
 
-  const projectedTwilioCost = stats.totalMessages * 0.064;
-  const projectedWhatsappApiCost = stats.totalMessages * (0.064 * 0.70);
+  const projectedTwilioCost = stats.totalMessages * CHANNEL_MESSAGE_COSTS.twilio;
+  const projectedWhatsappApiCost = stats.totalMessages * CHANNEL_MESSAGE_COSTS.whatsappApi;
   const projectedMigrationSavings = Math.max(projectedTwilioCost - projectedWhatsappApiCost, 0);
 
   return (
@@ -80,10 +81,17 @@ export const ChannelProfitabilityPanel: React.FC<ChannelProfitabilityPanelProps>
           </div>
         )}
 
+        {stats.totalMessages > 0 && stats.savingsPercentage < 35 && (
+          <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 sm:flex-row sm:items-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <p className="text-sm text-foreground">El ahorro bajó a {stats.savingsPercentage.toFixed(1)}%; revisa tarifas o migra tráfico al canal recomendado.</p>
+          </div>
+        )}
+
         <div className="flex flex-col gap-3 rounded-lg border bg-background p-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-medium">Canal más rentable: {stats.mostProfitableChannel}</p>
-            <p className="text-sm text-muted-foreground">Costo externo total: {formatCurrency(stats.externalCost)} · Ahorro estimado contra operación directa: {formatCurrency(stats.totalSavings)}</p>
+            <p className="text-sm text-muted-foreground">Día: {formatCurrency(stats.dailySavings)} · Semana: {formatCurrency(stats.weeklySavings)} · Mes proyectado: {formatCurrency(stats.monthlyProjectedSavings)}</p>
           </div>
           <div className="flex items-center gap-2 text-sm font-medium text-primary">
             Twilio <ArrowRight className="h-4 w-4" /> WhatsApp API

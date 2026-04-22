@@ -279,6 +279,13 @@ export const Dashboard = () => {
         </CardContent>
       </Card>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Conversaciones nuevas hoy</p><p className="mt-2 text-2xl font-bold">{stats.newConversationsToday}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Respondidas humano / IA</p><p className="mt-2 text-2xl font-bold">{stats.humanResponses} / {stats.aiResponses}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Cajeros activos</p><p className="mt-2 text-2xl font-bold text-primary">{stats.activeAgents}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Embudo con más actividad</p><p className="mt-2 text-lg font-semibold truncate">{stats.mostActiveFunnel}</p></CardContent></Card>
+      </div>
+
       {/* Charts */}
       <Card className="bg-gradient-to-br from-card to-card/80">
         <CardHeader>

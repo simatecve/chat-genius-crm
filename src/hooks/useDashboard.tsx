@@ -35,6 +35,9 @@ const emptyProfitabilityStats: ChannelProfitabilityStats = {
   externalCost: 0,
   totalSavings: 0,
   dailySavings: 0,
+  weeklySavings: 0,
+  monthlyProjectedSavings: 0,
+  savingsPercentage: 0,
   mostExpensiveChannel: 'Sin consumo',
   mostProfitableChannel: 'Sin consumo',
   recommendedChannel: 'Sin consumo'
@@ -135,7 +138,13 @@ export const useDashboard = (period: 'today' | 'week' | 'month' | 'year' = 'toda
       conversionRate: 0,
       yearlyNewProspects: 0,
       yearlyRecurringClients: 0,
-      yearlyTotal: 0
+      yearlyTotal: 0,
+      newConversationsToday: 0,
+      humanResponses: 0,
+      aiResponses: 0,
+      averageResponseMinutes: 0,
+      activeAgents: 0,
+      mostActiveFunnel: 'Sin actividad'
     },
     recentLeads: recentLeads || [],
     activeConversations: activeConversations || [],

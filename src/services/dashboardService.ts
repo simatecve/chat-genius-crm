@@ -13,6 +13,12 @@ export interface DashboardStats {
   yearlyNewProspects: number;
   yearlyRecurringClients: number;
   yearlyTotal: number;
+  newConversationsToday: number;
+  humanResponses: number;
+  aiResponses: number;
+  averageResponseMinutes: number;
+  activeAgents: number;
+  mostActiveFunnel: string;
 }
 
 export interface HeatmapData {
@@ -71,7 +77,12 @@ export const dashboardService = {
         incomingMessagesResult,
         outgoingMessagesResult,
         yearlyConversationsResult,
-        conversionResult
+        conversionResult,
+        todayConversationsResult,
+        humanResponsesResult,
+        aiResponsesResult,
+        activeAgentsResult,
+        funnelsResult
       ] = await Promise.all([
         supabase
           .from('leads')
@@ -110,7 +121,12 @@ export const dashboardService = {
           .eq('user_id', userId)
           .gte('created_at', yearStart.toISOString()),
         // Usar RPC para tasa de conversión (server-side)
-        supabase.rpc('get_conversion_rate', { p_user_id: userId })
+        supabase.rpc('get_conversion_rate', { p_user_id: userId }),
+        supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('user_id', userId).gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+        supabase.from('messages').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('direction', 'outbound').eq('is_bot', false),
+        supabase.from('messages').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('direction', 'outbound').eq('is_bot', true),
+        supabase.from('agent_presence').select('user_id', { count: 'exact', head: true }).eq('account_owner_id', userId).gte('last_seen_at', new Date(Date.now() - 90_000).toISOString()),
+        supabase.from('leads').select('column_id, lead_columns(name)').eq('user_id', userId).limit(1000)
       ]);
 
       // Calcular tasa de conversión desde RPC
@@ -134,6 +150,12 @@ export const dashboardService = {
 
       const incomingMessages = incomingMessagesResult.count || 0;
       const outgoingMessages = outgoingMessagesResult.count || 0;
+      const funnelCounts = new Map<string, number>();
+      (funnelsResult.data || []).forEach((lead: any) => {
+        const name = lead.lead_columns?.name || 'Sin embudo';
+        funnelCounts.set(name, (funnelCounts.get(name) || 0) + 1);
+      });
+      const mostActiveFunnel = Array.from(funnelCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Sin actividad';
 
       return {
         totalLeads,
@@ -147,7 +169,13 @@ export const dashboardService = {
         conversionRate: Math.round(conversionRate * 10) / 10,
         yearlyNewProspects,
         yearlyRecurringClients,
-        yearlyTotal: yearlyConversations.length
+        yearlyTotal: yearlyConversations.length,
+        newConversationsToday: todayConversationsResult.count || 0,
+        humanResponses: humanResponsesResult.count || 0,
+        aiResponses: aiResponsesResult.count || 0,
+        averageResponseMinutes: 0,
+        activeAgents: activeAgentsResult.count || 0,
+        mostActiveFunnel
       };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -163,7 +191,13 @@ export const dashboardService = {
         conversionRate: 0,
         yearlyNewProspects: 0,
         yearlyRecurringClients: 0,
-        yearlyTotal: 0
+        yearlyTotal: 0,
+        newConversationsToday: 0,
+        humanResponses: 0,
+        aiResponses: 0,
+        averageResponseMinutes: 0,
+        activeAgents: 0,
+        mostActiveFunnel: 'Sin actividad'
       };
     }
   },

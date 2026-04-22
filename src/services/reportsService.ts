@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { CHANNEL_MESSAGE_COSTS, getRecommendedChannel } from '@/lib/channelCosts';
 
 export type ChannelType = 'whatsapp' | 'twilio' | 'telegram' | 'webchat';
 
@@ -51,11 +52,7 @@ export interface SessionCounts {
   webchat: number;
 }
 
-export const MESSAGE_COSTS = {
-  internal: 0.00445 * 1.60,
-  twilio: 0.064,
-  whatsappApi: 0.064 * 0.70
-};
+export const MESSAGE_COSTS = CHANNEL_MESSAGE_COSTS;
 
 export interface ChannelProfitabilityStats {
   twilioMessages: number;
@@ -67,9 +64,12 @@ export interface ChannelProfitabilityStats {
   externalCost: number;
   totalSavings: number;
   dailySavings: number;
+  weeklySavings: number;
+  monthlyProjectedSavings: number;
+  savingsPercentage: number;
   mostExpensiveChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
   mostProfitableChannel: 'Twilio' | 'WhatsApp API' | 'Sin consumo';
-  recommendedChannel: 'WhatsApp API' | 'Twilio' | 'Sin consumo';
+  recommendedChannel: string;
 }
 
 export interface AgentPerformanceStats {
@@ -79,6 +79,11 @@ export interface AgentPerformanceStats {
   messagesSent: number;
   assignedConversations: number;
   unreadAssigned: number;
+  closedConversations: number;
+  dailyActivity: number;
+  averageResponseMinutes: number;
+  pendingRate: number;
+  performanceScore: number;
   lastActivityAt: string | null;
 }
 
@@ -96,6 +101,30 @@ export interface SystemHealthStats {
   pendingConversations: number;
   offlineAssignedConversations: number;
   lastMessageAt: string | null;
+  recentSendErrors: number;
+  aiActive: number;
+  aiTotal: number;
+  realtimeStatus: 'Funcionando' | 'Revisar';
+  recommendedChannel: string;
+}
+
+export interface MonthlyChannelCostSnapshot {
+  id: string;
+  month: string;
+  twilio_messages: number;
+  whatsapp_api_messages: number;
+  twilio_cost: number;
+  whatsapp_api_cost: number;
+  internal_cost: number;
+  external_cost: number;
+  total_savings: number;
+}
+
+export interface OperationalAlert {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'info' | 'warning' | 'critical';
 }
 
 // Get all session counts for all channel types (for badges)
@@ -159,7 +188,7 @@ export const getChannelProfitabilityStats = async (
   userId: string,
   dateRange: DateRange
 ): Promise<ChannelProfitabilityStats> => {
-  const [{ data: twilioConversations, error: twilioError }, { data: apiConnections, error: apiConnectionsError }] = await Promise.all([
+  const [{ data: twilioConversations, error: twilioError }, { data: apiConnections, error: apiConnectionsError }, { data: activeConnections }] = await Promise.all([
     supabase
       .from('conversations')
       .select('id')
@@ -169,7 +198,11 @@ export const getChannelProfitabilityStats = async (
       .from('whatsapp_connections')
       .select('phone_number, connection_subtype')
       .eq('user_id', userId)
-      .eq('connection_subtype', 'api')
+      .eq('connection_subtype', 'api'),
+    supabase
+      .from('whatsapp_connections')
+      .select('status, connection_subtype')
+      .eq('user_id', userId)
   ]);
 
   if (twilioError) throw twilioError;
@@ -202,6 +235,10 @@ export const getChannelProfitabilityStats = async (
   const externalCost = twilioCost + whatsappApiCost;
   const totalSavings = Math.max(externalCost - internalCost, 0);
   const days = Math.max(1, Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24)));
+  const active = activeConnections || [];
+  const whatsappApiActive = active.some(connection => connection.connection_subtype === 'api' && ['WORKING', 'connected', 'active'].includes(connection.status || ''));
+  const whatsappQrActive = active.some(connection => connection.connection_subtype !== 'api' && ['WORKING', 'connected', 'active'].includes(connection.status || ''));
+  const savingsPercentage = externalCost > 0 ? (totalSavings / externalCost) * 100 : 0;
 
   return {
     twilioMessages,
@@ -213,9 +250,12 @@ export const getChannelProfitabilityStats = async (
     externalCost,
     totalSavings,
     dailySavings: totalSavings / days,
+    weeklySavings: (totalSavings / days) * 7,
+    monthlyProjectedSavings: (totalSavings / days) * 30,
+    savingsPercentage,
     mostExpensiveChannel: totalMessages === 0 ? 'Sin consumo' : twilioCost >= whatsappApiCost ? 'Twilio' : 'WhatsApp API',
     mostProfitableChannel: totalMessages === 0 ? 'Sin consumo' : whatsappApiMessages > 0 ? 'WhatsApp API' : 'Twilio',
-    recommendedChannel: totalMessages === 0 ? 'Sin consumo' : 'WhatsApp API'
+    recommendedChannel: totalMessages === 0 ? 'Sin consumo' : getRecommendedChannel({ twilioCost, whatsappApiCost, whatsappApiActive, whatsappQrActive, twilioActive: twilioMessages > 0 })
   };
 };
 
@@ -230,7 +270,7 @@ export const getAgentPerformanceStats = async (
       .or(`id.eq.${userId},parent_user_id.eq.${userId}`),
     supabase
       .from('conversations')
-      .select('id, assigned_to, unread_count, last_message_time')
+      .select('id, assigned_to, unread_count, last_message_time, status, created_at')
       .eq('user_id', userId)
       .not('assigned_to', 'is', null),
     supabase
@@ -256,26 +296,47 @@ export const getAgentPerformanceStats = async (
       .filter(Boolean)
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 
+    const unreadAssigned = agentConversations.filter(conversation => (conversation.unread_count || 0) > 0).length;
+    const assignedConversationsCount = agentConversations.length;
+    const averageResponseMinutes = agentConversations.length > 0
+      ? agentConversations.reduce((sum, conversation) => {
+          const start = new Date(conversation.created_at || conversation.last_message_time || Date.now()).getTime();
+          const end = new Date(conversation.last_message_time || conversation.created_at || Date.now()).getTime();
+          return sum + Math.max(0, (end - start) / 60000);
+        }, 0) / agentConversations.length
+      : 0;
+    const pendingRate = assignedConversationsCount > 0 ? (unreadAssigned / assignedConversationsCount) * 100 : 0;
+    const closedConversations = agentConversations.filter(conversation => ['closed', 'cerrado', 'resolved'].includes((conversation.status || '').toLowerCase())).length;
+    const performanceScore = Math.max(0, (agentMessages.length * 2) + (closedConversations * 5) - (unreadAssigned * 3));
+
     return {
       id: profile.id,
       name: fullName || profile.email || 'Agente',
       email: profile.email || '',
       messagesSent: agentMessages.length,
-      assignedConversations: agentConversations.length,
-      unreadAssigned: agentConversations.filter(conversation => (conversation.unread_count || 0) > 0).length,
+      assignedConversations: assignedConversationsCount,
+      unreadAssigned,
+      closedConversations,
+      dailyActivity: agentMessages.length,
+      averageResponseMinutes,
+      pendingRate,
+      performanceScore,
       lastActivityAt: lastMessageAt
     };
-  }).sort((a, b) => b.messagesSent - a.messagesSent || b.assignedConversations - a.assignedConversations);
+  }).sort((a, b) => b.performanceScore - a.performanceScore || b.messagesSent - a.messagesSent);
 };
 
 export const getSystemHealthStats = async (userId: string): Promise<SystemHealthStats> => {
-  const [whatsappResult, twilioResult, telegramResult, webchatResult, conversationsResult, messagesResult] = await Promise.all([
+  const [whatsappResult, twilioResult, telegramResult, webchatResult, conversationsResult, messagesResult, presenceResult, errorResult, aiResult] = await Promise.all([
     supabase.from('whatsapp_connections').select('status, connection_subtype').eq('user_id', userId),
     supabase.from('twilio_connections').select('status').eq('user_id', userId),
     supabase.from('telegram_bots').select('status').eq('user_id', userId),
     supabase.from('web_chatbots').select('is_active').eq('user_id', userId),
     supabase.from('conversations').select('assigned_to, unread_count').eq('user_id', userId),
-    supabase.from('messages').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+    supabase.from('messages').select('created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1),
+    supabase.from('agent_presence').select('user_id, status, manual_override, last_seen_at').eq('account_owner_id', userId),
+    supabase.from('campaign_sends').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'failed'),
+    supabase.from('ai_agents').select('is_active').eq('user_id', userId)
   ]);
 
   if (whatsappResult.error) throw whatsappResult.error;
@@ -288,22 +349,90 @@ export const getSystemHealthStats = async (userId: string): Promise<SystemHealth
   const whatsappConnections = whatsappResult.data || [];
   const apiConnections = whatsappConnections.filter(connection => connection.connection_subtype === 'api');
   const conversations = conversationsResult.data || [];
+  const activeAgentIds = new Set((presenceResult.data || [])
+    .filter(agent => new Date(agent.last_seen_at || 0).getTime() > Date.now() - 90_000 && !['busy', 'offline'].includes(agent.manual_override || agent.status || 'offline'))
+    .map(agent => agent.user_id));
+  const whatsappActive = whatsappConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length;
+  const whatsappApiActive = apiConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length;
+  const twilioActive = (twilioResult.data || []).filter(connection => ['connected', 'active'].includes(connection.status || '')).length;
+  const telegramActive = (telegramResult.data || []).filter(bot => ['connected', 'active'].includes(bot.status || '')).length;
 
   return {
     whatsappTotal: whatsappConnections.length,
-    whatsappActive: whatsappConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length,
+    whatsappActive,
     whatsappApiTotal: apiConnections.length,
-    whatsappApiActive: apiConnections.filter(connection => ['WORKING', 'connected', 'active'].includes(connection.status || '')).length,
+    whatsappApiActive,
     twilioTotal: twilioResult.data?.length || 0,
-    twilioActive: (twilioResult.data || []).filter(connection => ['connected', 'active'].includes(connection.status || '')).length,
+    twilioActive,
     telegramTotal: telegramResult.data?.length || 0,
-    telegramActive: (telegramResult.data || []).filter(bot => ['connected', 'active'].includes(bot.status || '')).length,
+    telegramActive,
     webchatTotal: webchatResult.data?.length || 0,
     webchatActive: (webchatResult.data || []).filter(chatbot => chatbot.is_active).length,
     pendingConversations: conversations.filter(conversation => (conversation.unread_count || 0) > 0).length,
-    offlineAssignedConversations: 0,
-    lastMessageAt: messagesResult.data?.[0]?.created_at || null
+    offlineAssignedConversations: conversations.filter(conversation => conversation.assigned_to && !activeAgentIds.has(conversation.assigned_to)).length,
+    lastMessageAt: messagesResult.data?.[0]?.created_at || null,
+    recentSendErrors: errorResult.count || 0,
+    aiActive: (aiResult.data || []).filter(agent => agent.is_active).length,
+    aiTotal: aiResult.data?.length || 0,
+    realtimeStatus: messagesResult.error ? 'Revisar' : 'Funcionando',
+    recommendedChannel: getRecommendedChannel({ whatsappQrActive: whatsappActive > whatsappApiActive, whatsappApiActive: whatsappApiActive > 0, twilioActive: twilioActive > 0, telegramActive: telegramActive > 0 })
   };
+};
+
+export const getMonthlyChannelCostSnapshots = async (userId: string): Promise<MonthlyChannelCostSnapshot[]> => {
+  const { data, error } = await (supabase as any)
+    .from('monthly_channel_cost_snapshots')
+    .select('id, month, twilio_messages, whatsapp_api_messages, twilio_cost, whatsapp_api_cost, internal_cost, external_cost, total_savings')
+    .eq('user_id', userId)
+    .order('month', { ascending: false })
+    .limit(12);
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const upsertCurrentMonthlyChannelCostSnapshot = async (userId: string, stats: ChannelProfitabilityStats) => {
+  const month = new Date();
+  month.setDate(1);
+  const monthKey = month.toISOString().slice(0, 10);
+
+  const { error } = await (supabase as any)
+    .from('monthly_channel_cost_snapshots')
+    .upsert({
+      user_id: userId,
+      month: monthKey,
+      twilio_messages: stats.twilioMessages,
+      whatsapp_api_messages: stats.whatsappApiMessages,
+      twilio_cost: stats.twilioCost,
+      whatsapp_api_cost: stats.whatsappApiCost,
+      internal_cost: stats.internalCost,
+      external_cost: stats.externalCost,
+      total_savings: stats.totalSavings,
+    }, { onConflict: 'user_id,month' });
+
+  if (error) throw error;
+};
+
+export const getOperationalAlerts = (
+  profitability?: ChannelProfitabilityStats,
+  agents: AgentPerformanceStats[] = [],
+  health?: SystemHealthStats
+): OperationalAlert[] => {
+  const alerts: OperationalAlert[] = [];
+  if (profitability?.twilioCost && profitability.twilioCost > 150) {
+    alerts.push({ id: 'twilio-cost', title: 'Twilio con costo alto', description: `Twilio lleva $${profitability.twilioCost.toFixed(2)} USD.`, severity: 'critical' });
+  }
+  if (profitability && profitability.totalMessages > 0 && profitability.savingsPercentage < 35) {
+    alerts.push({ id: 'low-savings', title: 'Ahorro por debajo del objetivo', description: `El ahorro estimado está en ${profitability.savingsPercentage.toFixed(1)}%.`, severity: 'warning' });
+  }
+  const highVolumeAgent = agents.find(agent => agent.messagesSent > 500);
+  if (highVolumeAgent) {
+    alerts.push({ id: 'agent-volume', title: 'Cajero con volumen inusual', description: `${highVolumeAgent.name} envió ${highVolumeAgent.messagesSent} mensajes.`, severity: 'warning' });
+  }
+  if (health?.recentSendErrors && health.recentSendErrors > 0) {
+    alerts.push({ id: 'send-errors', title: 'Errores recientes de envío', description: `${health.recentSendErrors} envíos fallidos requieren revisión.`, severity: 'warning' });
+  }
+  return alerts;
 };
 
 // Helper function to get conversation IDs for a session

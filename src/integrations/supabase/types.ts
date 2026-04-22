@@ -1457,6 +1457,51 @@ export type Database = {
           },
         ]
       }
+      monthly_channel_cost_snapshots: {
+        Row: {
+          created_at: string
+          external_cost: number
+          id: string
+          internal_cost: number
+          month: string
+          total_savings: number
+          twilio_cost: number
+          twilio_messages: number
+          updated_at: string
+          user_id: string
+          whatsapp_api_cost: number
+          whatsapp_api_messages: number
+        }
+        Insert: {
+          created_at?: string
+          external_cost?: number
+          id?: string
+          internal_cost?: number
+          month: string
+          total_savings?: number
+          twilio_cost?: number
+          twilio_messages?: number
+          updated_at?: string
+          user_id: string
+          whatsapp_api_cost?: number
+          whatsapp_api_messages?: number
+        }
+        Update: {
+          created_at?: string
+          external_cost?: number
+          id?: string
+          internal_cost?: number
+          month?: string
+          total_savings?: number
+          twilio_cost?: number
+          twilio_messages?: number
+          updated_at?: string
+          user_id?: string
+          whatsapp_api_cost?: number
+          whatsapp_api_messages?: number
+        }
+        Relationships: []
+      }
       payment_methods: {
         Row: {
           api_key: string | null

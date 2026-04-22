@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3 } from 'lucide-react';
+import { AlertTriangle, BarChart3, History } from 'lucide-react';
 import { useReports } from '@/hooks/useReports';
 import { ChannelTypeSelector } from '@/components/reports/ChannelTypeSelector';
 import { SessionSelector } from '@/components/reports/SessionSelector';
@@ -13,6 +13,7 @@ import { AgentPerformanceRanking } from '@/components/reports/AgentPerformanceRa
 import { SystemHealthCenter } from '@/components/reports/SystemHealthCenter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Reports: React.FC = () => {
   const {
@@ -29,6 +30,8 @@ const Reports: React.FC = () => {
     profitabilityStats,
     agentPerformanceStats,
     systemHealthStats,
+    operationalAlerts,
+    monthlyCostSnapshots,
     sessionsLoading,
     statsLoading,
     dailyLoading,
@@ -129,6 +132,24 @@ const Reports: React.FC = () => {
         stats={profitabilityStats}
         isLoading={profitabilityLoading}
       />
+
+      {operationalAlerts.length > 0 && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-destructive" />Alertas inteligentes</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {operationalAlerts.map(alert => <div key={alert.id} className="rounded-lg border bg-background p-3"><Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>{alert.severity}</Badge><p className="mt-2 font-medium">{alert.title}</p><p className="text-sm text-muted-foreground">{alert.description}</p></div>)}
+          </CardContent>
+        </Card>
+      )}
+
+      {monthlyCostSnapshots.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" />Historial mensual de costos</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {monthlyCostSnapshots.slice(0, 4).map(snapshot => <div key={snapshot.id} className="rounded-lg border bg-background p-3"><p className="text-sm font-medium">{new Date(snapshot.month).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</p><p className="mt-2 text-lg font-semibold text-primary">${Number(snapshot.total_savings).toFixed(2)} USD</p><p className="text-xs text-muted-foreground">Twilio {snapshot.twilio_messages} · API {snapshot.whatsapp_api_messages}</p></div>)}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <AgentPerformanceRanking
