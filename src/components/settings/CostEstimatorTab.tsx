@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { DateRangeSelector } from '@/components/reports/DateRangeSelector';
 import type { DateRange } from '@/services/reportsService';
+import { CHANNEL_MESSAGE_COSTS } from '@/lib/channelCosts';
 import { endOfDay, format, startOfDay, startOfMonth, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -15,14 +16,13 @@ interface CostEstimatorTabProps {
   userId: string;
 }
 
-const BASE_INTERNAL_COST = 0.00445;
 const WHATSAPP_REFERENCE_COST = 0.0126;
 
 const COSTS = {
-  internal: BASE_INTERNAL_COST * 1.60,
-  twilio: 0.064,
+  internal: CHANNEL_MESSAGE_COSTS.internal,
+  twilio: CHANNEL_MESSAGE_COSTS.twilio,
   whatsappAverage: WHATSAPP_REFERENCE_COST,
-  whatsappApi: 0.064 * 0.70
+  whatsappApi: CHANNEL_MESSAGE_COSTS.whatsappApi
 };
 
 const emptyChannelCounts = { twilio: 0, whatsappApi: 0 };
