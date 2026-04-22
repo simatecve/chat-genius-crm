@@ -13,7 +13,8 @@ import {
   getMessagesByDateForChannel,
   getHourlyStatsForChannel,
   getNewConversationsByDate,
-  getNewConversationsByDateForChannel
+  getNewConversationsByDateForChannel,
+  getChannelProfitabilityStats
 } from '@/services/reportsService';
 
 export const useReports = () => {
@@ -39,6 +40,16 @@ export const useReports = () => {
     queryFn: () => getAllSessionCounts(user?.id || ''),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5
+  });
+
+  const {
+    data: profitabilityStats,
+    isLoading: profitabilityLoading
+  } = useQuery({
+    queryKey: ['report-profitability', user?.id, dateRange.startDate.toISOString(), dateRange.endDate.toISOString()],
+    queryFn: () => getChannelProfitabilityStats(user?.id || '', dateRange),
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 2
   });
 
   // Fetch sessions for selected channel type
@@ -205,6 +216,7 @@ export const useReports = () => {
     hourlyStats,
     newConversationsDaily,
     sessionCounts,
+    profitabilityStats,
 
     // Loading states
     isLoading: sessionsLoading || statsLoading || dailyLoading || hourlyLoading || newConvsLoading,
@@ -214,6 +226,7 @@ export const useReports = () => {
     hourlyLoading,
     newConvsLoading,
     countsLoading,
+    profitabilityLoading,
 
     // Errors
     error: sessionsError || statsError,
