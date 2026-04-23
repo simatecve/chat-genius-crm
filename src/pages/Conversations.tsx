@@ -56,32 +56,6 @@ const Conversations = () => {
   const [onlineAgentIds, setOnlineAgentIds] = useState<string[]>([]);
   const [allAgentIds, setAllAgentIds] = useState<string[]>([]);
 
-  const activeLeadIds = filterMode === 'funnel'
-    ? selectedEmbudo
-      ? embudoLeadIds
-      : selectedWorkspace
-        ? workspaceLeadIds
-        : []
-    : undefined;
-  const selectedSessionOption = selectedSessionFilter ? sessionOptions.find(session => session.id === selectedSessionFilter) : null;
-  const offlineAgentIds = useMemo(() => allAgentIds.filter(id => !onlineAgentIds.includes(id)), [allAgentIds, onlineAgentIds]);
-  const conversationQueryOptions = useMemo(() => ({
-    limit: 120,
-    searchTerm,
-    filterMode,
-    assignmentFilter,
-    sessionFilter: selectedSessionOption ? {
-      type: selectedSessionOption.type,
-      id: selectedSessionOption.id,
-      identifier: selectedSessionOption.identifier,
-    } : null,
-    leadIds: activeLeadIds,
-    offlineAgentIds,
-  }), [searchTerm, filterMode, assignmentFilter, selectedSessionOption, activeLeadIds, offlineAgentIds]);
-
-  // Hooks para gestionar datos
-  const { conversations, isLoading, unreadCount, markAsRead } = useConversations(conversationQueryOptions);
-  const { messages, hasMoreMessages, isLoadingOlderMessages, loadOlderMessages, sendMessage, sendMessageWithAttachment, isSending } = useMessages(selectedConversation?.id || null);
   const { activeConnections, isSessionActiveByPhone, getSessionNameByPhone, connections: whatsappConnections } = useWhatsAppConnections();
   const { connections: twilioConnections, activeConnections: activeTwilioConnections, isConnectionActive } = useTwilioConnections();
   const { connections: telegramConnections } = useTelegramConnections();
@@ -119,6 +93,33 @@ const Conversations = () => {
     
     return options;
   }, [whatsappConnections, telegramConnections, twilioConnections]);
+
+  const activeLeadIds = filterMode === 'funnel'
+    ? selectedEmbudo
+      ? embudoLeadIds
+      : selectedWorkspace
+        ? workspaceLeadIds
+        : []
+    : undefined;
+  const selectedSessionOption = selectedSessionFilter ? sessionOptions.find(session => session.id === selectedSessionFilter) : null;
+  const offlineAgentIds = useMemo(() => allAgentIds.filter(id => !onlineAgentIds.includes(id)), [allAgentIds, onlineAgentIds]);
+  const conversationQueryOptions = useMemo(() => ({
+    limit: 120,
+    searchTerm,
+    filterMode,
+    assignmentFilter,
+    sessionFilter: selectedSessionOption ? {
+      type: selectedSessionOption.type,
+      id: selectedSessionOption.id,
+      identifier: selectedSessionOption.identifier,
+    } : null,
+    leadIds: activeLeadIds,
+    offlineAgentIds,
+  }), [searchTerm, filterMode, assignmentFilter, selectedSessionOption, activeLeadIds, offlineAgentIds]);
+
+  // Hooks para gestionar datos
+  const { conversations, isLoading, unreadCount, markAsRead } = useConversations(conversationQueryOptions);
+  const { messages, hasMoreMessages, isLoadingOlderMessages, loadOlderMessages, sendMessage, sendMessageWithAttachment, isSending } = useMessages(selectedConversation?.id || null);
 
   // Cargar workspaces
   useEffect(() => {
