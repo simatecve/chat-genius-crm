@@ -83,6 +83,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const isMobile = useIsMobile();
   const [contactTags, setContactTags] = useState<Record<string, string[]>>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [scrollTop, setScrollTop] = useState(0);
+  const itemHeight = 89;
+  const overscan = 6;
+  const viewportHeight = 720;
 
   // Cuántos filtros activos hay (para badge en mobile)
   const activeFilterCount = useMemo(() => {
@@ -104,8 +108,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
     const loadContactTags = async () => {
       if (conversations.length === 0) return;
       
-      // Solo cargar tags para las primeras 20 conversaciones visibles
-      const visibleConversations = conversations.slice(0, 20);
+      const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+      const endIndex = Math.min(conversations.length, Math.ceil((scrollTop + viewportHeight) / itemHeight) + overscan);
+      const visibleConversations = conversations.slice(startIndex, endIndex);
       const phoneNumbers = visibleConversations
         .map(c => c.phone_number)
         .filter(Boolean)
@@ -134,7 +139,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
     // Debounce para evitar llamadas excesivas
     const timeoutId = setTimeout(loadContactTags, 300);
     return () => clearTimeout(timeoutId);
-  }, [conversations.length]); // Solo ejecutar cuando cambia la cantidad, no la referencia
+  }, [conversations, scrollTop, contactTags]);
 
   // Función para enmascarar números de teléfono
   const maskPhoneNumber = (phone: string | null) => {
@@ -258,6 +263,12 @@ const ConversationList: React.FC<ConversationListProps> = ({
     </>
   );
 
+  const visibleRange = useMemo(() => {
+    const start = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+    const end = Math.min(conversations.length, Math.ceil((scrollTop + viewportHeight) / itemHeight) + overscan);
+    return { start, end, items: conversations.slice(start, end) };
+  }, [conversations, scrollTop]);
+
   return <div className="h-full border-r border-border flex flex-col">
       {/* Header */}
       <div className="p-3 md:p-4 border-b border-border">
@@ -315,13 +326,15 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
 
       {/* Lista de conversaciones */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1" onScrollCapture={(event) => setScrollTop((event.target as HTMLElement).scrollTop)}>
         {isLoading ? <div className="p-4 text-center text-muted-foreground">
             Cargando conversaciones...
           </div> : conversations.length === 0 ? <div className="p-4 text-center text-muted-foreground">
             {searchTerm ? 'No se encontraron conversaciones' : 'No hay conversaciones'}
-          </div> : <div className="divide-y divide-border">
-            {conversations.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} isSelected={selectedConversation?.id === conversation.id} onSelect={() => onSelectConversation(conversation)} formatTime={formatTime} getInitials={getInitials} isCajero={isCajero} maskPhoneNumber={maskPhoneNumber} tags={contactTags[conversation.phone_number] || []} getTagColor={getTagColor} />)}
+          </div> : <div className="relative" style={{ height: conversations.length * itemHeight }}>
+            <div className="absolute left-0 right-0 divide-y divide-border" style={{ transform: `translateY(${visibleRange.start * itemHeight}px)` }}>
+              {visibleRange.items.map(conversation => <ConversationItem key={conversation.id} conversation={conversation} isSelected={selectedConversation?.id === conversation.id} onSelect={() => onSelectConversation(conversation)} formatTime={formatTime} getInitials={getInitials} isCajero={isCajero} maskPhoneNumber={maskPhoneNumber} tags={contactTags[conversation.phone_number] || []} getTagColor={getTagColor} />)}
+            </div>
           </div>}
       </ScrollArea>
     </div>;
@@ -369,7 +382,7 @@ const ConversationItem = memo<ConversationItemProps>(({
     <div 
       onClick={onSelect} 
       className={cn(
-        "p-3 md:p-4 cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted", 
+        "h-[89px] p-3 md:p-4 cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted", 
         isSelected && "bg-muted"
       )}
     >
