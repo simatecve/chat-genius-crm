@@ -5,7 +5,7 @@ import { useAuth } from './useAuth';
 import { useUserPermissions } from './useUserPermissions';
 import { useAssignmentSettings } from './useAssignmentSettings';
 import { Database } from '@/integrations/supabase/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useToast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -25,15 +25,17 @@ export const useConversations = (options: Omit<ConversationQueryOptions, 'restri
   const canSeeAll = isAdmin || hasPermission('puede_ver_mensajes_otros');
   const restrictToAgentId = !canSeeAll && user?.id ? user.id : null;
   const includeUnassigned = settings?.include_unassigned_for_all ?? true;
+  const optionsKey = JSON.stringify(options);
+  const stableOptions = useMemo(() => options, [optionsKey]);
 
   const conversationsQuery = useQuery({
-    queryKey: ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, options],
+    queryKey: ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, stableOptions],
     queryFn: () =>
       ConversationService.getConversations(effectiveUserId || '', {
         restrictToAgentId,
         includeUnassigned,
         currentUserId: user?.id || null,
-        ...options,
+        ...stableOptions,
       }),
     enabled: !!effectiveUserId,
     staleTime: 30000,
@@ -79,7 +81,7 @@ export const useConversations = (options: Omit<ConversationQueryOptions, 'restri
                 // Si es UPDATE, actualizar el cache directamente y reordenar
         if (payload.eventType === 'UPDATE' && payload.new) {
           queryClient.setQueryData<ConversationWithLastMessage[]>(
-            ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, options],
+            ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, stableOptions],
             (old) => {
               if (!old) return old;
               
@@ -127,7 +129,7 @@ export const useConversations = (options: Omit<ConversationQueryOptions, 'restri
           
           // Actualizar la conversación afectada directamente en cache en vez de refetch completo
           queryClient.setQueryData<ConversationWithLastMessage[]>(
-            ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, options],
+            ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, stableOptions],
             (old) => {
               if (!old) return old;
               
@@ -164,7 +166,7 @@ export const useConversations = (options: Omit<ConversationQueryOptions, 'restri
       conversationsSubscription.unsubscribe();
       supabase.removeChannel(messagesChannel);
     };
-  }, [effectiveUserId, queryClient, restrictToAgentId, includeUnassigned, options]);
+  }, [effectiveUserId, queryClient, restrictToAgentId, includeUnassigned, stableOptions]);
 
   return {
     conversations: conversationsQuery.data || [],
