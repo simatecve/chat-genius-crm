@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import logger from '@/lib/logger';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -10,13 +11,31 @@ export interface ConversationWithLastMessage extends Conversation {
   messages?: Message[];
 }
 
+export interface ConversationQueryOptions {
+  restrictToAgentId?: string | null;
+  includeUnassigned?: boolean;
+  limit?: number;
+  offset?: number;
+  filterMode?: 'all' | 'unassigned' | 'funnel' | 'pending' | 'stale' | 'offline' | 'bot_off' | 'urgent';
+  assignmentFilter?: 'all' | 'mine' | 'unassigned';
+  currentUserId?: string | null;
+  sessionFilter?: {
+    type: 'whatsapp' | 'telegram' | 'twilio';
+    id: string;
+    identifier: string;
+  } | null;
+  searchTerm?: string;
+  leadIds?: string[];
+  offlineAgentIds?: string[];
+}
+
 export class ConversationService {
   /**
    * Obtiene todas las conversaciones del usuario actual
    */
   static async getConversations(
     userId: string,
-    opts?: { restrictToAgentId?: string | null; includeUnassigned?: boolean }
+    opts?: ConversationQueryOptions
   ): Promise<ConversationWithLastMessage[]> {
     try {
       // Seleccionar columnas necesarias (excluyendo mensajes) para reducir egress
@@ -33,9 +52,41 @@ export class ConversationService {
         }
       }
 
+      if (opts?.assignmentFilter === 'mine' && opts.currentUserId) {
+        query = query.eq('assigned_to', opts.currentUserId);
+      } else if (opts?.assignmentFilter === 'unassigned') {
+        query = query.is('assigned_to', null);
+      }
+
+      if (opts?.sessionFilter) {
+        if (opts.sessionFilter.type === 'whatsapp') query = query.eq('whatsapp_number', opts.sessionFilter.identifier);
+        if (opts.sessionFilter.type === 'telegram') query = query.eq('telegram_bot_id', opts.sessionFilter.id);
+        if (opts.sessionFilter.type === 'twilio') query = query.eq('twilio_connection_id', opts.sessionFilter.id);
+      }
+
+      const filterMode = opts?.filterMode || 'all';
+      if (filterMode === 'unassigned') query = query.is('lead_id', null);
+      if (filterMode === 'pending') query = query.gt('unread_count', 0);
+      if (filterMode === 'stale') {
+        query = query.gt('unread_count', 0).lt('last_inbound_message_time', new Date(Date.now() - 30 * 60 * 1000).toISOString());
+      }
+      if (filterMode === 'offline' && opts?.offlineAgentIds?.length) query = query.in('assigned_to', opts.offlineAgentIds);
+      if (filterMode === 'urgent') query = query.or('payment_receipt_detected_at.not.is.null,last_message.ilike.%comprobante%');
+      if (filterMode === 'funnel' && opts?.leadIds?.length) query = query.in('lead_id', opts.leadIds);
+      if (filterMode === 'funnel' && opts?.leadIds && opts.leadIds.length === 0) return [];
+
+      const normalizedSearch = opts?.searchTerm?.trim();
+      if (normalizedSearch && normalizedSearch.length >= 2) {
+        const safeSearch = normalizedSearch.replace(/[,%]/g, '');
+        query = query.or(`pushname.ilike.%${safeSearch}%,phone_number.ilike.%${safeSearch}%,contact_name.ilike.%${safeSearch}%`);
+      }
+
+      const limit = opts?.limit ?? 100;
+      const offset = opts?.offset ?? 0;
       const { data, error } = await query
-        .order('last_message_time', { ascending: false })
-        .limit(100);
+        .neq('channel_type', 'webchat')
+        .order('last_message_time', { ascending: false, nullsFirst: false })
+        .range(offset, offset + limit - 1);
 
       if (error) {
         console.error('Error fetching conversations:', error);
@@ -103,8 +154,6 @@ export class ConversationService {
    */
   static async getMessages(conversationId: string, userId: string, limit: number = 50, offset: number = 0): Promise<Message[]> {
     try {
-      console.log('[ConversationService] Fetching messages for conversationId:', conversationId);
-      
       // Seleccionar solo columnas necesarias para reducir egress
       const { data, error } = await supabase
         .from('messages')
@@ -118,7 +167,6 @@ export class ConversationService {
         throw error;
       }
 
-      console.log('[ConversationService] Found messages:', data?.length || 0);
       // Retornar en orden cronológico (más antiguos primero)
       return (data || []).reverse();
     } catch (error) {
@@ -141,15 +189,9 @@ export class ConversationService {
     twilioConnectionId?: string | null
   ): Promise<Message | null> {
     try {
-      console.log('[ConversationService] Sending message...', {
-        channelType,
-        telegramBotId,
-        conversationId
-      });
-
       // Si es WebChat, usar web-chat-send
       if (channelType === 'webchat') {
-        console.log('[ConversationService] Sending via WebChat...');
+        logger.debug('[ConversationService] Sending via WebChat');
         
         const { data, error } = await supabase.functions.invoke('web-chat-send', {
           body: {
@@ -168,13 +210,13 @@ export class ConversationService {
           throw new Error(data?.error || 'Failed to send WebChat message');
         }
 
-        console.log('[ConversationService] WebChat message sent successfully');
+        logger.debug('[ConversationService] WebChat message sent successfully');
         return data.savedMessage;
       }
       
       // Si es Telegram, usar telegram-send-message
       if (channelType === 'telegram' && telegramBotId) {
-        console.log('[ConversationService] Sending via Telegram...');
+        logger.debug('[ConversationService] Sending via Telegram');
         
         const { data, error } = await supabase.functions.invoke('telegram-send-message', {
           body: {
@@ -196,13 +238,13 @@ export class ConversationService {
           throw new Error(data?.error || 'Failed to send Telegram message');
         }
 
-        console.log('[ConversationService] Telegram message sent successfully');
+        logger.debug('[ConversationService] Telegram message sent successfully');
         return data.savedMessage;
       }
 
       // Si es Twilio, usar twilio-send-message
       if (channelType === 'twilio' && twilioConnectionId) {
-        console.log('[ConversationService] Sending via Twilio...');
+        logger.debug('[ConversationService] Sending via Twilio');
         
         const { data, error } = await supabase.functions.invoke('twilio-send-message', {
           body: {
@@ -224,12 +266,12 @@ export class ConversationService {
           throw new Error(data?.error || 'Failed to send Twilio message');
         }
 
-        console.log('[ConversationService] Twilio message sent successfully');
+        logger.debug('[ConversationService] Twilio message sent successfully');
         return data.savedMessage;
       }
       
       // Si es WhatsApp, usar waha-send-message
-      console.log('[ConversationService] Sending via WhatsApp...');
+      logger.debug('[ConversationService] Sending via WhatsApp');
       
       const { data, error } = await supabase.functions.invoke('waha-send-message', {
         body: {
@@ -250,7 +292,7 @@ export class ConversationService {
         throw new Error(data?.error || 'Failed to send WhatsApp message');
       }
 
-      console.log('[ConversationService] WhatsApp message sent successfully');
+      logger.debug('[ConversationService] WhatsApp message sent successfully');
       return data.savedMessage;
     } catch (error) {
       console.error('[ConversationService] Error in sendMessage:', error);
@@ -310,7 +352,7 @@ export class ConversationService {
         throw new Error(`Webhook response error: ${response.status}`);
       }
 
-      console.log('Message sent to webhook successfully');
+      logger.debug('Message sent to webhook successfully');
     } catch (error) {
       console.error('Error sending to webhook:', error);
       throw error; // Lanzamos el error para que se maneje en el componente
@@ -354,7 +396,7 @@ export class ConversationService {
         body: JSON.stringify(payload),
       });
 
-      console.log('Message sent to webhook successfully');
+      logger.debug('Message sent to webhook successfully');
     } catch (error) {
       console.error('Error sending to webhook:', error);
       // No lanzamos el error para que no afecte el flujo principal
