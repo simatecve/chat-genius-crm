@@ -80,12 +80,6 @@ export const useInfiniteLeads = ({
     }));
 
     try {
-      // Obtener count total primero
-      const { count } = await supabase
-        .from('leads')
-        .select('id', { count: 'exact', head: true })
-        .eq('column_id', columnId);
-
       // Cargar leads con paginación - columnas específicas para reducir egress
       const { data, error } = await supabase
         .from('leads')
@@ -137,7 +131,7 @@ export const useInfiniteLeads = ({
             hasMore: (data?.length || 0) === pageSize,
             loading: false,
             offset: offset + (data?.length || 0),
-            totalCount: count || 0
+            totalCount: append ? Math.max(prev[columnId]?.totalCount || 0, offset + (data?.length || 0)) : (data?.length || 0)
           }
         };
       });
@@ -285,11 +279,19 @@ export const useInfiniteLeads = ({
     setInitialLoading(true);
     
     try {
-      // Cargar todas las columnas en paralelo
+      const visibleColumnIds = columnIds.slice(0, 4);
+      const backgroundColumnIds = columnIds.slice(4);
+
       await Promise.all([
-        ...columnIds.map(colId => loadLeadsForColumn(colId, 0, false)),
+        ...visibleColumnIds.map(colId => loadLeadsForColumn(colId, 0, false)),
         loadOrphanConversations(false)
       ]);
+
+      if (backgroundColumnIds.length > 0) {
+        window.setTimeout(() => {
+          Promise.all(backgroundColumnIds.map(colId => loadLeadsForColumn(colId, 0, false)));
+        }, 250);
+      }
     } finally {
       setInitialLoading(false);
       isInitialized.current = true;
@@ -356,8 +358,7 @@ export const useInfiniteLeads = ({
   // Effect para cargar datos cuando cambian las columnas
   useEffect(() => {
     if (userId && columnIds.length > 0 && defaultColumnId && !isInitialized.current) {
-      console.log('[useInfiniteLeads] Loading initial data for columns:', columnIds.length);
-      loadInitial();
+loadInitial();
     }
   }, [userId, workspaceId, columnIds.length, defaultColumnId, loadInitial]);
 

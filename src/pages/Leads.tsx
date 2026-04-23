@@ -153,7 +153,6 @@ const Leads = () => {
 
   // Ref para debounce de recargas realtime
   const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const loadLeadsRef = useRef<() => Promise<void>>();
 
   // Estado para el modal de chat
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -338,7 +337,6 @@ const Leads = () => {
   useEffect(() => {
     if (effectiveUserId && !effectiveUserIdLoading && selectedWorkspace) {
       loadColumns();
-      loadLeads();
     }
   }, [selectedWorkspace, effectiveUserId, effectiveUserIdLoading]);
 
@@ -346,8 +344,7 @@ const Leads = () => {
   const debouncedLoadLeads = useCallback(() => {
     // Si hay un movimiento en progreso, ignorar el evento Realtime
     if (isMoving()) {
-      console.log('[Leads] Skipping Realtime reload - move in progress');
-      return;
+return;
     }
     
     if (reloadTimeoutRef.current) {
@@ -498,7 +495,7 @@ const Leads = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      await Promise.all([loadWorkspaces(), loadColumns(), loadLeads()]);
+      await Promise.all([loadWorkspaces(), loadColumns()]);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -557,8 +554,7 @@ const Leads = () => {
     // Verificar que el workspace seleccionado sea válido
     const validWorkspaceIds = data.map(w => w.id);
     if (selectedWorkspace && !validWorkspaceIds.includes(selectedWorkspace)) {
-      console.log('[Leads] Resetting selectedWorkspace - current is invalid');
-      const defaultWs = data.find(w => w.is_default) || data[0];
+const defaultWs = data.find(w => w.is_default) || data[0];
       setSelectedWorkspace(defaultWs.id);
     } else if (!selectedWorkspace && data.length > 0) {
       // Prefer workspace marked as default, otherwise first by position
@@ -609,207 +605,12 @@ const Leads = () => {
     setColumns([data]);
   };
   const loadLeads = async () => {
-    if (!effectiveUserId) return;
-
-    // Si hay workspace seleccionado, primero obtener los IDs de las columnas
-    let columnIds: string[] = [];
-    let defaultColumnId: string | null = null;
-    if (selectedWorkspace) {
-      // Incluir columnas con workspace_id igual al seleccionado O sin workspace (null)
-      const {
-        data: columnsData,
-        error: columnsError
-      } = await supabase.from('lead_columns').select('id, is_default').eq('user_id', effectiveUserId).or(`workspace_id.eq.${selectedWorkspace},workspace_id.is.null`);
-      if (columnsError) {
-        console.error('Error loading columns for leads:', columnsError);
-        return;
-      }
-      columnIds = columnsData?.map(col => col.id) || [];
-
-      // Encontrar columna por defecto para asignar leads virtuales
-      const defaultCol = columnsData?.find(col => col.is_default);
-      defaultColumnId = defaultCol?.id || columnsData?.[0]?.id || null;
-
-      // Si no hay columnas en el workspace, crear una por defecto
-      if (columnIds.length === 0) {
-        console.log('[Leads] No columns found, creating default column');
-        const {
-          data: newColumn,
-          error: createError
-        } = await supabase.from('lead_columns').insert({
-          user_id: effectiveUserId,
-          workspace_id: selectedWorkspace,
-          name: 'Nuevos Contactos',
-          color: '#22c55e',
-          position: 0,
-          is_default: true
-        }).select().single();
-        if (createError) {
-          console.error('Error creating default column:', createError);
-          setLeads([]);
-          return;
-        }
-        columnIds = [newColumn.id];
-        defaultColumnId = newColumn.id;
-        setColumns([newColumn]);
-      }
-    }
-
-    // Construir query de leads con límite para performance
-    let query = supabase.from('leads').select(`
-        *,
-        lead_columns(*),
-        conversations:conversations!conversations_lead_id_fkey(
-          id,
-          phone_number,
-          pushname,
-          created_at,
-          last_message,
-          last_message_time,
-          last_inbound_message_time,
-          unread_count,
-          channel_type
-        )
-      `);
-
-    // Filtrar por columnas del workspace si está seleccionado
-    if (selectedWorkspace && columnIds.length > 0) {
-      query = query.in('column_id', columnIds);
-    }
-
-    // Cargar leads reales - sin límite para no perder conversaciones
-    const {
-      data: realLeads,
-      error
-    } = await query.order('last_inbound_message_time', {
-      ascending: false,
-      nullsFirst: false
-    });
-    if (error) {
-      console.error('Error loading leads:', error);
-      return;
-    }
-
-    // Cargar conversaciones huérfanas (sin lead_id) - EXCLUYENDO webchat
-    // Filtradas por workspace/conexión para consistencia con el hook useInfiniteLeads
-    
-    // Obtener channel_type del workspace seleccionado
-    const selectedWorkspaceData = workspaces.find(w => w.id === selectedWorkspace);
-    const wsChannelType = selectedWorkspaceData?.channel_type;
-    
-    // Obtener IDs de conexiones según el channel_type del workspace
-    let connectionIds: string[] = [];
-    
-    if (selectedWorkspace && wsChannelType === 'twilio') {
-      const { data: twilioConns } = await supabase
-        .from('twilio_connections')
-        .select('id')
-        .eq('workspace_id', selectedWorkspace);
-      connectionIds = twilioConns?.map(c => c.id) || [];
-    } else if (selectedWorkspace && wsChannelType === 'telegram') {
-      const { data: telegramBots } = await supabase
-        .from('telegram_bots')
-        .select('id')
-        .eq('workspace_id', selectedWorkspace);
-      connectionIds = telegramBots?.map(b => b.id) || [];
-    }
-    
-    // Base query para conversaciones huérfanas
-    let orphanQuery = supabase
-      .from('conversations')
-      .select('id, phone_number, pushname, last_message, last_message_time, last_inbound_message_time, unread_count, channel_type, twilio_connection_id, telegram_bot_id, created_at, updated_at')
-      .eq('user_id', effectiveUserId)
-      .is('lead_id', null)
-      ;
-    
-    // Aplicar filtro por conexiones si el workspace tiene channel_type específico
-    if (wsChannelType === 'twilio') {
-      if (connectionIds.length > 0) {
-        // Incluir conexiones activas del workspace O conexiones eliminadas (NULL)
-        // para mantener visibles las conversaciones de sesiones eliminadas
-        orphanQuery = orphanQuery.or(
-          `twilio_connection_id.in.(${connectionIds.join(',')}),twilio_connection_id.is.null`
-        );
-        orphanQuery = orphanQuery.eq('channel_type', 'twilio');
-      } else {
-        // Si no hay conexiones activas, solo mostrar las de conexiones eliminadas
-        orphanQuery = orphanQuery.is('twilio_connection_id', null)
-          .eq('channel_type', 'twilio');
-      }
-    } else if (wsChannelType === 'telegram' && connectionIds.length > 0) {
-      orphanQuery = orphanQuery.in('telegram_bot_id', connectionIds);
-    } else if (wsChannelType === 'whatsapp') {
-      orphanQuery = orphanQuery.eq('channel_type', 'whatsapp');
-    }
-    // Si channel_type es null o 'all', no aplicar filtro adicional (comportamiento original)
-    
-    const {
-      data: orphanConversations,
-      error: orphanError
-    } = await orphanQuery.order('last_inbound_message_time', {
-      ascending: false,
-      nullsFirst: false
-    }).limit(200);
-    
-    if (orphanError) {
-      console.error('Error loading orphan conversations:', orphanError);
-    }
-    console.log('[Leads] Orphan conversations loaded:', orphanConversations?.length || 0, 'defaultColumnId:', defaultColumnId, 'wsChannelType:', wsChannelType);
-
-    // Usar todos los leads reales sin filtrar webchat
-    const filteredRealLeads = (realLeads || []).map(lead => ({
-      ...lead,
-      conversations: lead.conversations || []
-    }));
-
-    // Crear leads virtuales desde conversaciones huérfanas
-    const virtualLeads: LeadWithColumn[] = (orphanConversations || []).map((conv, index) => ({
-      id: `virtual-${conv.id}`,
-      name: conv.pushname || conv.phone_number || 'Sin nombre',
-      phone: conv.phone_number,
-      email: null,
-      company: null,
-      notes: null,
-      value: null,
-      tags: null,
-      column_id: defaultColumnId || '',
-      position: index,
-      user_id: effectiveUserId,
-      created_at: conv.created_at,
-      updated_at: conv.updated_at,
-      last_inbound_message_time: conv.last_inbound_message_time,
-      bot_active: true,
-      isVirtual: true,
-      originalConversationId: conv.id,
-      conversations: [{
-        id: conv.id,
-        phone_number: conv.phone_number,
-        pushname: conv.pushname,
-          created_at: conv.created_at,
-        last_message: conv.last_message,
-        last_message_time: conv.last_message_time,
-        last_inbound_message_time: conv.last_inbound_message_time,
-        unread_count: conv.unread_count,
-        channel_type: conv.channel_type
-      }]
-    }));
-
-    // Combinar leads reales (sin webchat) + virtuales
-    const allLeads = [...filteredRealLeads, ...virtualLeads];
-
-    // Ordenar leads por último mensaje recibido (más reciente arriba) - ordenamiento global
-    const sortedData = allLeads.sort((a, b) => {
-      const aTime = a.conversations?.[0]?.last_inbound_message_time || a.conversations?.[0]?.last_message_time || a.updated_at;
-      const bTime = b.conversations?.[0]?.last_inbound_message_time || b.conversations?.[0]?.last_message_time || b.updated_at;
-
-      // Más reciente primero (descendente)
-      return new Date(bTime || 0).getTime() - new Date(aTime || 0).getTime();
-    });
-    setLeads(sortedData);
+    setIsRefreshing(true);
+    await refreshAll();
+    setIsRefreshing(false);
   };
 
-  // Actualizar ref de loadLeads para uso en debounce
-  loadLeadsRef.current = loadLeads;
+
   const handleCreateColumn = async () => {
     if (!newColumnName.trim()) {
       toast({
@@ -948,7 +749,7 @@ const Leads = () => {
       notes: newLead.notes || null,
       column_id: targetColumnId,
       user_id: effectiveUserId,
-      position: leads.filter(l => l.column_id === targetColumnId).length
+      position: currentLeads.filter(l => l.column_id === targetColumnId).length
     }).select(`
         *,
         lead_columns(*)
@@ -983,12 +784,13 @@ const Leads = () => {
     const isVirtualLead = leadId.startsWith('virtual-');
     if (isVirtualLead) {
       // Convertir lead virtual a lead real
-      const virtualLead = leads.find(l => l.id === leadId);
+      const currentLeads = getAllLeads();
+      const virtualLead = currentLeads.find(l => l.id === leadId);
       if (!virtualLead || !virtualLead.originalConversationId) return;
-      const previousLeads = [...leads];
+      const previousLeads = [...getAllLeads()];
 
       // Remover el lead virtual de la UI inmediatamente
-      setLeads(leads.filter(l => l.id !== leadId));
+      setLeads(currentLeads.filter(l => l.id !== leadId));
       try {
         // Crear lead real en la base de datos
         const {
@@ -998,7 +800,7 @@ const Leads = () => {
           name: virtualLead.name,
           phone: virtualLead.phone,
           column_id: targetColumnId,
-          position: leads.filter(l => l.column_id === targetColumnId).length,
+          position: currentLeads.filter(l => l.column_id === targetColumnId).length,
           user_id: effectiveUserId
         }).select(`
             *,
@@ -1038,18 +840,19 @@ const Leads = () => {
     }
 
     // Lead real - comportamiento normal
-    const lead = leads.find(l => l.id === leadId);
+    const currentLeads = getAllLeads();
+    const lead = currentLeads.find(l => l.id === leadId);
     if (!lead) return;
     
     const sourceColumnId = lead.column_id;
-    const previousLeads = [...leads];
+    const previousLeads = [...currentLeads];
 
     // ✅ ACTUALIZACIÓN OPTIMISTA INMEDIATA - UI responde al instante
     // Actualizar estado local
-    setLeads(leads.map(l => l.id === leadId ? {
+    setLeads(currentLeads.map(l => l.id === leadId ? {
       ...l,
       column_id: targetColumnId,
-      position: leads.filter(x => x.column_id === targetColumnId).length
+      position: currentLeads.filter(x => x.column_id === targetColumnId).length
     } : l));
     
     // También actualizar el cache del hook de paginación
@@ -1061,7 +864,7 @@ const Leads = () => {
         error
       } = await supabase.from('leads').update({
         column_id: targetColumnId,
-        position: leads.filter(l => l.column_id === targetColumnId).length
+        position: currentLeads.filter(l => l.column_id === targetColumnId).length
       }).eq('id', leadId);
       if (error) throw error;
     } catch (error) {
