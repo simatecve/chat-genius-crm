@@ -260,6 +260,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
 
+  const messageGroups = useMemo(() => groupMessagesByDate(messages), [messages]);
+
   if (!conversation) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -275,8 +277,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       </div>
     );
   }
-
-  const messageGroups = useMemo(() => groupMessagesByDate(messages), [messages]);
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-background">
