@@ -1,338 +1,461 @@
 
-# Plan para agregar Alertas de consumo, recomendaciones por lead y costos por cajero
+# Plan de revisión y optimización de velocidad del sistema
 
 ## Objetivo
 
-Agregar una capa operativa de control de costos para que cada cuenta pueda:
+Mejorar la velocidad general del sistema, principalmente en:
 
-- Configurar umbrales mensuales de consumo.
-- Ver historial de alertas disparadas.
-- Recibir recomendaciones de acción en el Dashboard.
-- Recomendar el mejor canal según tipo de lead.
-- Detectar cajeros/agentes con consumo excesivo.
+- Conversaciones / Chats.
+- Embudos / Kanban de leads.
+- Carga inicial de páginas.
+- Búsquedas, filtros y cambios de conversación.
+- Realtime sin recargas pesadas.
 
-## 1. Nueva pantalla en Configuración > Alertas de consumo
+## Diagnóstico inicial
 
-Agregar una nueva pestaña dentro de `Configuración` llamada **Alertas de consumo**.
+La app ya tiene algunas optimizaciones importantes:
 
-Permitirá configurar:
+- Lazy loading de páginas en `App.tsx`.
+- React Query con cache global.
+- Índices existentes para:
+  - `conversations(user_id, last_message_time)`
+  - `messages(conversation_id, created_at)`
+  - `leads(column_id, last_inbound_message_time)`
+- Paginación parcial en embudos con `useInfiniteLeads`.
+- Cache directo de conversaciones al recibir mensajes realtime.
 
-- Umbral mensual de costo Twilio.
-- Umbral mensual de mensajes Twilio.
-- Umbral de consumo inusual de WhatsApp API.
-- Umbral máximo de mensajes por cajero/agente.
-- Porcentaje mínimo esperado de ahorro.
-- Activar/desactivar cada alerta.
-- Definir severidad: informativa, advertencia o crítica.
+Pero todavía hay cuellos claros:
 
-Ejemplo de configuración:
+1. Demasiados logs en consola en Chats y ChatArea.
+2. Conversaciones filtra mucho en frontend, no en base de datos.
+3. Embudos tiene doble sistema de carga: `loadLeads()` carga muchos datos y `useInfiniteLeads()` también pagina.
+4. Cada columna de embudo hace consultas separadas de count + datos.
+5. Cada tarjeta de embudo puede consultar estado de bot individualmente.
+6. En conversaciones, búsqueda y filtros avanzados no están paginados ni completamente delegados a Supabase.
+7. Realtime puede disparar invalidaciones amplias.
+8. El preview de desarrollo carga lento por Vite, pero eso afecta menos al dominio publicado; aun así se puede reducir peso de rutas.
+
+---
+
+## Fase 1: Limpieza rápida de rendimiento en Chats
+
+### 1. Quitar logs pesados
+
+Reemplazar `console.log` por `logger` solo cuando sea necesario y eliminar logs que imprimen arrays completos de mensajes.
+
+Archivos:
+
+- `src/hooks/useConversations.ts`
+- `src/components/conversations/ChatArea.tsx`
+- `src/pages/Conversations.tsx`
+- `src/hooks/useQuickReplies.ts`
+
+Especialmente quitar:
+
+- Logs de todos los mensajes renderizados.
+- Logs de grupos de mensajes.
+- Logs de cada evento realtime.
+- Logs por render de `Conversations`.
+
+Resultado esperado:
+
+- Menos bloqueo del hilo principal.
+- Menos ruido en consola.
+- Mejor respuesta al abrir chats con muchos mensajes.
+
+### 2. Memoizar agrupación de mensajes
+
+En `ChatArea.tsx`, `groupMessagesByDate(messages)` se calcula en cada render.
+
+Cambiarlo a:
 
 ```text
-Twilio costo mensual máximo: $150 USD
-WhatsApp API consumo inusual: +40% vs período anterior
-Mensajes por cajero máximo: 500 por mes
-Ahorro mínimo esperado: 35%
+const messageGroups = useMemo(() => groupMessagesByDate(messages), [messages])
 ```
 
-Archivos principales:
+Resultado:
 
-- `src/pages/Settings.tsx`
-- `src/components/settings/ConsumptionAlertsTab.tsx`
-- `src/services/consumptionAlertsService.ts`
-- `src/hooks/useConsumptionAlerts.ts`
+- Menos trabajo al escribir en el input.
+- Menos recálculo al abrir/cerrar paneles.
 
-## 2. Base de datos para configuración e historial
+### 3. Evitar scroll suave en cada actualización
 
-Crear migración Supabase con dos tablas nuevas.
-
-### Tabla `consumption_alert_settings`
-
-Guardará los umbrales por cuenta y, opcionalmente, por usuario/cajero.
-
-Campos:
+Actualmente el chat hace:
 
 ```text
-id
-account_owner_id
-target_user_id nullable
-twilio_monthly_cost_threshold
-twilio_monthly_message_threshold
-whatsapp_api_unusual_growth_percent
-agent_monthly_message_threshold
-minimum_savings_percent
-enable_twilio_cost_alert
-enable_whatsapp_api_unusual_alert
-enable_agent_volume_alert
-enable_low_savings_alert
-created_at
-updated_at
+scrollIntoView({ behavior: 'smooth' })
 ```
 
-### Tabla `consumption_alert_history`
+en cada cambio de mensajes.
 
-Guardará cada alerta disparada y la recomendación generada.
+Ajustar para:
 
-Campos:
+- Usar scroll inmediato al cargar conversación.
+- Usar smooth solo para mensajes nuevos cuando el usuario ya está cerca del final.
+- No forzar scroll si el usuario está leyendo mensajes viejos.
 
-```text
-id
-account_owner_id
-target_user_id nullable
-alert_type
-severity
-title
-description
-recommended_action
-metric_value
-threshold_value
-period_start
-period_end
-metadata jsonb
-is_read
-created_at
-```
+Resultado:
 
-RLS:
+- Menos lag en conversaciones largas.
+- Mejor experiencia al revisar historial.
+
+---
+
+## Fase 2: Optimizar carga de Conversaciones
+
+### 1. Crear paginación real en conversaciones
+
+Actualmente `getConversations()` trae solo 100 y luego la página filtra en memoria.
+
+Agregar soporte para:
 
 ```text
-account_owner_id = get_account_owner_id(auth.uid())
-```
-
-Esto mantiene la arquitectura actual de Superadmin > Client/Admin > Cajero y evita mezclar datos entre cuentas.
-
-## 3. Motor de alertas inteligentes
-
-Crear una lógica central que evalúe las métricas actuales contra los umbrales configurados.
-
-Alertas a generar:
-
-- Twilio supera costo mensual definido.
-- Twilio supera mensajes mensuales definidos.
-- WhatsApp API crece de forma inusual contra el período anterior.
-- Un cajero/agente supera el volumen mensual permitido.
-- El ahorro cae por debajo del mínimo esperado.
-- Errores de envío recientes requieren revisión.
-
-Cada alerta incluirá:
-
-```text
-Título
-Descripción
-Severidad
-Métrica actual
-Umbral configurado
-Recomendación concreta
-Fecha
-Usuario/cajero relacionado si aplica
-```
-
-Ejemplo:
-
-```text
-Alerta: Twilio lleva $185.00 USD este mes.
-Recomendación: migrar tráfico a WhatsApp API para ahorrar aproximadamente 30%.
+limit
+offset / cursor
+filterMode
+assignmentFilter
+sessionFilter
+searchTerm
+selectedEmbudo
 ```
 
 Archivos:
 
-- `src/services/consumptionAlertsService.ts`
-- `src/services/reportsService.ts`
-- `src/hooks/useConsumptionAlerts.ts`
+- `src/services/conversationService.ts`
+- `src/hooks/useConversations.ts`
+- `src/pages/Conversations.tsx`
+- `src/components/conversations/ConversationList.tsx`
 
-## 4. Historial de alertas y recomendaciones en Dashboard
+Resultado:
 
-Agregar un panel en el Dashboard llamado **Alertas y recomendaciones**.
+- La base devuelve solo lo que se necesita.
+- Se podrá cargar “más conversaciones” con scroll.
+- Los filtros serán más rápidos en cuentas grandes.
 
-Mostrará:
+### 2. Mover filtros pesados al servidor
 
-- Últimas alertas disparadas.
-- Severidad.
-- Acción recomendada.
-- Fecha.
-- Cajero relacionado, si aplica.
-- Botón para marcar como leída.
-- Estado “sin alertas críticas” cuando todo está normal.
+Pasar estos filtros de frontend a Supabase:
 
-También reutilizará las alertas operativas existentes, pero ahora quedarán guardadas en historial y no solo calculadas en memoria.
+- Sin responder.
+- Sin respuesta +30 minutos.
+- Asignadas offline, usando lista de agentes online.
+- Por sesión.
+- Por asignación.
+- Por embudo / workspace.
+- Búsqueda por nombre o teléfono.
 
-Archivos:
+Resultado:
 
-- `src/components/dashboard/Dashboard.tsx`
-- `src/hooks/useDashboard.tsx`
-- `src/services/dashboardService.ts`
-- `src/components/dashboard/ConsumptionAlertsPanel.tsx`
+- Menos memoria en navegador.
+- Menos render de listas grandes.
+- Menos dependencia de tener todo cargado para filtrar.
 
-## 5. Recomendador de canal por tipo de lead
+### 3. Mejorar búsqueda
 
-Crear reglas de recomendación usando:
+Agregar debounce de búsqueda de 300 ms y no ejecutar búsqueda por cada tecla inmediatamente.
 
-- Tipo de lead:
-  - Nuevo.
-  - Caliente.
-  - En seguimiento.
-- Scoring derivado.
-- Costos Twilio vs WhatsApp API.
-- Disponibilidad de canales.
-- Período seleccionado en reportes.
-- Actividad reciente del lead.
+También evitar búsquedas con menos de 2 caracteres.
 
-Como no hay un campo único de scoring visible actualmente, se implementará un scoring derivado con señales existentes:
+Resultado:
 
-```text
-Lead nuevo:
-- creado recientemente
-- columna o etiqueta contiene “nuevo”
+- Menos consultas.
+- Mejor respuesta al escribir.
 
-Lead caliente:
-- columna/etiqueta contiene “caliente”, “interesado”, “calificado”
-- conversación reciente
-- comprobante detectado
-- alta actividad
+---
 
-Lead en seguimiento:
-- columna/etiqueta contiene “seguimiento”
-- última respuesta antigua
-- pendiente de contacto
-```
+## Fase 3: Optimizar lista visual de Conversaciones
 
-Recomendaciones ejemplo:
+### 1. Virtualizar la lista de chats
 
-```text
-Lead nuevo:
-Canal recomendado: WhatsApp API
-Motivo: menor costo para volumen alto.
+`ConversationList.tsx` renderiza todos los items disponibles.
 
-Lead caliente:
-Canal recomendado: WhatsApp QR o canal activo más confiable
-Motivo: priorizar respuesta rápida y continuidad.
+Agregar virtualización con una estrategia ligera:
 
-Lead en seguimiento:
-Canal recomendado: WhatsApp API
-Motivo: bajo costo para recontacto masivo.
-```
+- Renderizar solo los elementos visibles.
+- Mantener altura estimada por item.
+- Preservar selección actual.
 
-Archivos:
+Resultado:
 
-- `src/lib/channelCosts.ts`
-- `src/services/channelRecommendationService.ts`
-- `src/services/reportsService.ts`
-- `src/components/reports/LeadChannelRecommendationPanel.tsx`
-- Opcionalmente integración visual en `src/pages/Leads.tsx` o panel de Reportes.
+- Lista fluida aunque haya cientos o miles de conversaciones.
+- Menos DOM y menos renders.
 
-## 6. Panel de consumo y costos por cajero/agente
+### 2. Cargar tags solo de los visibles
 
-Ampliar el ranking de cajeros para mostrar costos estimados.
+Ya carga tags de las primeras 20 conversaciones, pero depende de `conversations.length`.
 
-Métricas por agente:
+Ajustar para que dependa de los IDs visibles/paginados y no vuelva a consultar datos ya cacheados.
 
-- Mensajes enviados.
-- Mensajes Twilio estimados.
-- Mensajes WhatsApp API estimados.
-- Costo Twilio.
-- Costo WhatsApp API.
-- Costo interno “Nuestro Sistema”.
-- Costo total estimado.
-- Ahorro estimado.
-- Porcentaje sobre el total del equipo.
-- Recomendación si envía demasiado.
+Resultado:
 
-Ejemplo:
+- Menos consultas a `contacts`.
+- Menos recargas innecesarias al filtrar.
 
-```text
-Cajero: Juan
-Mensajes: 742
-Twilio: 510 mensajes · $32.64 USD
-WhatsApp API: 232 mensajes · $10.39 USD
-Costo interno: $5.28 USD
-Recomendación: derivar más tráfico a WhatsApp API.
-```
+---
+
+## Fase 4: Optimizar mensajes dentro del chat
+
+### 1. Mantener paginación de mensajes y agregar “cargar anteriores”
+
+Actualmente se cargan 50 mensajes, pero no hay flujo claro para cargar anteriores desde la UI.
+
+Agregar:
+
+- Botón o carga automática al subir.
+- `hasMoreMessages`.
+- `loadOlderMessages`.
 
 Archivos:
 
-- `src/components/reports/AgentPerformanceRanking.tsx`
-- `src/components/reports/AgentCostPanel.tsx`
-- `src/services/reportsService.ts`
-- `src/hooks/useReports.ts`
+- `src/services/conversationService.ts`
+- `src/hooks/useConversations.ts`
+- `src/components/conversations/ChatArea.tsx`
 
-## 7. Reportes: integración con período seleccionado
+Resultado:
 
-Los nuevos cálculos respetarán el rango seleccionado en Reportes:
+- Chats largos abren rápido.
+- Historial completo sigue disponible bajo demanda.
 
-- Hoy.
-- 7 días.
-- 30 días.
-- Este mes.
-- Rango personalizado.
+### 2. Evitar invalidar toda la conversación después de enviar
 
-Se usarán las tarifas centralizadas actuales:
+Después de enviar, usar actualización de cache puntual en vez de invalidaciones amplias.
 
-```text
-Twilio: $0.064
-WhatsApp API: 30% menos que Twilio
-Nuestro Sistema: 0.00445 * 1.60
-```
+Resultado:
 
-Esto evita duplicar tarifas en diferentes componentes.
+- El mensaje aparece rápido.
+- Menos refetch.
+- Menos saltos visuales.
 
-## 8. Flujo de guardado de alertas
+---
 
-Cuando el Dashboard o Reportes calculen una alerta:
+## Fase 5: Optimizar Embudos / Kanban
 
-1. Se revisa la configuración activa del usuario.
-2. Se compara la métrica contra el umbral.
-3. Si supera el umbral, se genera recomendación.
-4. Se guarda en `consumption_alert_history`.
-5. Se evita duplicar la misma alerta dentro del mismo período.
-6. Se muestra en Dashboard.
+### 1. Eliminar carga duplicada de leads
 
-Para evitar spam de alertas, se usará una clave lógica por período:
+`Leads.tsx` todavía tiene `loadLeads()` que carga leads reales + conversaciones huérfanas, mientras `useInfiniteLeads()` también carga por páginas.
+
+Unificar la carga para que el tablero use una sola fuente:
 
 ```text
-account_owner_id + alert_type + target_user_id + period_start + period_end
+useInfiniteLeads
 ```
 
-## 9. Permisos y seguridad
+Mantener `loadLeads()` solo si queda necesario para compatibilidad, o retirarlo del flujo principal.
 
-- Solo usuarios admin/client podrán editar umbrales.
-- Cajeros podrán ver alertas si tienen permisos de dashboard/reportes.
-- Las tablas usarán RLS con `get_account_owner_id(auth.uid())`.
-- No se guardarán roles en `profiles`.
-- No se usará `service_role` en frontend.
-- No se modificará manualmente `src/integrations/supabase/types.ts`.
+Resultado:
 
-## 10. Orden de implementación
+- Menos consultas duplicadas.
+- Menor carga inicial.
+- Menos datos en memoria.
 
-1. Crear migración con tablas de configuración e historial.
-2. Crear servicio de configuración de alertas.
-3. Crear pestaña `Alertas de consumo` en Configuración.
-4. Crear motor de evaluación de alertas.
-5. Guardar historial evitando duplicados.
-6. Agregar panel de alertas/recomendaciones al Dashboard.
-7. Crear recomendador de canal por tipo de lead.
-8. Agregar panel de recomendaciones por lead en Reportes.
-9. Ampliar ranking de cajeros con costos estimados.
-10. Validar que todo compile correctamente.
+### 2. Reducir consultas por columna
 
-## Resultado esperado
+`useInfiniteLeads` hace por cada columna:
 
-El sistema quedará con una sección completa de control de consumo:
+- count total.
+- consulta de leads.
+- join con conversaciones.
+
+Optimizar con una de estas opciones:
+
+Opción recomendada:
+- Crear una función RPC `get_funnel_column_leads_page`.
+- Devuelve leads + conversación principal + total en una sola llamada por columna.
+
+Alternativa:
+- Mantener Supabase JS pero evitar count exacto en carga inicial y calcularlo bajo demanda.
+
+Resultado:
+
+- Menor tiempo de carga en embudos con muchas columnas.
+- Menos roundtrips a Supabase.
+
+### 3. Priorizar columnas visibles
+
+En vez de cargar todas las columnas en paralelo, cargar:
+
+1. Columnas visibles primero.
+2. Resto en background.
+3. Más leads al hacer scroll.
+
+Resultado:
+
+- El usuario ve el embudo antes.
+- Menos sensación de pantalla “trabada”.
+
+### 4. Evitar consulta por tarjeta para estado del bot
+
+Cada `LeadCard` usa `useBotBlock`, lo cual puede generar muchas consultas si hay muchas tarjetas.
+
+Cambiar a carga batch:
+
+- Obtener bloqueos de bot para los teléfonos visibles.
+- Pasar estado por props.
+- Actualizar localmente al activar/desactivar.
+
+Archivos:
+
+- `src/components/KanbanBoard.tsx`
+- `src/hooks/useBotBlock.tsx`
+- posible nuevo hook `useBotBlockMap.ts`
+
+Resultado:
+
+- Gran mejora en embudos con muchos leads.
+- Menos consultas N+1.
+
+---
+
+## Fase 6: Realtime más eficiente
+
+### 1. No invalidar listas completas salvo que sea necesario
+
+En `useConversations.ts`, actualizar cache puntual para:
+
+- `last_message`
+- `last_message_time`
+- `unread_count`
+- `assigned_to`
+- `status`
+
+Solo hacer refetch completo en casos como:
+
+- conversación nueva fuera de página actual,
+- cambio de filtro activo,
+- delete.
+
+### 2. Debounce de refresh en embudos
+
+Revisar el flujo realtime de `Leads.tsx` para que múltiples eventos no disparen recargas grandes.
+
+Aplicar:
 
 ```text
-Configuración > Alertas de consumo
-- Twilio máximo mensual: $150 USD
-- WhatsApp API consumo inusual: +40%
-- Cajero máximo mensual: 500 mensajes
-
-Dashboard
-- Twilio lleva $185 USD este mes
-- Recomendación: migrar tráfico a WhatsApp API
-- Cajero Juan envió 742 mensajes
-- Recomendación: revisar asignación o derivar campañas
-
-Reportes
-- Costo por cajero
-- Ahorro por agente
-- Canal recomendado por tipo de lead
+debounce 500-1000 ms
+refresh solo de columna afectada
+ignorar evento si fue movimiento optimista local
 ```
 
-Esto completa la parte avanzada del roadmap: alertas configurables, historial operativo, recomendaciones accionables y control de consumo por usuario.
+Resultado:
+
+- Menos parpadeos.
+- Menos recargas al mover tarjetas.
+- Menos carga cuando entran muchos mensajes.
+
+---
+
+## Fase 7: Índices de base de datos recomendados
+
+Agregar migración con índices seguros para los nuevos patrones de consulta.
+
+Índices sugeridos:
+
+```text
+conversations(user_id, lead_id, last_message_time desc)
+conversations(user_id, assigned_to, last_message_time desc)
+conversations(user_id, channel_type, last_message_time desc)
+conversations(user_id, whatsapp_number, last_message_time desc)
+conversations(user_id, twilio_connection_id, last_message_time desc)
+conversations(user_id, telegram_bot_id, last_message_time desc)
+conversations(user_id, unread_count, last_inbound_message_time desc)
+conversations(user_id, last_inbound_message_time desc) where unread_count > 0
+
+leads(user_id, column_id, last_inbound_message_time desc)
+leads(column_id, updated_at desc)
+
+contacts(phone_number)
+contacto_bloqueado_bot(user_id, numero)
+agent_presence(account_owner_id, last_seen_at desc)
+```
+
+No se modifica data histórica.
+
+RLS sigue usando la estructura actual:
+
+```text
+get_account_owner_id(auth.uid())
+```
+
+---
+
+## Fase 8: Medición antes y después
+
+Después de implementar, medir:
+
+### Conversaciones
+
+- Tiempo hasta ver lista de chats.
+- Tiempo al seleccionar una conversación.
+- Tiempo al escribir en input.
+- Tiempo al buscar.
+- Número de queries Supabase al cargar la página.
+- Número de renders de `ChatArea`.
+
+### Embudos
+
+- Tiempo hasta ver primeras columnas.
+- Tiempo hasta ver primeras tarjetas.
+- Tiempo al mover lead.
+- Queries por carga inicial.
+- Queries por tarjeta.
+- Uso de memoria y nodos DOM.
+
+Resultado esperado:
+
+```text
+Conversaciones:
+- apertura más rápida
+- menos lag al escribir
+- menos recargas completas
+- búsqueda más estable
+
+Embudos:
+- carga inicial más liviana
+- menos consultas por columna/tarjeta
+- drag and drop más fluido
+- mejor rendimiento en cuentas grandes
+```
+
+---
+
+## Orden de implementación recomendado
+
+1. Quitar logs pesados y memoizar cálculos en ChatArea.
+2. Optimizar scroll y renders del chat.
+3. Agregar debounce y paginación real en conversaciones.
+4. Mover filtros de conversaciones al servicio/query.
+5. Virtualizar lista de conversaciones.
+6. Unificar carga de embudos en `useInfiniteLeads`.
+7. Eliminar consultas N+1 de `useBotBlock` en tarjetas.
+8. Optimizar carga por columnas y realtime de embudos.
+9. Crear migración con índices faltantes.
+10. Medir rendimiento y ajustar.
+
+## Archivos principales a tocar
+
+- `src/hooks/useConversations.ts`
+- `src/services/conversationService.ts`
+- `src/pages/Conversations.tsx`
+- `src/components/conversations/ConversationList.tsx`
+- `src/components/conversations/ChatArea.tsx`
+- `src/pages/Leads.tsx`
+- `src/hooks/useInfiniteLeads.ts`
+- `src/components/KanbanBoard.tsx`
+- `src/hooks/useBotBlock.tsx`
+- `src/hooks/useQuickReplies.ts`
+- `supabase/migrations/*`
+
+## Nota sobre el resultado de performance observado
+
+En el preview de desarrollo se observó carga inicial lenta, pero gran parte viene del entorno Vite/dev server y carga de módulos. Eso no representa exactamente la velocidad del dominio publicado.
+
+Aun así, los problemas internos detectados en Chats y Embudos sí pueden afectar producción, especialmente:
+
+- logs masivos,
+- filtros en frontend,
+- consultas duplicadas,
+- renderizado de listas largas,
+- consultas por tarjeta,
+- realtime con invalidaciones amplias.
+
+Este plan ataca esos puntos directamente.
