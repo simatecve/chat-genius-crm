@@ -36,7 +36,7 @@ import type { Tables } from '@/integrations/supabase/types';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { TriggerActivationService } from '@/services/triggerActivationService';
 import { useAuth } from '@/hooks/useAuth';
-import { useBotBlock } from '@/hooks/useBotBlock';
+import { useBotBlockMap } from '@/hooks/useBotBlockMap';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useTags, syncTagsBetweenContactAndLead } from '@/hooks/useTags';
@@ -103,6 +103,7 @@ interface LeadCardProps {
   }[];
   onMoveToWorkspace?: (leadId: string, workspaceId: string) => void;
   apiConnectionNumbers?: Set<string>;
+  botBlockMap?: ReturnType<typeof useBotBlockMap>;
 }
 const LeadCardComponent: React.FC<LeadCardProps & {
   etiquetas: any[];
@@ -118,14 +119,13 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   onTagsUpdated,
   allWorkspaces,
   onMoveToWorkspace,
-  apiConnectionNumbers
+  apiConnectionNumbers,
+  botBlockMap
 }) => {
   const navigate = useNavigate();
-  const {
-    isBlocked,
-    isLoading: isBotToggling,
-    toggleBotBlock
-  } = useBotBlock(lead.phone || null, lead.name || null);
+  const isBlocked = botBlockMap?.isBlocked(lead.phone) ?? false;
+  const isBotToggling = botBlockMap?.isLoading(lead.phone) ?? false;
+  const toggleBotBlock = () => lead.phone && botBlockMap?.toggleBotBlock(lead.phone, lead.name);
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [leadTags, setLeadTags] = useState<string[]>(lead.tags || []);
@@ -483,6 +483,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     refresh: refreshTags
   } = useTags();
   const queryClient = useQueryClient();
+  const visiblePhones = useMemo(() => leads.map(lead => lead.phone).filter(Boolean) as string[], [leads]);
+  const botBlockMap = useBotBlockMap(visiblePhones);
 
   // Fetch WhatsApp API connection phone numbers
   const { data: apiConnectionNumbers } = useQuery({
@@ -563,7 +565,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           const conversationsCount = columnLeads.reduce((count, lead) => {
             return count + (lead.conversations?.length || 0);
           }, 0);
-          return <ColumnWithInfiniteScroll key={column.id} column={column} columnLeads={columnLeads} columnState={columnState} conversationsCount={conversationsCount} onEditColumn={onEditColumn} onDeleteColumn={onDeleteColumn} onCreateLead={onCreateLead} onEditLead={onEditLead} onDeleteLead={onDeleteLead} onConvertToContactList={onConvertToContactList} onManageMessageTriggers={onManageMessageTriggers} onOpenConversation={onOpenConversation} onLoadMore={onLoadMore} allWorkspaces={allWorkspaces} onMoveLeadToWorkspace={onMoveLeadToWorkspace} getTagColor={getTagColor} etiquetas={etiquetas} refreshTags={refreshTags} queryClient={queryClient} apiConnectionNumbers={apiConnectionNumbers} />;
+          return <ColumnWithInfiniteScroll key={column.id} column={column} columnLeads={columnLeads} columnState={columnState} conversationsCount={conversationsCount} onEditColumn={onEditColumn} onDeleteColumn={onDeleteColumn} onCreateLead={onCreateLead} onEditLead={onEditLead} onDeleteLead={onDeleteLead} onConvertToContactList={onConvertToContactList} onManageMessageTriggers={onManageMessageTriggers} onOpenConversation={onOpenConversation} onLoadMore={onLoadMore} allWorkspaces={allWorkspaces} onMoveLeadToWorkspace={onMoveLeadToWorkspace} getTagColor={getTagColor} etiquetas={etiquetas} refreshTags={refreshTags} queryClient={queryClient} apiConnectionNumbers={apiConnectionNumbers} botBlockMap={botBlockMap} />;
         })}
         </div>
       </TooltipProvider>
@@ -596,6 +598,7 @@ interface ColumnWithInfiniteScrollProps {
   refreshTags: () => void;
   queryClient: any;
   apiConnectionNumbers?: Set<string>;
+  botBlockMap?: ReturnType<typeof useBotBlockMap>;
 }
 const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
   column,
@@ -617,7 +620,8 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
   etiquetas,
   refreshTags,
   queryClient,
-  apiConnectionNumbers
+  apiConnectionNumbers,
+  botBlockMap
 }) => {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -734,7 +738,7 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
           <div ref={scrollContainerRef} className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
             <Droppable droppableId={column.id}>
               {(provided, snapshot) => <div ref={provided.innerRef} {...provided.droppableProps} className={`min-h-[200px] space-y-2 rounded-lg transition-all duration-200 ${snapshot.isDraggingOver ? 'bg-primary/10 border-2 border-dashed border-primary/40 p-2 scale-[1.01]' : 'border-2 border-transparent'}`}>
-                  {filteredLeads.map((lead, index) => <LeadCard key={lead.id} lead={lead} index={index} onEdit={onEditLead} onDelete={onDeleteLead} onOpenConversation={onOpenConversation} getTagColor={getTagColor} etiquetas={etiquetas} allWorkspaces={allWorkspaces} onMoveToWorkspace={onMoveLeadToWorkspace} apiConnectionNumbers={apiConnectionNumbers} onTagsUpdated={() => {
+                  {filteredLeads.map((lead, index) => <LeadCard key={lead.id} lead={lead} index={index} onEdit={onEditLead} onDelete={onDeleteLead} onOpenConversation={onOpenConversation} getTagColor={getTagColor} etiquetas={etiquetas} allWorkspaces={allWorkspaces} onMoveToWorkspace={onMoveLeadToWorkspace} apiConnectionNumbers={apiConnectionNumbers} botBlockMap={botBlockMap} onTagsUpdated={() => {
                 refreshTags();
                 queryClient.invalidateQueries({
                   queryKey: ['leads']
