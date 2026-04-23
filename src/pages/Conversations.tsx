@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import ConversationList from '@/components/conversations/ConversationList';
@@ -6,7 +6,7 @@ import ChatArea from '@/components/conversations/ChatArea';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { ContactInfoPanel } from '@/components/conversations/ContactInfoPanel';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { useConversations, useMessages, useSearchConversations } from '@/hooks/useConversations';
+import { useConversations, useMessages } from '@/hooks/useConversations';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffectiveUserId } from '@/hooks/useEffectiveUserId';
 import { useWhatsAppConnections } from '@/hooks/useWhatsAppConnections';
@@ -54,11 +54,8 @@ const Conversations = () => {
   const [selectedSessionFilter, setSelectedSessionFilter] = useState<string | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [onlineAgentIds, setOnlineAgentIds] = useState<string[]>([]);
+  const [allAgentIds, setAllAgentIds] = useState<string[]>([]);
 
-  // Hooks para gestionar datos
-  const { conversations, isLoading, unreadCount, markAsRead } = useConversations();
-  const { data: searchResults } = useSearchConversations(searchTerm);
-  const { messages, sendMessage, sendMessageWithAttachment, isSending } = useMessages(selectedConversation?.id || null);
   const { activeConnections, isSessionActiveByPhone, getSessionNameByPhone, connections: whatsappConnections } = useWhatsAppConnections();
   const { connections: twilioConnections, activeConnections: activeTwilioConnections, isConnectionActive } = useTwilioConnections();
   const { connections: telegramConnections } = useTelegramConnections();
@@ -97,11 +94,32 @@ const Conversations = () => {
     return options;
   }, [whatsappConnections, telegramConnections, twilioConnections]);
 
-  console.log('[Conversations] Current state:', {
-    selectedConversationId: selectedConversation?.id,
-    messagesCount: messages.length,
-    messagesPreview: messages.slice(0, 3).map(m => ({ id: m.id, content: m.content?.substring(0, 20), direction: m.direction }))
-  });
+  const activeLeadIds = filterMode === 'funnel'
+    ? selectedEmbudo
+      ? embudoLeadIds
+      : selectedWorkspace
+        ? workspaceLeadIds
+        : []
+    : undefined;
+  const selectedSessionOption = selectedSessionFilter ? sessionOptions.find(session => session.id === selectedSessionFilter) : null;
+  const offlineAgentIds = useMemo(() => allAgentIds.filter(id => !onlineAgentIds.includes(id)), [allAgentIds, onlineAgentIds]);
+  const conversationQueryOptions = useMemo(() => ({
+    limit: 120,
+    searchTerm,
+    filterMode,
+    assignmentFilter,
+    sessionFilter: selectedSessionOption ? {
+      type: selectedSessionOption.type,
+      id: selectedSessionOption.id,
+      identifier: selectedSessionOption.identifier,
+    } : null,
+    leadIds: activeLeadIds,
+    offlineAgentIds,
+  }), [searchTerm, filterMode, assignmentFilter, selectedSessionOption, activeLeadIds, offlineAgentIds]);
+
+  // Hooks para gestionar datos
+  const { conversations, isLoading, unreadCount, markAsRead } = useConversations(conversationQueryOptions);
+  const { messages, hasMoreMessages, isLoadingOlderMessages, loadOlderMessages, sendMessage, sendMessageWithAttachment, isSending } = useMessages(selectedConversation?.id || null);
 
   // Cargar workspaces
   useEffect(() => {
@@ -168,7 +186,9 @@ const Conversations = () => {
         .select('user_id, status, manual_override, last_seen_at')
         .eq('account_owner_id', effectiveUserId)
         .gte('last_seen_at', new Date(Date.now() - 90_000).toISOString());
-      setOnlineAgentIds((data || []).filter(agent => !['busy', 'offline'].includes(agent.manual_override || agent.status || 'offline')).map(agent => agent.user_id));
+      const agents = data || [];
+      setAllAgentIds(Array.from(new Set(agents.map(agent => agent.user_id))));
+      setOnlineAgentIds(agents.filter(agent => !['busy', 'offline'].includes(agent.manual_override || agent.status || 'offline')).map(agent => agent.user_id));
     };
     loadPresence();
   }, [effectiveUserId]);
@@ -188,66 +208,8 @@ const Conversations = () => {
     loadLeadsByEmbudo();
   }, [selectedEmbudo]);
 
-  // Determinar qué conversaciones mostrar
-  const displayConversations = React.useMemo(() => {
-    let filtered = searchTerm ? (searchResults || []) : conversations;
-    
-    // 1. Excluir webchat - tienen su propia página
-    filtered = filtered.filter(conv => conv.channel_type !== 'webchat');
-    
-    // 2. Filtrar por sesión/conexión si está seleccionada
-    if (selectedSessionFilter) {
-      const selectedSession = sessionOptions.find(s => s.id === selectedSessionFilter);
-      if (selectedSession) {
-        if (selectedSession.type === 'whatsapp') {
-          filtered = filtered.filter(conv => conv.whatsapp_number === selectedSession.identifier);
-        } else if (selectedSession.type === 'telegram') {
-          filtered = filtered.filter(conv => conv.telegram_bot_id === selectedSession.id);
-        } else if (selectedSession.type === 'twilio') {
-          filtered = filtered.filter(conv => conv.twilio_connection_id === selectedSession.id);
-        }
-      }
-    }
-    
-    // 3. Filtrar por modo operativo/embudo
-    if (filterMode === 'unassigned') {
-      filtered = filtered.filter(conv => !conv.lead_id);
-    } else if (filterMode === 'pending') {
-      filtered = filtered.filter(conv => (conv.unread_count || 0) > 0);
-    } else if (filterMode === 'stale') {
-      const cutoff = Date.now() - 30 * 60 * 1000;
-      filtered = filtered.filter(conv => (conv.unread_count || 0) > 0 && new Date(conv.last_inbound_message_time || conv.last_message_time || conv.created_at || 0).getTime() < cutoff);
-    } else if (filterMode === 'offline') {
-      filtered = filtered.filter(conv => conv.assigned_to && !onlineAgentIds.includes(conv.assigned_to));
-    } else if (filterMode === 'bot_off') {
-      filtered = filtered.filter((conv: any) => (conv.unread_count || 0) > 0 && !onlineAgentIds.includes(conv.assigned_to || '') && conv.channel_type !== 'webchat');
-    } else if (filterMode === 'urgent') {
-      filtered = filtered.filter(conv => !!conv.payment_receipt_detected_at || (conv.last_message || '').toLowerCase().includes('comprobante'));
-    } else if (filterMode === 'funnel') {
-      if (selectedEmbudo) {
-        filtered = filtered.filter(conv => conv.lead_id && embudoLeadIds.includes(conv.lead_id));
-      } else if (selectedWorkspace) {
-        filtered = filtered.filter(conv => conv.lead_id && workspaceLeadIds.includes(conv.lead_id));
-      }
-    }
-    // Si filterMode === 'all', no filtra por lead_id ni pendientes
-
-    // 4. Filtrar por asignación
-    if (assignmentFilter === 'mine' && user?.id) {
-      filtered = filtered.filter((c: any) => c.assigned_to === user.id);
-    } else if (assignmentFilter === 'unassigned') {
-      filtered = filtered.filter((c: any) => !c.assigned_to);
-    }
-
-    // 5. Ordenar por fecha de último mensaje descendente (más recientes primero)
-    filtered = [...filtered].sort((a, b) => {
-      const dateA = new Date(a.last_message_time || a.created_at || 0).getTime();
-      const dateB = new Date(b.last_message_time || b.created_at || 0).getTime();
-      return dateB - dateA;
-    });
-    
-    return filtered;
-  }, [searchTerm, searchResults, conversations, selectedEmbudo, selectedWorkspace, embudoLeadIds, workspaceLeadIds, filterMode, selectedSessionFilter, sessionOptions, assignmentFilter, user?.id, onlineAgentIds]);
+  // Las conversaciones ya llegan filtradas y ordenadas desde Supabase.
+  const displayConversations = React.useMemo(() => conversations, [conversations]);
 
   // Seleccionar conversación automáticamente desde navegación de embudos
   useEffect(() => {
@@ -264,11 +226,9 @@ const Conversations = () => {
 
   // Manejar selección de conversación
   const handleSelectConversation = (conversation: Conversation) => {
-    console.log('[Conversations] Selecting conversation:', conversation.id, 'unread:', conversation.unread_count);
     setSelectedConversation(conversation);
     if (conversation.unread_count && conversation.unread_count > 0) {
-      console.log('[Conversations] Marking as read:', conversation.id);
-      markAsRead(conversation.id);
+markAsRead(conversation.id);
     }
     
     // Auto-seleccionar sesión WhatsApp si está activa (buscar por phone_number, usar name para envío)
@@ -506,6 +466,9 @@ const Conversations = () => {
             <ChatArea
               conversation={selectedConversation}
               messages={messages}
+              hasMoreMessages={hasMoreMessages}
+              isLoadingOlderMessages={isLoadingOlderMessages}
+              onLoadOlderMessages={loadOlderMessages}
               onSendMessage={handleSendMessage}
               isSending={isSending}
               onToggleInfoPanel={() => setShowInfoPanel(true)}

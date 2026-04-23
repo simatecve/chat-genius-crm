@@ -1,0 +1,13 @@
+CREATE INDEX IF NOT EXISTS idx_conversations_user_lead_last_message ON public.conversations (user_id, lead_id, last_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_assigned_last_message ON public.conversations (user_id, assigned_to, last_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_channel_last_message ON public.conversations (user_id, channel_type, last_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_whatsapp_last_message ON public.conversations (user_id, whatsapp_number, last_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_twilio_last_message ON public.conversations (user_id, twilio_connection_id, last_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_telegram_last_message ON public.conversations (user_id, telegram_bot_id, last_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_unread_inbound ON public.conversations (user_id, unread_count, last_inbound_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_pending_inbound ON public.conversations (user_id, last_inbound_message_time DESC) WHERE unread_count > 0;
+CREATE INDEX IF NOT EXISTS idx_leads_user_column_inbound ON public.leads (user_id, column_id, last_inbound_message_time DESC);
+CREATE INDEX IF NOT EXISTS idx_leads_column_updated ON public.leads (column_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_contacts_phone_number ON public.contacts (phone_number);
+CREATE INDEX IF NOT EXISTS idx_contacto_bloqueado_bot_user_numero ON public.contacto_bloqueado_bot (user_id, numero);
+CREATE INDEX IF NOT EXISTS idx_agent_presence_owner_last_seen ON public.agent_presence (account_owner_id, last_seen_at DESC);

@@ -31,6 +31,9 @@ type Message = Database['public']['Tables']['messages']['Row'];
 interface ChatAreaProps {
   conversation: Conversation | null;
   messages: Message[];
+  hasMoreMessages?: boolean;
+  isLoadingOlderMessages?: boolean;
+  onLoadOlderMessages?: () => void;
   onSendMessage: (message: string, attachment?: File) => void;
   isSending: boolean;
   onToggleInfoPanel: () => void;
@@ -47,6 +50,9 @@ interface ChatAreaProps {
 const ChatArea: React.FC<ChatAreaProps> = ({
   conversation,
   messages,
+  hasMoreMessages = false,
+  isLoadingOlderMessages = false,
+  onLoadOlderMessages,
   onSendMessage,
   isSending,
   onToggleInfoPanel,
@@ -86,12 +92,29 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     return '****' + phone.slice(-4);
   };
 
-  // Auto-scroll al final cuando llegan nuevos mensajes
+  const previousConversationIdRef = useRef<string | null>(null);
+  const previousMessageCountRef = useRef(0);
+
+  const isNearBottom = useCallback(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
+    if (!viewport) return true;
+    return viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 120;
+  }, []);
+
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!messagesEndRef.current) return;
+
+    const conversationChanged = previousConversationIdRef.current !== conversation?.id;
+    const messageCountIncreased = messages.length > previousMessageCountRef.current;
+    const shouldAutoScroll = conversationChanged || (messageCountIncreased && isNearBottom());
+
+    if (shouldAutoScroll) {
+      messagesEndRef.current.scrollIntoView({ behavior: conversationChanged ? 'auto' : 'smooth' });
     }
-  }, [messages]);
+
+    previousConversationIdRef.current = conversation?.id || null;
+    previousMessageCountRef.current = messages.length;
+  }, [conversation?.id, messages.length, isNearBottom]);
 
   // Manejar envío de mensaje
   const handleSendMessage = async () => {
@@ -182,11 +205,10 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  // Filtrar respuestas rápidas
-  const filteredQuickReplies = quickReplies.filter(reply => 
+  const filteredQuickReplies = useMemo(() => quickReplies.filter(reply => 
     reply.title.toLowerCase().includes(quickReplyFilter) ||
     reply.message.toLowerCase().includes(quickReplyFilter)
-  );
+  ), [quickReplies, quickReplyFilter]);
 
   // Remover archivo seleccionado
   const removeSelectedFile = () => {
@@ -237,11 +259,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     return groups;
   };
 
-  console.log('[ChatArea] Rendering with:', {
-    hasConversation: !!conversation,
-    messagesCount: messages.length,
-    messages: messages.map(m => ({ id: m.id, content: m.content.substring(0, 20), direction: m.direction }))
-  });
 
   if (!conversation) {
     return (
@@ -259,13 +276,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     );
   }
 
-  const messageGroups = groupMessagesByDate(messages);
-  console.log('[ChatArea] Message groups:', Object.keys(messageGroups));
-  console.log('[ChatArea] Messages per group:', Object.entries(messageGroups).map(([date, msgs]) => ({
-    date,
-    count: msgs.length,
-    messages: msgs.map(m => ({ id: m.id, content: m.content?.substring(0, 30), created_at: m.created_at }))
-  })));
+  const messageGroups = useMemo(() => groupMessagesByDate(messages), [messages]);
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-background">
@@ -318,9 +329,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               <AssignToKanban 
                 conversationPhone={conversation.whatsapp_number}
                 conversationName={conversation.pushname}
-                onLeadAssigned={(lead) => {
-                  console.log('Lead asignado:', lead);
-                }}
+                onLeadAssigned={() => {}}
                 iconOnly
               />
             )}
@@ -346,9 +355,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                     <AssignToKanban 
                       conversationPhone={conversation.whatsapp_number}
                       conversationName={conversation.pushname}
-                      onLeadAssigned={(lead) => {
-                        console.log('Lead asignado:', lead);
-                      }}
+                      onLeadAssigned={() => {}}
                     />
                   </div>
                 )}
@@ -459,6 +466,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         ref={scrollAreaRef}
       >
         <div className="space-y-4">
+          {hasMoreMessages && (
+            <div className="flex justify-center">
+              <Button variant="ghost" size="sm" onClick={onLoadOlderMessages} disabled={isLoadingOlderMessages}>
+                {isLoadingOlderMessages ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cargar anteriores'}
+              </Button>
+            </div>
+          )}
           {Object.entries(messageGroups).map(([date, dateMessages]) => (
             <div key={date}>
               {/* Separador de fecha */}

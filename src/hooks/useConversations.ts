@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ConversationService, ConversationWithLastMessage } from '@/services/conversationService';
+import { ConversationQueryOptions, ConversationService, ConversationWithLastMessage } from '@/services/conversationService';
 import { useEffectiveUserId } from './useEffectiveUserId';
 import { useAuth } from './useAuth';
 import { useUserPermissions } from './useUserPermissions';
 import { useAssignmentSettings } from './useAssignmentSettings';
 import { Database } from '@/integrations/supabase/types';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useToast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -14,7 +14,7 @@ type MessageInsert = Database['public']['Tables']['messages']['Insert'];
 /**
  * Hook para gestionar conversaciones
  */
-export const useConversations = () => {
+export const useConversations = (options: Omit<ConversationQueryOptions, 'restrictToAgentId' | 'includeUnassigned' | 'currentUserId'> = {}) => {
   const { effectiveUserId } = useEffectiveUserId();
   const { user } = useAuth();
   const { isAdmin, hasPermission } = useUserPermissions();
@@ -25,13 +25,17 @@ export const useConversations = () => {
   const canSeeAll = isAdmin || hasPermission('puede_ver_mensajes_otros');
   const restrictToAgentId = !canSeeAll && user?.id ? user.id : null;
   const includeUnassigned = settings?.include_unassigned_for_all ?? true;
+  const optionsKey = JSON.stringify(options);
+  const stableOptions = useMemo(() => options, [optionsKey]);
 
   const conversationsQuery = useQuery({
-    queryKey: ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned],
+    queryKey: ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, stableOptions],
     queryFn: () =>
       ConversationService.getConversations(effectiveUserId || '', {
         restrictToAgentId,
         includeUnassigned,
+        currentUserId: user?.id || null,
+        ...stableOptions,
       }),
     enabled: !!effectiveUserId,
     staleTime: 30000,
@@ -74,12 +78,10 @@ export const useConversations = () => {
     const conversationsSubscription = ConversationService.subscribeToConversations(
       effectiveUserId,
       (payload) => {
-        console.log('Conversation change:', payload);
-        
-        // Si es UPDATE, actualizar el cache directamente y reordenar
+                // Si es UPDATE, actualizar el cache directamente y reordenar
         if (payload.eventType === 'UPDATE' && payload.new) {
           queryClient.setQueryData<ConversationWithLastMessage[]>(
-            ['conversations', effectiveUserId],
+            ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, stableOptions],
             (old) => {
               if (!old) return old;
               
@@ -117,9 +119,7 @@ export const useConversations = () => {
         },
         (payload) => {
           const newMsg = payload.new as any;
-          console.log('New message received globally:', newMsg?.conversation_id);
-          
-          // Actualizar unread count directamente en cache
+                    // Actualizar unread count directamente en cache
           if (newMsg?.direction === 'inbound' || newMsg?.direction === 'incoming') {
             queryClient.setQueryData<number>(
               ['unreadCount', effectiveUserId],
@@ -129,7 +129,7 @@ export const useConversations = () => {
           
           // Actualizar la conversación afectada directamente en cache en vez de refetch completo
           queryClient.setQueryData<ConversationWithLastMessage[]>(
-            ['conversations', effectiveUserId],
+            ['conversations', effectiveUserId, restrictToAgentId, includeUnassigned, stableOptions],
             (old) => {
               if (!old) return old;
               
@@ -166,7 +166,7 @@ export const useConversations = () => {
       conversationsSubscription.unsubscribe();
       supabase.removeChannel(messagesChannel);
     };
-  }, [effectiveUserId, queryClient]);
+  }, [effectiveUserId, queryClient, restrictToAgentId, includeUnassigned, stableOptions]);
 
   return {
     conversations: conversationsQuery.data || [],
@@ -184,11 +184,17 @@ export const useConversations = () => {
  */
 export const useSearchConversations = (searchTerm: string) => {
   const { effectiveUserId } = useEffectiveUserId();
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   return useQuery({
-    queryKey: ['searchConversations', effectiveUserId, searchTerm],
-    queryFn: () => ConversationService.searchConversations(effectiveUserId || '', searchTerm),
-    enabled: !!effectiveUserId && searchTerm.length > 0,
+    queryKey: ['searchConversations', effectiveUserId, debouncedSearchTerm],
+    queryFn: () => ConversationService.searchConversations(effectiveUserId || '', debouncedSearchTerm),
+    enabled: !!effectiveUserId && debouncedSearchTerm.length >= 2,
     staleTime: 10000,
   });
 };
@@ -201,12 +207,15 @@ export const useMessages = (conversationId: string | null) => {
   const { effectiveUserId } = useEffectiveUserId();
   const queryClient = useQueryClient();
 
-  console.log('[useMessages] conversationId:', conversationId, 'effectiveUserId:', effectiveUserId);
+  const [messageLimit, setMessageLimit] = useState(50);
 
+  useEffect(() => {
+    setMessageLimit(50);
+  }, [conversationId]);
   // Query para obtener mensajes - optimizado
   const messagesQuery = useQuery({
-    queryKey: ['messages', conversationId, effectiveUserId],
-    queryFn: () => ConversationService.getMessages(conversationId || '', effectiveUserId || ''),
+    queryKey: ['messages', conversationId, effectiveUserId, messageLimit],
+    queryFn: () => ConversationService.getMessages(conversationId || '', effectiveUserId || '', messageLimit),
     enabled: !!conversationId && !!effectiveUserId,
     staleTime: 30000, // 30 segundos - el realtime maneja nuevos mensajes
     refetchInterval: false, // Desactivar polling - realtime es suficiente
@@ -248,7 +257,7 @@ export const useMessages = (conversationId: string | null) => {
       await queryClient.cancelQueries({ queryKey: ['messages', conversationId] });
       
       // Snapshot del estado anterior
-      const previousMessages = queryClient.getQueryData<Message[]>(['messages', conversationId, effectiveUserId]);
+      const previousMessages = queryClient.getQueryData<Message[]>(['messages', conversationId, effectiveUserId, messageLimit]);
       
       // Crear mensaje temporal optimista
       const tempMessage: Message = {
@@ -270,25 +279,20 @@ export const useMessages = (conversationId: string | null) => {
       
       // Agregar mensaje optimista a la cache
       queryClient.setQueryData<Message[]>(
-        ['messages', conversationId, effectiveUserId],
+        ['messages', conversationId, effectiveUserId, messageLimit],
         (old = []) => [...old, tempMessage]
       );
-      
-      console.log('[Optimistic] Added temp message:', tempMessage.id);
       
       return { previousMessages };
     },
     onSuccess: (savedMessage) => {
-      console.log('[Message] Sent successfully, refreshing...');
-      // Invalidar mensajes para obtener el mensaje real del servidor
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (error, variables, context) => {
       console.error('Error sending message:', error);
       // Revertir al estado anterior en caso de error
       if (context?.previousMessages) {
-        queryClient.setQueryData(['messages', conversationId, effectiveUserId], context.previousMessages);
+        queryClient.setQueryData(['messages', conversationId, effectiveUserId, messageLimit], context.previousMessages);
       }
       toast({
         title: 'Error',
@@ -362,12 +366,10 @@ export const useMessages = (conversationId: string | null) => {
     const subscription = ConversationService.subscribeToMessages(
       conversationId,
       (payload) => {
-        console.log('Message change:', payload);
-        
-        if (payload.eventType === 'INSERT') {
+                if (payload.eventType === 'INSERT') {
           // Agregar nuevo mensaje a la cache con la key correcta (incluye effectiveUserId)
           queryClient.setQueryData(
-            ['messages', conversationId, effectiveUserId],
+            ['messages', conversationId, effectiveUserId, messageLimit],
             (oldMessages: Message[] = []) => {
               // Evitar duplicados por ID real
               const exists = oldMessages.some(msg => msg.id === payload.new.id);
@@ -382,19 +384,20 @@ export const useMessages = (conversationId: string | null) => {
             }
           );
         }
-        
-        // Invalidar conversaciones para actualizar último mensaje
-        queryClient.invalidateQueries({ queryKey: ['conversations'] });
+
       }
     );
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [conversationId, queryClient]);
+  }, [conversationId, queryClient, effectiveUserId, messageLimit]);
 
   return {
     messages: messagesQuery.data || [],
+    hasMoreMessages: (messagesQuery.data?.length || 0) >= messageLimit,
+    isLoadingOlderMessages: messagesQuery.isFetching && messageLimit > 50,
+    loadOlderMessages: () => setMessageLimit(prev => prev + 50),
     isLoading: messagesQuery.isLoading,
     error: messagesQuery.error,
     sendMessage: sendMessageMutation.mutate,
