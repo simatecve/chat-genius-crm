@@ -719,6 +719,7 @@ const defaultWs = data.find(w => w.is_default) || data[0];
   };
   const handleCreateLead = async () => {
     if (!newLead.name.trim()) return;
+    const currentLeads = getAllLeads();
 
     // Si no se especifica columna, usar la columna por defecto
     let targetColumnId = newLead.column_id;

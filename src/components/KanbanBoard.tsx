@@ -483,7 +483,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     refresh: refreshTags
   } = useTags();
   const queryClient = useQueryClient();
-  const visiblePhones = useMemo(() => leads.map(lead => lead.phone).filter(Boolean) as string[], [leads]);
+  const safeLeads = useMemo(() => leads.filter((lead): lead is LeadWithColumn => Boolean(lead?.id)), [leads]);
+  const visiblePhones = useMemo(() => safeLeads.map(lead => lead.phone).filter(Boolean) as string[], [safeLeads]);
   const botBlockMap = useBotBlockMap(visiblePhones);
 
   // Fetch WhatsApp API connection phone numbers
@@ -502,7 +503,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     staleTime: 60000,
   });
   const getLeadsByColumn = (columnId: string) => {
-    return leads.filter(lead => lead && lead.column_id === columnId).sort((a, b) => {
+    return safeLeads.filter(lead => lead.column_id === columnId).sort((a, b) => {
       // Obtener el último mensaje de cada lead
       const lastMessageA = a.conversations?.[0]?.last_message_time;
       const lastMessageB = b.conversations?.[0]?.last_message_time;
