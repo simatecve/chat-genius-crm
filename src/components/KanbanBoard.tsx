@@ -70,9 +70,9 @@ interface ColumnState {
 interface KanbanBoardProps {
   columns: LeadColumn[];
   leads: LeadWithColumn[];
-  onEditColumn: (column: LeadColumn) => void;
-  onDeleteColumn: (columnId: string) => void;
-  onCreateLead: (columnId: string) => void;
+  onEditColumn?: (column: LeadColumn) => void;
+  onDeleteColumn?: (columnId: string) => void;
+  onCreateLead?: (columnId: string) => void;
   onEditLead?: (lead: Lead) => void;
   onDeleteLead?: (leadId: string) => void;
   onMoveLeadToColumn?: (leadId: string, targetColumnId: string) => void;
@@ -582,9 +582,9 @@ interface ColumnWithInfiniteScrollProps {
   columnLeads: LeadWithColumn[];
   columnState?: ColumnState;
   conversationsCount: number;
-  onEditColumn: (column: LeadColumn) => void;
-  onDeleteColumn: (columnId: string) => void;
-  onCreateLead: (columnId: string) => void;
+  onEditColumn?: (column: LeadColumn) => void;
+  onDeleteColumn?: (columnId: string) => void;
+  onCreateLead?: (columnId: string) => void;
   onEditLead?: (lead: Lead) => void;
   onDeleteLead?: (leadId: string) => void;
   onConvertToContactList?: (column: LeadColumn) => void;

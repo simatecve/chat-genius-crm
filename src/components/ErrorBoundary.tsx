@@ -37,8 +37,8 @@ class ErrorBoundary extends Component<Props, State> {
           <AlertTitle>Error de Renderizado</AlertTitle>
           <AlertDescription>
             Ha ocurrido un error al mostrar este componente. Por favor, recarga la página o contacta al soporte técnico.
-            {import.meta.env.DEV && (
-              <details className="mt-2">
+            {this.state.error && (
+              <details className="mt-2 whitespace-normal break-words">
                 <summary>Detalles del error (solo en desarrollo)</summary>
                 <pre className="text-xs mt-1 whitespace-pre-wrap">
                   {this.state.error?.message}
