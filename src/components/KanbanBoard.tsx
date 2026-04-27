@@ -711,10 +711,10 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEditColumn(column)}>
+                {onEditColumn && <DropdownMenuItem onClick={() => onEditColumn(column)}>
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
-                </DropdownMenuItem>
+                </DropdownMenuItem>}
                 {onManageMessageTriggers && <DropdownMenuItem onClick={() => onManageMessageTriggers(column)}>
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Disparadores de Mensaje
@@ -723,7 +723,7 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
                     <Users className="h-4 w-4 mr-2" />
                     Convertir a Lista de Contactos
                   </DropdownMenuItem>}
-                {!column.is_default && <DropdownMenuItem onClick={() => onDeleteColumn(column.id)} className="text-destructive">
+                {onDeleteColumn && !column.is_default && <DropdownMenuItem onClick={() => onDeleteColumn(column.id)} className="text-destructive">
                     <Trash2 className="h-4 w-4 mr-2" />
                     Eliminar
                   </DropdownMenuItem>}
@@ -733,10 +733,10 @@ const ColumnWithInfiniteScroll: React.FC<ColumnWithInfiniteScrollProps> = ({
         </CardHeader>
         <CardContent className="space-y-2 px-3 pb-3">
           {/* Add Lead Button */}
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted/50 h-8" onClick={() => onCreateLead(column.id)}>
+          {onCreateLead && <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted/50 h-8" onClick={() => onCreateLead(column.id)}>
             <Plus className="h-3.5 w-3.5 mr-2" />
             <span className="text-xs">Agregar Lead</span>
-          </Button>
+          </Button>}
 
           {/* Droppable Area for Leads con scroll */}
           <div ref={scrollContainerRef} className="max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
