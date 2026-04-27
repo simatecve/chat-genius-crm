@@ -205,6 +205,8 @@ const LeadCardComponent: React.FC<LeadCardProps & {
   const isWhatsAppApi = channelType === 'whatsapp' && !!conversation?.whatsapp_number && !!apiConnectionNumbers?.has(conversation.whatsapp_number);
   const lastMessage = conversation?.last_message;
   const lastMessageTime = conversation?.last_message_time;
+  const unreadCount = conversation?.unread_count || 0;
+  const hasUnread = unreadCount > 0;
   
   // Format time and date (hour above, date below)
   const formattedTime = lastMessageTime 
@@ -218,7 +220,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
     <Draggable draggableId={lead.id} index={index}>
       {(provided, snapshot) => <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`mb-2 transition-all duration-200 ${snapshot.isDragging ? 'scale-105 rotate-1 z-50 opacity-95' : 'animate-kanban-drop'}`}>
           <Card 
-            className={`p-3 transition-all cursor-grab border-border/40 bg-card/80 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' : 'hover:bg-muted/30 hover:shadow-md'} ${lead.isVirtual ? 'border-l-4 border-l-amber-500/70' : ''}`} 
+            className={`p-3 transition-all cursor-grab border-border/40 bg-card/80 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/30 cursor-grabbing' : 'hover:bg-muted/30 hover:shadow-md'} ${lead.isVirtual ? 'border-l-4 border-l-amber-500/70' : ''} ${hasUnread ? 'border-l-4 border-l-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm' : ''}`} 
             onMouseDown={(e) => {
               dragStartPos.current = { x: e.clientX, y: e.clientY };
             }}
@@ -248,9 +250,10 @@ const LeadCardComponent: React.FC<LeadCardProps & {
             <div className="flex items-start gap-3">
               {/* Avatar con icono de canal superpuesto */}
               <div className="relative shrink-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${lead.isVirtual ? 'bg-amber-500/20 text-amber-600' : 'bg-muted'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${lead.isVirtual ? 'bg-amber-500/20 text-amber-600' : hasUnread ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                   {displayName.charAt(0).toUpperCase()}
                 </div>
+                {hasUnread && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary ring-2 ring-background" />}
                 {/* Icono de canal superpuesto */}
                 {channelType && (
                   <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-background flex items-center justify-center border border-border shadow-sm">
@@ -264,7 +267,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                 {/* Fila 1: Nombre + Hora */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="font-semibold text-sm truncate">
+                    <span className={`text-sm truncate ${hasUnread ? 'font-bold text-foreground' : 'font-semibold'}`}>
                       {displayName}
                     </span>
                     {lead.isVirtual && (
@@ -272,9 +275,9 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                         Nuevo
                       </Badge>
                     )}
-                    {hasConversation && conversation && conversation.unread_count > 0 && (
-                      <Badge variant="destructive" className="h-4 w-4 p-0 flex items-center justify-center text-[10px] shrink-0">
-                        {conversation.unread_count}
+                    {hasUnread && (
+                      <Badge variant="destructive" className="min-h-5 min-w-5 px-1.5 flex items-center justify-center text-[10px] shrink-0 shadow-sm">
+                        {unreadCount}
                       </Badge>
                     )}
                   </div>
@@ -290,7 +293,7 @@ const LeadCardComponent: React.FC<LeadCardProps & {
                 
                 {/* Fila 2: Último mensaje + Icono bot */}
                 <div className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="text-xs text-muted-foreground truncate flex-1">
+                  <span className={`text-xs truncate flex-1 ${hasUnread ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                     {lastMessage 
                       ? (lastMessage.length > 35 ? lastMessage.substring(0, 35) + '...' : lastMessage)
                       : 'Sin mensajes'}
