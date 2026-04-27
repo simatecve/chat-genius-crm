@@ -235,7 +235,7 @@ const EditSessionDialog = ({ open, onClose, sessionType, session, onSuccess }: E
       }
 
       const { error: updateError } = await supabase
-        .from(tableName)
+        .from(tableName as any)
         .update(updateData)
         .eq('id', session.id);
 

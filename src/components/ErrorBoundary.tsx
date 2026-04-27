@@ -37,7 +37,7 @@ class ErrorBoundary extends Component<Props, State> {
           <AlertTitle>Error de Renderizado</AlertTitle>
           <AlertDescription>
             Ha ocurrido un error al mostrar este componente. Por favor, recarga la página o contacta al soporte técnico.
-            {process.env.NODE_ENV === 'development' && (
+            {import.meta.env.DEV && (
               <details className="mt-2">
                 <summary>Detalles del error (solo en desarrollo)</summary>
                 <pre className="text-xs mt-1 whitespace-pre-wrap">
