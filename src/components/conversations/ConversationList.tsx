@@ -364,6 +364,8 @@ const ConversationItem = memo<ConversationItemProps>(({
   tags,
   getTagColor
 }) => {
+  const hasUnread = (conversation.unread_count || 0) > 0;
+
   // Determinar el ícono según el tipo de canal
   const channelIcon = useMemo(() => {
     if (conversation.channel_type === 'whatsapp') {
@@ -382,7 +384,8 @@ const ConversationItem = memo<ConversationItemProps>(({
     <div 
       onClick={onSelect} 
       className={cn(
-        "h-[89px] p-3 md:p-4 cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted", 
+        "h-[89px] p-3 md:p-4 cursor-pointer hover:bg-muted/50 transition-colors active:bg-muted border-l-4 border-l-transparent", 
+        hasUnread && "bg-primary/10 border-l-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]",
         isSelected && "bg-muted"
       )}
     >
@@ -398,12 +401,15 @@ const ConversationItem = memo<ConversationItemProps>(({
               {channelIcon}
             </div>
           )}
+          {hasUnread && (
+            <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary ring-2 ring-background" />
+          )}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <h3 className="text-sm md:text-base font-medium truncate">
+              <h3 className={cn("text-sm md:text-base truncate", hasUnread ? "font-bold text-foreground" : "font-medium")}>
                 {conversation.pushname || (isCajero ? maskPhoneNumber(conversation.whatsapp_number) : conversation.whatsapp_number)}
               </h3>
             </div>
@@ -436,11 +442,11 @@ const ConversationItem = memo<ConversationItemProps>(({
           )}
 
           <div className="flex items-center justify-between mt-1">
-            <p className="text-sm text-muted-foreground truncate">
+            <p className={cn("text-sm truncate", hasUnread ? "font-medium text-foreground" : "text-muted-foreground")}>
               {conversation.last_message || 'Sin mensajes'}
             </p>
-            {conversation.unread_count && conversation.unread_count > 0 && (
-              <Badge variant="destructive" className="text-xs ml-2">
+            {hasUnread && (
+              <Badge variant="destructive" className="text-xs ml-2 min-w-6 justify-center shadow-sm">
                 {conversation.unread_count}
               </Badge>
             )}
