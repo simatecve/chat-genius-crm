@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
@@ -74,6 +74,7 @@ const Leads = () => {
     loading: effectiveUserIdLoading
   } = useEffectiveUserId();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Permisos específicos de embudos
   const canCreateFunnels = isAdmin || hasPermission('puede_crear_embudos');
@@ -327,6 +328,29 @@ const Leads = () => {
       });
     }
   };
+
+  const openConversationById = useCallback(async (conversationId: string) => {
+    const { data: fullConversation, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('id', conversationId)
+      .single();
+
+    if (fullConversation && !error) {
+      setSelectedConversation(fullConversation);
+      setSelectedConversationId(fullConversation.id);
+      setIsChatModalOpen(true);
+      markAsRead(fullConversation.id);
+      return true;
+    }
+
+    toast({
+      title: 'Error',
+      description: 'No se pudo cargar la conversación',
+      variant: 'destructive'
+    });
+    return false;
+  }, [markAsRead]);
   useEffect(() => {
     if (effectiveUserId && !effectiveUserIdLoading) {
       loadData();
@@ -416,6 +440,17 @@ return;
 
   // Obtener leads desde el hook de paginación
   const paginatedLeads = useMemo(() => getAllLeads(), [getAllLeads]);
+
+  useEffect(() => {
+    const state = location.state as { conversationId?: string } | null;
+    if (!state?.conversationId) return;
+
+    openConversationById(state.conversationId).then((opened) => {
+      if (opened) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    });
+  }, [location.state, location.pathname, navigate, openConversationById]);
 
   useEffect(() => {
     const loadConversationIdsWithMessages = async () => {
