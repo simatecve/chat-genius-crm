@@ -153,7 +153,7 @@ const Leads = () => {
   });
 
   // Ref para debounce de recargas realtime
-  const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Estado para el modal de chat
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);

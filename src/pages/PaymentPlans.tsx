@@ -170,7 +170,7 @@ const PaymentPlans = () => {
           user_id: user.id,
           plan_id: planId,
           status: 'pending',
-          started_at: new Date().toISOString()
+          start_date: new Date().toISOString()
         }, {
           onConflict: 'user_id',
           ignoreDuplicates: false
