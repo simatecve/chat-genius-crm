@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, LogOut, MessageSquare, Trash2, ChevronDown, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,16 +11,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { dashboardService, ActiveConversation } from '@/services/dashboardService';
 import { useProfile } from '@/hooks/useProfile';
 import { AgentPresenceChip } from './AgentPresenceChip';
+import { playIncomingMessageSound } from '@/lib/notificationSound';
 export const Header = () => {
   const { signOut, user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [activeConversations, setActiveConversations] = React.useState<ActiveConversation[]>([]);
   const unreadCount = React.useMemo(() => activeConversations.reduce((sum, c) => sum + (c.unread_count || 0), 0), [activeConversations]);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
   const clearAlerts = React.useCallback(() => {
     setActiveConversations([]);
   }, []);
+  const openConversationInFunnel = React.useCallback((conversationId: string) => {
+    setAlertsOpen(false);
+    navigate('/leads', { state: { conversationId } });
+  }, [navigate]);
   const fetchActive = React.useCallback(async () => {
     if (!user?.id) return;
     const list = await dashboardService.getActiveConversations(user.id, 5);
@@ -37,7 +44,11 @@ export const Header = () => {
         table: 'messages',
         event: 'INSERT',
         filter: `user_id=eq.${user.id}`,
-      }, async () => {
+      }, async (payload) => {
+        const newMessage = payload.new as { direction?: string } | null;
+        if (newMessage?.direction === 'inbound' || newMessage?.direction === 'incoming') {
+          playIncomingMessageSound();
+        }
         await fetchActive();
       })
       .on('postgres_changes', {
@@ -103,10 +114,15 @@ export const Header = () => {
                 <ScrollArea className="h-64">
                   <div className="space-y-1">
                     {activeConversations.map((c) => (
-                      <div key={c.id} className="px-2 py-2 rounded-md hover:bg-muted/50">
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => openConversationInFunnel(c.id)}
+                        className="w-full px-2 py-2 text-left rounded-md hover:bg-muted/60 focus:bg-muted/60 focus:outline-none transition-colors cursor-pointer"
+                      >
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-3">
-                            <MessageSquare className="h-4 w-4" />
+                            <MessageSquare className="h-4 w-4 mt-0.5 text-primary" />
                             <div>
                               <div className="text-sm font-medium">{c.pushname || c.whatsapp_number}</div>
                               {c.last_message && (
@@ -125,7 +141,7 @@ export const Header = () => {
                             </span>
                           )}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </ScrollArea>
