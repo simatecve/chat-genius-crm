@@ -2,20 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://pxvembsxhwvpotydtiqa.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dmVtYnN4aHd2cG90eWR0aXFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3NTgwMzcsImV4cCI6MjA3OTMzNDAzN30.PsDIcCO0Dq1Zis-2iO-ffAbnK11ksSxEqsrRMua49pk";
+const SUPABASE_URL = "https://owxkdodbgqtnhdnrspqp.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93eGtkb2RiZ3F0bmhkbnJzcHFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMjk4NDksImV4cCI6MjA5MjkwNTg0OX0.Z5BRSlE3-XhC5VDjSX-V0FOU9zne2Y4gFGPapxxp9Sc";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-// Regular client for normal operations.
-// SECURITY: The service_role key MUST NEVER be exposed to the client.
-// All administrative operations (creating/deleting users, listing auth users,
-// updating emails/passwords) are now performed via secure edge functions:
-//   - admin-list-users
-//   - admin-update-user
-//   - create-user
-//   - delete-user
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
