@@ -1,5 +1,5 @@
 # Etapa 1: Construir la aplicación React (Vite)
-FROM node:18-alpine AS build
+FROM node:20-alpine AS build
 
 # Establecer el directorio de trabajo
 WORKDIR /app
@@ -39,8 +39,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copiar la salida del build de Vite al directorio público de Nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Exponer el puerto 80
-EXPOSE 80
+# Exponer el puerto 3000
+EXPOSE 3000
 
 # Iniciar Nginx
 CMD ["nginx", "-g", "daemon off;"]
