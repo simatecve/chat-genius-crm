@@ -39,8 +39,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copiar la salida del build de Vite al directorio público de Nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Exponer el puerto 3000
-EXPOSE 3000
+# Exponer el puerto 3001
+EXPOSE 3001
 
 # Iniciar Nginx
 CMD ["nginx", "-g", "daemon off;"]
