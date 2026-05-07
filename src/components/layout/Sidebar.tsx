@@ -97,6 +97,11 @@ export const Sidebar = () => {
       icon: Send,
       href: '/campanas-masivas',
       permission: 'puede_enviar_mensajes'
+    }, {
+      label: 'Llamadas IA',
+      icon: Phone,
+      href: '/llamadas-ia',
+      permission: 'puede_enviar_mensajes'
     }]
   }, {
     label: 'Gestión',
