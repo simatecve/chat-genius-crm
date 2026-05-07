@@ -478,8 +478,8 @@ export class ConversationService {
    * Suscribirse a cambios en tiempo real de conversaciones
    */
   static subscribeToConversations(userId: string, callback: (payload: any) => void) {
-    // Usar nombre de canal fijo para reusar conexiones (sin Date.now())
-    const channelName = `conversations-${userId}`;
+    // Unique channel name per subscription to avoid reusing an already-subscribed channel
+    const channelName = `conversations-${userId}-${crypto.randomUUID()}`;
     
     return supabase
       .channel(channelName)
@@ -505,8 +505,8 @@ export class ConversationService {
    * Suscribirse a cambios en tiempo real de mensajes
    */
   static subscribeToMessages(conversationId: string, callback: (payload: any) => void) {
-    // Usar nombre de canal fijo para reusar conexiones (sin Date.now())
-    const channelName = `messages-${conversationId}`;
+    // Unique channel name per subscription to avoid reusing an already-subscribed channel
+    const channelName = `messages-${conversationId}-${crypto.randomUUID()}`;
     
     return supabase
       .channel(channelName)
