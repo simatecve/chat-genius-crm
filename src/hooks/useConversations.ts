@@ -108,8 +108,12 @@ export const useConversations = (options: Omit<ConversationQueryOptions, 'restri
     );
 
     // Suscribirse a nuevos mensajes para reordenar conversaciones
+    // Supabase no permite agregar callbacks postgres_changes a un canal que ya está
+    // en estado joining/joined. En React StrictMode o rerenders rápidos, removeChannel
+    // puede no completar antes del siguiente effect, así que el topic debe ser único.
+    const messagesChannelName = `messages-global-${effectiveUserId}-${crypto.randomUUID()}`;
     const messagesChannel = supabase
-      .channel(`messages-global-${effectiveUserId}`)
+      .channel(messagesChannelName)
       .on(
         'postgres_changes',
         {
