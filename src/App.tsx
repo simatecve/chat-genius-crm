@@ -25,6 +25,7 @@ const Leads = lazy(() => import("./pages/Leads"));
 const LeadsWebChat = lazy(() => import("./pages/LeadsWebChat"));
 const Conversations = lazy(() => import("./pages/Conversations"));
 const LlamadasIA = lazy(() => import("./pages/LlamadasIA"));
+const EmailInboxes = lazy(() => import("./pages/EmailInboxes"));
 const InternalChat = lazy(() => import("./pages/InternalChat"));
 const LandingChat = lazy(() => import("./pages/LandingChat"));
 const Sales = lazy(() => import("./pages/Sales"));
@@ -143,6 +144,11 @@ const App = () => (
               <Route path="/llamadas-ia" element={
                 <ProtectedRoute>
                   <LlamadasIA />
+                </ProtectedRoute>
+              } />
+              <Route path="/bandejas-email" element={
+                <ProtectedRoute>
+                  <EmailInboxes />
                 </ProtectedRoute>
               } />
               <Route path="/calendario" element={

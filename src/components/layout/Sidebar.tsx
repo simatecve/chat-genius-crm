@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare, Globe, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, UserPlus, Send, Settings, Menu, X, Bot, Phone, ShoppingCart, MessagesSquare, Globe, BarChart3, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useConversations } from '@/hooks/useConversations';
@@ -102,6 +102,11 @@ export const Sidebar = () => {
       icon: Phone,
       href: '/llamadas-ia',
       permission: 'puede_enviar_mensajes'
+    }, {
+      label: 'Bandejas de Email',
+      icon: Mail,
+      href: '/bandejas-email',
+      permission: 'puede_ver_chats'
     }]
   }, {
     label: 'Gestión',
