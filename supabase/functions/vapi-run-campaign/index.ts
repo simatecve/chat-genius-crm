@@ -33,13 +33,10 @@ serve(async (req) => {
     const contacts = campaign.contacts;
     console.log(`Starting campaign ${campaign.name} for ${contacts.length} contacts`);
 
-    // 3. Ejecutar llamadas (podemos usar Promise.all con un limitador si es necesario, 
-    // pero para empezar las lanzaremos secuencialmente o en pequeños batches)
+    // 3. Ejecutar llamadas
     for (const phone of contacts) {
       try {
-        // Llamar a nuestra propia función vapi-call internamente o directamente a VAPI
-        // Para simplificar, llamamos a la API de VAPI directamente desde aquí
-        await fetch("https://api.vapi.ai/call", {
+        const vapiResp = await fetch("https://api.vapi.ai/call", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${Deno.env.get("VAPI_KEY")}`,
@@ -52,8 +49,15 @@ serve(async (req) => {
             metadata: { campaignId: campaign.id }
           }),
         });
+
+        if (!vapiResp.ok) {
+          const errorText = await vapiResp.text();
+          console.error(`VAPI Call Failed for ${phone}:`, errorText);
+        } else {
+          console.log(`VAPI Call Success for ${phone}`);
+        }
       } catch (e) {
-        console.error(`Error calling ${phone}:`, e);
+        console.error(`Network Error calling ${phone}:`, e);
       }
     }
 

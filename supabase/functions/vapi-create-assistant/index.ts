@@ -72,6 +72,16 @@ serve(async (req) => {
     const vapiData = await vapiResp.json();
     const vapiAssistantId = vapiData.id;
 
+    // --- NUEVO: PUBLICAR EL ASISTENTE ---
+    // Esto elimina el mensaje de "Unsaved changes" y activa el asistente
+    await fetch(`https://api.vapi.ai/assistant/${vapiAssistantId}/publish`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${Deno.env.get("VAPI_KEY")}`,
+        "Content-Type": "application/json",
+      },
+    });
+
     // Guardar en Supabase
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
