@@ -62,7 +62,7 @@ serve(async (req) => {
       console.log(`Descargando email desde s3://${bucketName}/${objectKey}`)
 
       // Inicializar cliente de S3 usando variables de entorno de Supabase
-      const s3Client = new S3Client({
+      let s3Client = new S3Client({
         region: Deno.env.get('AWS_REGION') ?? 'us-east-1',
         credentials: {
           accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') ?? '',
@@ -70,14 +70,43 @@ serve(async (req) => {
         }
       });
 
-      // Obtener el documento de S3
-      const getObjCmd = new GetObjectCommand({
-        Bucket: bucketName,
-        Key: objectKey
-      });
-      const s3Response = await s3Client.send(getObjCmd);
+      let s3Response;
+      try {
+        const getObjCmd = new GetObjectCommand({
+          Bucket: bucketName,
+          Key: objectKey
+        });
+        s3Response = await s3Client.send(getObjCmd);
+      } catch (err) {
+        // Manejar error de redirección de región (PermanentRedirect)
+        if (err.name === 'PermanentRedirect' || (err.$metadata?.httpStatusCode === 301)) {
+          const endpoint = err.Endpoint || err.endpoint;
+          console.log(`Redirección de S3 detectada. Reintentando con endpoint: ${endpoint}`);
+          
+          if (endpoint) {
+            // Reintentar con el endpoint específico proporcionado por AWS
+            s3Client = new S3Client({
+              region: Deno.env.get('AWS_REGION') ?? 'us-east-1',
+              endpoint: `https://${endpoint}`,
+              credentials: {
+                accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') ?? '',
+                secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') ?? '',
+              }
+            });
+            const retryCmd = new GetObjectCommand({
+              Bucket: bucketName,
+              Key: objectKey
+            });
+            s3Response = await s3Client.send(retryCmd);
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
       
-      if (!s3Response.Body) {
+      if (!s3Response || !s3Response.Body) {
           throw new Error("No body received from S3")
       }
       
