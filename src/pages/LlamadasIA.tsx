@@ -243,49 +243,54 @@ export default function LlamadasIA() {
       });
       if (!assistantRes.success) throw new Error(assistantRes.error || 'Error al crear asistente');
 
-      const vapiAssistantId = assistantRes.vapiAssistantId;
-
-      // 2. Guardar campaña en ia_calls
-      const { data: campaign, error: campaignErr } = await supabase
-        .from('ia_calls')
+      // 2. Guardar campaña en vapi_campaigns
+      const { error: campaignErr } = await supabase
+        .from('vapi_campaigns')
         .insert({
-          user_id: user?.id,
           name: campaignName,
+          assistant_id: assistantRes.vapiAssistantId,
+          phone_number_id: selectedPhoneId,
           contacts,
-          knowledge_base_text: systemPrompt,
-          knowledge_base_files: [],
-          status: 'processing',
-        })
-        .select('id').single();
+          status: 'pending',
+        });
 
       if (campaignErr) throw campaignErr;
 
-      // 3. Disparar llamada por cada contacto
-      let success = 0;
-      for (const phone of contacts) {
-        const callRes = await callFn('vapi-call', {
-          destination: phone,
-          assistantId: vapiAssistantId,
-          phoneNumberId: selectedPhoneId,
-          campaignId: campaign.id,
-        });
-        if (callRes.success) success++;
-      }
-
       toast({
-        title: '¡Campaña lanzada!',
-        description: `Asistente creado y ${success}/${contacts.length} llamadas iniciadas.`,
+        title: '¡Campaña guardada!',
+        description: `El asistente se creó correctamente. Ahora puedes ejecutar la campaña desde la pestaña Gestión.`,
       });
 
       // Limpiar formulario
       setCampaignName(''); setFirstMessage(''); setSystemPrompt('');
       setContactsText(''); setKbFiles([]); setSelectedPhoneId('');
-      await loadCalls();
-      setActiveTab('history');
+      loadCampaigns();
+      setActiveTab('campaigns');
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
       setLoadingCreate(false);
+    }
+  };
+
+  const executeCampaign = async (campaign: VapiCampaign) => {
+    toast({ title: "Iniciando campaña", description: "Procesando llamadas en segundo plano..." });
+    
+    // Optimismo: actualizar UI
+    setCampaigns(prev => prev.map(c => c.id === campaign.id ? { ...c, status: 'running' } : c));
+
+    try {
+      const res = await callFn('vapi-run-campaign', { campaignId: campaign.id });
+      if (res.success) {
+        toast({ title: "Campaña completada", description: `Se han procesado los contactos de ${campaign.name}` });
+      } else {
+        toast({ title: "Error en campaña", description: res.error, variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error de conexión", variant: "destructive" });
+    } finally {
+      loadCampaigns();
+      loadCalls();
     }
   };
 
