@@ -54,7 +54,11 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 function callFn(fn: string, body: object) {
   return fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+    headers: { 
+      'Content-Type': 'application/json', 
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+    },
     body: JSON.stringify(body),
   }).then(r => r.json());
 }
