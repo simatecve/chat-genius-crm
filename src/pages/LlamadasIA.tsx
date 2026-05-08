@@ -89,9 +89,12 @@ export default function LlamadasIA() {
   const [campaignName, setCampaignName] = useState('');
   const [firstMessage, setFirstMessage] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
-  const [voiceId, setVoiceId] = useState('bIHbv24MWmeRgasZH58o'); // Rachel (ElevenLabs)
-  const [voiceProvider, setVoiceProvider] = useState('elevenlabs');
+  const [voiceId, setVoiceId] = useState('bIHbv24MWmeRgasZH58o'); // Rachel (11labs)
+  const [voiceProvider, setVoiceProvider] = useState('11labs');
   const [modelName, setModelName] = useState('gpt-4o-mini');
+  const [availableVoices, setAvailableVoices] = useState<any[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(false);
+
   const [contactsText, setContactsText] = useState('');
   const [kbFiles, setKbFiles] = useState<AttachmentFile[]>([]);
   const [selectedPhoneId, setSelectedPhoneId] = useState('');
@@ -119,7 +122,30 @@ export default function LlamadasIA() {
     loadPhoneNumbers();
     loadAssistants();
     loadCalls();
+    loadVoices();
   }, []);
+
+  async function loadVoices() {
+    const { data } = await supabase.from('vapi_voices').select('*').order('name');
+    if (data) setAvailableVoices(data);
+  }
+
+  async function syncVoices() {
+    setLoadingVoices(true);
+    try {
+      const res = await callFn('vapi-sync-voices', {});
+      if (res.success) {
+        toast({ title: "Voces sincronizadas", description: `Se han cargado ${res.count} voces.` });
+        loadVoices();
+      } else {
+        toast({ title: "Error", description: res.details || "No se pudieron sincronizar las voces.", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error de conexión", variant: "destructive" });
+    } finally {
+      setLoadingVoices(false);
+    }
+  }
 
   const loadPhoneNumbers = async () => {
     setLoadingNumbers(true);
@@ -358,7 +384,17 @@ export default function LlamadasIA() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Voz del asistente</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Voz del asistente</Label>
+                    <button 
+                      onClick={syncVoices} 
+                      className="text-[10px] text-primary hover:underline flex items-center gap-1"
+                      disabled={loadingVoices}
+                    >
+                      {loadingVoices ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      Sincronizar voces
+                    </button>
+                  </div>
                   <select
                     value={`${voiceProvider}:${voiceId}`}
                     onChange={e => {
@@ -368,17 +404,20 @@ export default function LlamadasIA() {
                     }}
                     className="w-full p-2 rounded-md bg-background border border-border text-foreground text-sm"
                   >
-                    <optgroup label="ElevenLabs (Recomendado)">
-                      <option value="elevenlabs:bIHbv24MWmeRgasZH58o">Rachel (Femenina)</option>
-                      <option value="elevenlabs:pNInz6obpgDQGcFMA">Adam (Masculino)</option>
-                    </optgroup>
-                    <optgroup label="PlayHT">
-                      <option value="playht:jennifer">Jennifer (Femenina)</option>
-                      <option value="playht:will">Will (Masculino)</option>
-                    </optgroup>
-                    <optgroup label="Google">
-                      <option value="google:es-MX-Standard-A">Español MX Femenino</option>
-                      <option value="google:es-ES-Standard-A">Español ES Femenino</option>
+                    <option value="11labs:bIHbv24MWmeRgasZH58o">Voz por defecto (Rachel - 11labs)</option>
+                    {availableVoices.length > 0 && (
+                      <optgroup label="Voces disponibles en VAPI">
+                        {availableVoices.map(v => (
+                          <option key={v.vapi_voice_id} value={`${v.provider}:${v.vapi_voice_id}`}>
+                            {v.name} ({v.provider})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="Opciones rápidas">
+                      <option value="11labs:pNInz6obpgDQGcFMA">Adam (11labs)</option>
+                      <option value="playht:jennifer">Jennifer (PlayHT)</option>
+                      <option value="google:es-MX-Standard-A">Español MX (Google)</option>
                     </optgroup>
                   </select>
                 </div>
