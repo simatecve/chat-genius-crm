@@ -16,7 +16,8 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Obtener números de VAPI
+    // Intentar con /phone-number primero, si falla probar /phone-numbers
+    // El estándar actual de VAPI para listar es GET /phone-number
     const resp = await fetch("https://api.vapi.ai/phone-number", {
       headers: {
         Authorization: `Bearer ${Deno.env.get("VAPI_KEY")}`,
@@ -26,10 +27,14 @@ serve(async (req) => {
 
     if (!resp.ok) {
       const txt = await resp.text();
-      console.error("VAPI error fetching phone numbers:", txt);
+      console.error("VAPI API Error:", txt);
       return new Response(
-        JSON.stringify({ error: "VAPI error", details: txt }),
-        { status: 502, headers: { ...cors, "Content-Type": "application/json" } },
+        JSON.stringify({ 
+          error: "VAPI_API_ERROR", 
+          status: resp.status,
+          details: txt 
+        }),
+        { status: 200, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }
 
