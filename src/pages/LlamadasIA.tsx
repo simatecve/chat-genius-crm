@@ -89,8 +89,8 @@ export default function LlamadasIA() {
   const [campaignName, setCampaignName] = useState('');
   const [firstMessage, setFirstMessage] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
-  const [voiceId, setVoiceId] = useState('jennifer');
-  const [modelName, setModelName] = useState('gpt-4o-mini');
+  const [voiceId, setVoiceId] = useState('bIHbv24MWmeRgasZH58o'); // Rachel (ElevenLabs)
+  const [voiceProvider, setVoiceProvider] = useState('elevenlabs');
   const [contactsText, setContactsText] = useState('');
   const [kbFiles, setKbFiles] = useState<AttachmentFile[]>([]);
   const [selectedPhoneId, setSelectedPhoneId] = useState('');
@@ -183,6 +183,7 @@ export default function LlamadasIA() {
         name: campaignName,
         firstMessage: firstMessage || 'Hola, ¿cómo puedo ayudarte?',
         systemPrompt,
+        voiceProvider,
         voiceId,
         modelName,
       });
@@ -358,16 +359,26 @@ export default function LlamadasIA() {
                 <div className="space-y-2">
                   <Label>Voz del asistente</Label>
                   <select
-                    value={voiceId}
-                    onChange={e => setVoiceId(e.target.value)}
+                    value={`${voiceProvider}:${voiceId}`}
+                    onChange={e => {
+                      const [p, id] = e.target.value.split(':');
+                      setVoiceProvider(p);
+                      setVoiceId(id);
+                    }}
                     className="w-full p-2 rounded-md bg-background border border-border text-foreground text-sm"
                   >
-                    <option value="jennifer">Jennifer (Inglés)</option>
-                    <option value="es-ES-Standard-A">Español ES Femenino</option>
-                    <option value="es-MX-Standard-A">Español MX Femenino</option>
-                    <option value="es-US-Standard-A">Español US Femenino</option>
-                    <option value="pNInz6obpgDQGcFMA">Adam (ElevenLabs)</option>
-                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel (ElevenLabs)</option>
+                    <optgroup label="ElevenLabs (Recomendado)">
+                      <option value="elevenlabs:bIHbv24MWmeRgasZH58o">Rachel (Femenina)</option>
+                      <option value="elevenlabs:pNInz6obpgDQGcFMA">Adam (Masculino)</option>
+                    </optgroup>
+                    <optgroup label="PlayHT">
+                      <option value="playht:jennifer">Jennifer (Femenina)</option>
+                      <option value="playht:will">Will (Masculino)</option>
+                    </optgroup>
+                    <optgroup label="Google">
+                      <option value="google:es-MX-Standard-A">Español MX Femenino</option>
+                      <option value="google:es-ES-Standard-A">Español ES Femenino</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div className="space-y-2">
