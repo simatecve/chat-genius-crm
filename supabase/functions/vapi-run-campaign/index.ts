@@ -34,6 +34,7 @@ serve(async (req) => {
     console.log(`Starting campaign ${campaign.name} for ${contacts.length} contacts`);
 
     // 3. Ejecutar llamadas
+    let firstError = null;
     for (const phone of contacts) {
       try {
         const vapiResp = await fetch("https://api.vapi.ai/call", {
@@ -45,26 +46,29 @@ serve(async (req) => {
           body: JSON.stringify({
             assistantId: campaign.assistant_id,
             phoneNumberId: campaign.phone_number_id,
-            customer: {
-              number: phone
-            },
-            assistantOverrides: {
-              variableValues: {
-                name: "Cliente"
-              }
-            }
+            customer: { number: phone },
+            // Algunos servidores de Vapi prefieren este campo plano:
+            customerNumber: phone 
           }),
         });
 
         if (!vapiResp.ok) {
-          const errorText = await vapiResp.text();
-          console.error(`VAPI Call Failed for ${phone}:`, errorText);
-        } else {
-          console.log(`VAPI Call Success for ${phone}`);
+          firstError = await vapiResp.text();
+          console.error(`VAPI Error for ${phone}:`, firstError);
+          break; // Detener para informar el error
         }
       } catch (e) {
-        console.error(`Network Error calling ${phone}:`, e);
+        firstError = e.message;
+        break;
       }
+    }
+
+    if (firstError) {
+      await supabase.from("vapi_campaigns").update({ status: "error" }).eq("id", campaignId);
+      return new Response(JSON.stringify({ success: false, error: firstError }), {
+        status: 200, // Retornamos 200 para que el CRM lea el JSON de error
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
     }
 
     // 4. Finalizar

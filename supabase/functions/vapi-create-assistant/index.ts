@@ -73,14 +73,20 @@ serve(async (req) => {
     const vapiAssistantId = vapiData.id;
 
     // --- NUEVO: PUBLICAR EL ASISTENTE ---
-    // Esto elimina el mensaje de "Unsaved changes" y activa el asistente
-    await fetch(`https://api.vapi.ai/assistant/${vapiAssistantId}/publish`, {
+    const pubResp = await fetch(`https://api.vapi.ai/assistant/${vapiAssistantId}/publish`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${Deno.env.get("VAPI_KEY")}`,
         "Content-Type": "application/json",
       },
     });
+    
+    if (pubResp.ok) {
+      console.log("Assistant published successfully");
+    } else {
+      const pubErr = await pubResp.text();
+      console.error("Assistant publish failed:", pubErr);
+    }
 
     // Guardar en Supabase
     const supabase = createClient(
