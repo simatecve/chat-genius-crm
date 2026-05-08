@@ -45,8 +45,14 @@ serve(async (req) => {
           body: JSON.stringify({
             assistantId: campaign.assistant_id,
             phoneNumberId: campaign.phone_number_id,
-            customer: { number: phone },
-            metadata: { campaignId: campaign.id }
+            customer: {
+              number: phone
+            },
+            assistantOverrides: {
+              variableValues: {
+                name: "Cliente"
+              }
+            }
           }),
         });
 
