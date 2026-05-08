@@ -91,6 +91,7 @@ export default function LlamadasIA() {
   const [systemPrompt, setSystemPrompt] = useState('');
   const [voiceId, setVoiceId] = useState('bIHbv24MWmeRgasZH58o'); // Rachel (ElevenLabs)
   const [voiceProvider, setVoiceProvider] = useState('elevenlabs');
+  const [modelName, setModelName] = useState('gpt-4o-mini');
   const [contactsText, setContactsText] = useState('');
   const [kbFiles, setKbFiles] = useState<AttachmentFile[]>([]);
   const [selectedPhoneId, setSelectedPhoneId] = useState('');
