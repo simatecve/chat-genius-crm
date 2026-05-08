@@ -28,120 +28,123 @@ serve(async (req) => {
       return new Response("Invalid JSON", { status: 400 })
     }
 
-    // 1. Manejar confirmación de suscripción de AWS SNS
-    if (payload.Type === 'SubscriptionConfirmation' && payload.SubscribeURL) {
+    let bucketName = null;
+    let objectKey = null;
+
+    // Detect if payload is array from n8n
+    if (Array.isArray(payload) && payload.length > 0 && payload[0].bucket && payload[0].key) {
+      bucketName = payload[0].bucket;
+      objectKey = payload[0].key;
+      console.log(`Direct S3 payload detected. Bucket: ${bucketName}, Key: ${objectKey}`);
+    } else if (payload.Type === 'SubscriptionConfirmation' && payload.SubscribeURL) {
+      // 1. Manejar confirmación de suscripción de AWS SNS
       console.log("Confirmando suscripción a SNS:", payload.SubscribeURL)
       await fetch(payload.SubscribeURL)
       return new Response(JSON.stringify({ success: true, message: "Subscription confirmed" }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
-    }
-
-    // 2. Procesar notificación de SES (viene dentro de un evento de SNS en payload.Message)
-    if (payload.Type === 'Notification' && payload.Message) {
+    } else if (payload.Type === 'Notification' && payload.Message) {
+      // 2. Procesar notificación de SES (viene dentro de un evento de SNS en payload.Message)
       const sesMessage = JSON.parse(payload.Message)
       
       if (sesMessage.notificationType === 'Received') {
-        const mailInfo = sesMessage.mail
         const receipt = sesMessage.receipt
-
-        // Buscar información de S3 (donde SES guardó el correo crudo)
         const s3Action = receipt.action
         if (s3Action && s3Action.type === 'S3') {
-          const bucketName = s3Action.bucketName
-          const objectKey = s3Action.objectKey
-
-          console.log(`Descargando email desde s3://${bucketName}/${objectKey}`)
-
-          // Inicializar cliente de S3 usando variables de entorno de Supabase
-          // Necesitas configurar AWS_REGION, AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY en Supabase
-          const s3Client = new S3Client({
-            region: Deno.env.get('AWS_REGION') ?? 'us-east-1',
-            credentials: {
-              accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') ?? '',
-              secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') ?? '',
-            }
-          });
-
-          // Obtener el documento de S3
-          const getObjCmd = new GetObjectCommand({
-            Bucket: bucketName,
-            Key: objectKey
-          });
-          const s3Response = await s3Client.send(getObjCmd);
-          
-          if (!s3Response.Body) {
-             throw new Error("No body received from S3")
-          }
-          
-          const emailRawStream = await s3Response.Body.transformToByteArray();
-          const emailRawBuffer = Buffer.from(emailRawStream);
-
-          // Parsear el archivo raw EML/MIME
-          const parsedEmail = await simpleParser(emailRawBuffer);
-
-          const fromEmail = parsedEmail.from?.value[0]?.address || mailInfo.source || '';
-          const toEmailList = parsedEmail.to?.value?.map(t => t.address) || mailInfo.destination || [];
-          const toEmail = toEmailList[0] || '';
-          const subject = parsedEmail.subject || mailInfo.commonHeaders?.subject || '';
-          const textBody = parsedEmail.text || '';
-          const htmlBody = parsedEmail.html || '';
-
-          if (!toEmail) {
-            console.log("No destination email found");
-            return new Response("No destination email", { status: 200 })
-          }
-
-          // 3. Buscar si existe una bandeja para este correo destino
-          const { data: inbox, error: inboxError } = await supabaseClient
-            .from('email_inboxes')
-            .select('id')
-            .eq('email_address', toEmail)
-            .single()
-
-          // Si no existe la bandeja, podemos crearla opcionalmente o ignorar el correo.
-          // El usuario indicó: "con eso vas a crear la bandeja de email"
-          let inboxId = inbox?.id;
-          
-          if (!inboxId) {
-            console.log(`Bandeja no encontrada para ${toEmail}, creando una nueva...`);
-            const { data: newInbox, error: createInboxError } = await supabaseClient
-              .from('email_inboxes')
-              .insert({
-                email_address: toEmail,
-                name: `Bandeja de ${toEmail}`,
-                provider: 'smtp'
-              })
-              .select('id')
-              .single()
-              
-            if (createInboxError) throw createInboxError;
-            inboxId = newInbox.id;
-          }
-
-          // 4. Insertar el mensaje en la base de datos
-          const { error: insertError } = await supabaseClient
-            .from('email_messages')
-            .insert({
-              inbox_id: inboxId,
-              from_email: fromEmail,
-              to_email: toEmail,
-              subject: subject,
-              body_text: textBody,
-              body_html: htmlBody,
-              direction: 'inbound',
-              is_read: false
-            })
-
-          if (insertError) {
-            console.error("Error guardando el mensaje:", insertError);
-            throw insertError;
-          }
-          
-          console.log("Mensaje procesado y guardado correctamente.");
+          bucketName = s3Action.bucketName
+          objectKey = s3Action.objectKey
         }
       }
+    }
+
+    if (bucketName && objectKey) {
+      console.log(`Descargando email desde s3://${bucketName}/${objectKey}`)
+
+      // Inicializar cliente de S3 usando variables de entorno de Supabase
+      const s3Client = new S3Client({
+        region: Deno.env.get('AWS_REGION') ?? 'us-east-1',
+        credentials: {
+          accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') ?? '',
+          secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') ?? '',
+        }
+      });
+
+      // Obtener el documento de S3
+      const getObjCmd = new GetObjectCommand({
+        Bucket: bucketName,
+        Key: objectKey
+      });
+      const s3Response = await s3Client.send(getObjCmd);
+      
+      if (!s3Response.Body) {
+          throw new Error("No body received from S3")
+      }
+      
+      const emailRawStream = await s3Response.Body.transformToByteArray();
+
+      // Parsear el archivo raw EML/MIME
+      const parsedEmail = await simpleParser(emailRawStream);
+
+      const fromEmail = parsedEmail.from?.value[0]?.address || '';
+      const toEmailList = parsedEmail.to?.value?.map(t => t.address) || [];
+      const toEmail = toEmailList[0] || '';
+      const subject = parsedEmail.subject || '';
+      const textBody = parsedEmail.text || '';
+      const htmlBody = parsedEmail.html || '';
+
+      if (!toEmail) {
+        console.log("No destination email found");
+        return new Response("No destination email", { status: 200 })
+      }
+
+      // 3. Buscar si existe una bandeja para este correo destino
+      const { data: inbox, error: inboxError } = await supabaseClient
+        .from('email_inboxes')
+        .select('id')
+        .eq('email_address', toEmail)
+        .single()
+
+      let inboxId = inbox?.id;
+      
+      if (!inboxId) {
+        console.log(`Bandeja no encontrada para ${toEmail}, creando una nueva...`);
+        const { data: newInbox, error: createInboxError } = await supabaseClient
+          .from('email_inboxes')
+          .insert({
+            email_address: toEmail,
+            name: `Bandeja de ${toEmail}`,
+            provider: 'smtp'
+          })
+          .select('id')
+          .single()
+          
+        if (createInboxError) throw createInboxError;
+        inboxId = newInbox.id;
+      }
+
+      // 4. Insertar el mensaje en la base de datos
+      const { error: insertError } = await supabaseClient
+        .from('email_messages')
+        .insert({
+          inbox_id: inboxId,
+          from_email: fromEmail,
+          to_email: toEmail,
+          subject: subject,
+          body_text: textBody,
+          body_html: htmlBody,
+          direction: 'inbound',
+          is_read: false
+        })
+
+      if (insertError) {
+        console.error("Error guardando el mensaje:", insertError);
+        throw insertError;
+      }
+      
+      console.log("Mensaje procesado y guardado correctamente.");
+    } else {
+      console.log("Payload ignorado o formato no reconocido");
     }
 
     return new Response(JSON.stringify({ success: true }), {
