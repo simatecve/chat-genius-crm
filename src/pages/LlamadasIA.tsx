@@ -24,6 +24,16 @@ interface VapiAssistant {
   created_at: string;
 }
 
+interface VapiCampaign {
+  id: string;
+  name: string;
+  assistant_id: string;
+  phone_number_id: string;
+  contacts: string[];
+  status: 'pending' | 'running' | 'completed';
+  created_at: string;
+}
+
 interface VapiPhoneNumber {
   id: string;
   vapi_phone_number_id: string;
@@ -46,7 +56,14 @@ interface VapiCall {
 
 interface AttachmentFile { file: File; name: string; }
 
-type ActiveTab = 'create' | 'calls' | 'history';
+type ActiveTab = 'create' | 'campaigns' | 'calls' | 'history';
+
+const tabs: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'create', label: 'Nueva Campaña', icon: <Bot className="h-4 w-4" /> },
+  { id: 'campaigns', label: 'Gestión de Campañas', icon: <Play className="h-4 w-4" /> },
+  { id: 'calls', label: 'Llamada Rápida', icon: <PhoneCall className="h-4 w-4" /> },
+  { id: 'history', label: 'Historial', icon: <BarChart3 className="h-4 w-4" /> },
+];
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -102,10 +119,12 @@ export default function LlamadasIA() {
 
   // ---- Listas ----
   const [assistants, setAssistants] = useState<VapiAssistant[]>([]);
+  const [campaigns, setCampaigns] = useState<VapiCampaign[]>([]);
   const [phoneNumbers, setPhoneNumbers] = useState<VapiPhoneNumber[]>([]);
   const [calls, setCalls] = useState<VapiCall[]>([]);
   const [loadingNumbers, setLoadingNumbers] = useState(false);
   const [loadingCalls, setLoadingCalls] = useState(false);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
 
   // ---- Llamada rápida ----
   const [quickDest, setQuickDest] = useState('');
@@ -290,12 +309,6 @@ export default function LlamadasIA() {
     avgDuration: calls.filter(c => c.duration_seconds).reduce((acc, c) => acc + (c.duration_seconds ?? 0), 0)
       / (calls.filter(c => c.duration_seconds).length || 1),
   };
-
-  const tabs: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'create', label: 'Nueva Campaña', icon: <Bot className="h-4 w-4" /> },
-    { id: 'calls', label: 'Llamada Rápida', icon: <PhoneCall className="h-4 w-4" /> },
-    { id: 'history', label: 'Historial', icon: <BarChart3 className="h-4 w-4" /> },
-  ];
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -500,7 +513,61 @@ export default function LlamadasIA() {
           </Card>
         )}
 
-        {/* ========== TAB: LLAMADA RÁPIDA ========== */}
+        {/* ========== TAB: GESTIÓN DE CAMPAÑAS ========== */}
+        {activeTab === 'campaigns' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Mis Campañas</h2>
+              <Button variant="outline" size="sm" onClick={loadCampaigns} disabled={loadingCampaigns}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loadingCampaigns ? 'animate-spin' : ''}`} />
+                Actualizar lista
+              </Button>
+            </div>
+            {loadingCampaigns ? (
+              <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            ) : campaigns.length === 0 ? (
+              <Card><CardContent className="p-12 text-center text-muted-foreground">No hay campañas creadas aún.</CardContent></Card>
+            ) : (
+              <div className="grid gap-4">
+                {campaigns.map(camp => (
+                  <Card key={camp.id} className="overflow-hidden border-border bg-card/50">
+                    <CardContent className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-lg text-foreground">{camp.name}</h3>
+                          <Badge variant={camp.status === 'completed' ? 'default' : camp.status === 'running' ? 'secondary' : 'outline'}>
+                            {camp.status.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Creada: {new Date(camp.created_at).toLocaleString()}
+                        </p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3" /> {camp.contacts.length} contactos
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Bot className="h-3 w-3" /> Asistente: {camp.assistant_id.substring(0, 8)}...
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 w-full md:w-auto">
+                        <Button 
+                          onClick={() => executeCampaign(camp)} 
+                          disabled={camp.status === 'running'}
+                          className={`flex-1 md:flex-none ${camp.status === 'running' ? 'animate-pulse' : ''}`}
+                        >
+                          {camp.status === 'running' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                          {camp.status === 'completed' ? 'Volver a lanzar' : 'Ejecutar ahora'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'calls' && (
           <Card className="border-border">
             <CardHeader>
