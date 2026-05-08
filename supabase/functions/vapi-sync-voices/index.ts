@@ -16,17 +16,45 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    // Obtener voces de VAPI
-    const resp = await fetch("https://api.vapi.ai/voice", {
+    // Intentar obtener voces de VAPI
+    let resp = await fetch("https://api.vapi.ai/voice", {
       headers: {
         Authorization: `Bearer ${Deno.env.get("VAPI_KEY")}`,
         "Content-Type": "application/json",
       },
     });
 
+    // Si falla el singular, intentar el plural
+    if (resp.status === 404) {
+      resp = await fetch("https://api.vapi.ai/voices", {
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("VAPI_KEY")}`,
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
     if (!resp.ok) {
       const txt = await resp.text();
-      return new Response(JSON.stringify({ error: "VAPI error", details: txt }), { status: 502, headers: cors });
+      console.error("VAPI API Error Details:", txt);
+      
+      // Fallback: Si no podemos listar, insertamos al menos las básicas para que el usuario no se quede bloqueado
+      const fallbackVoices = [
+        { vapi_voice_id: "bIHbv24MWmeRgasZH58o", provider: "11labs", name: "Rachel (Default)" },
+        { vapi_voice_id: "pNInz6obpgDQGcFMA", provider: "11labs", name: "Adam" },
+        { vapi_voice_id: "jennifer", provider: "playht", name: "Jennifer" }
+      ];
+      
+      await supabase.from("vapi_voices").upsert(
+        fallbackVoices.map(v => ({ vapi_voice_id: v.vapi_voice_id, provider: v.provider, name: v.name })),
+        { onConflict: "vapi_voice_id" }
+      );
+
+      return new Response(JSON.stringify({ 
+        error: "VAPI_ENDPOINT_NOT_FOUND", 
+        message: "El endpoint de voces falló, se cargaron voces básicas de respaldo.",
+        details: txt 
+      }), { status: 200, headers: cors });
     }
 
     const voices = await resp.json();
