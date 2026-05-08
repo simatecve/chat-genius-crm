@@ -64,6 +64,7 @@ serve(async (req) => {
       // Inicializar cliente de S3 usando variables de entorno de Supabase
       let s3Client = new S3Client({
         region: Deno.env.get('AWS_REGION') ?? 'us-east-1',
+        forcePathStyle: true, // Requerido para buckets con puntos (.) para evitar errores de SSL
         credentials: {
           accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') ?? '',
           secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') ?? '',
@@ -84,10 +85,11 @@ serve(async (req) => {
           console.log(`Redirección de S3 detectada. Reintentando con endpoint: ${endpoint}`);
           
           if (endpoint) {
-            // Reintentar con el endpoint específico proporcionado por AWS
+            // Reintentar con el endpoint específico proporcionado por AWS y path-style
             s3Client = new S3Client({
               region: Deno.env.get('AWS_REGION') ?? 'us-east-1',
               endpoint: `https://${endpoint}`,
+              forcePathStyle: true, // Mantener path-style en el reintento
               credentials: {
                 accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID') ?? '',
                 secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY') ?? '',
