@@ -142,7 +142,15 @@ export default function LlamadasIA() {
     loadAssistants();
     loadCalls();
     loadVoices();
+    loadCampaigns();
   }, []);
+
+  async function loadCampaigns() {
+    setLoadingCampaigns(true);
+    const { data } = await supabase.from('vapi_campaigns').select('*').order('created_at', { ascending: false });
+    if (data) setCampaigns(data as VapiCampaign[]);
+    setLoadingCampaigns(false);
+  }
 
   async function loadVoices() {
     const { data } = await supabase.from('vapi_voices').select('*').order('name');
