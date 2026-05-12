@@ -15,10 +15,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 }
 
-declare const EdgeRuntime: {
-  waitUntil(promise: Promise<unknown>): void
-}
-
 type N8nWebhookItem = {
   bucket: string
   key: string
@@ -42,6 +38,14 @@ const getEnv = (...keys: string[]) => {
     if (value && value.trim()) return value.trim()
   }
   return undefined
+}
+
+const normalizeWebhookUrl = (value: string) => {
+  let url = value.trim()
+  url = url.replace(/^`+/, "").replace(/`+$/, "")
+  url = url.replace(/^"+/, "").replace(/"+$/, "")
+  url = url.replace(/^'+/, "").replace(/'+$/, "")
+  return url.trim()
 }
 
 const hmacSha256 = async (key: Uint8Array, data: string) => {
@@ -220,6 +224,17 @@ const sendSmtpEmail = async (params: {
   })
 
   return info
+}
+
+const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal })
+    return res
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 serve(async (req) => {
@@ -458,48 +473,77 @@ serve(async (req) => {
       })
 
       if (!hasAutoReplyHeader && inbox.ai_enabled && inbox.ai_webhook_url && fromEmail) {
-        const aiWebhookUrl = inbox.ai_webhook_url.trim()
-        const aiTask = (async () => {
+        const aiWebhookUrl = normalizeWebhookUrl(inbox.ai_webhook_url)
+
+        if (!/^https?:\/\/.+/i.test(aiWebhookUrl)) {
+          console.log("[webhook-email] Webhook n8n inválido:", aiWebhookUrl)
+        } else {
+          if (aiWebhookUrl.includes("/webhook-test/")) {
+            console.log(
+              "[webhook-email] Aviso: URL contiene /webhook-test/. Si el workflow no está en modo Test, n8n devolverá 404.",
+            )
+          }
+
           try {
+            const payload = {
+              inbox_id: inbox.id,
+              inbox_email: inbox.email_address,
+              from_email: fromEmail,
+              to_email: toEmail,
+              subject,
+              body_text: bodyText,
+              body_html: bodyHtml,
+              received_at: receivedAt,
+            }
+
             console.log("[webhook-email] IA activa, enviando a n8n:", {
               inboxId: inbox.id,
               url: aiWebhookUrl,
             })
 
-            const aiResponse = await fetch(aiWebhookUrl, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                inbox_id: inbox.id,
-                inbox_email: inbox.email_address,
-                from_email: fromEmail,
-                to_email: toEmail,
-                subject,
-                body_text: bodyText,
-                body_html: bodyHtml,
-                received_at: receivedAt,
-              }),
-            })
+            const aiResponse = await fetchWithTimeout(
+              aiWebhookUrl,
+              {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  "user-agent": "supabase-edge/webhook-email",
+                },
+                body: JSON.stringify(payload),
+              },
+              25000,
+            )
+
+            const aiResponseText = await aiResponse.text().catch(() => "")
 
             console.log("[webhook-email] Respuesta n8n:", {
               ok: aiResponse.ok,
               status: aiResponse.status,
               contentType: aiResponse.headers.get("content-type"),
+              bodyPreview: aiResponseText.slice(0, 500),
             })
 
-            if (!aiResponse.ok) return
+            if (!aiResponse.ok) {
+              continue
+            }
 
-            const reply = await extractAiReply(aiResponse)
+            const reply = await extractAiReply(
+              new Response(aiResponseText, { headers: aiResponse.headers, status: aiResponse.status }),
+            )
+
             const signed = applySignature({
               text: reply?.text?.trim() || "",
               html: reply?.html?.trim(),
               signatureText: inbox.signature_text,
               signatureHtml: inbox.signature_html,
             })
+
             const replyText = signed.text?.trim() || ""
             const replyHtml = signed.html?.trim()
 
-            if (!replyText && !replyHtml) return
+            if (!replyText && !replyHtml) {
+              continue
+            }
 
             const replySubject = (reply?.subject?.trim() || subject || "(Sin asunto)")
 
@@ -537,12 +581,6 @@ serve(async (req) => {
           } catch (aiError) {
             console.log("[webhook-email] Error IA auto-respuesta:", aiError)
           }
-        })()
-
-        try {
-          EdgeRuntime.waitUntil(aiTask)
-        } catch {
-          await aiTask
         }
       }
     }
