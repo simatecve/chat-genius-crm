@@ -109,12 +109,20 @@ const parseAiWebhookResponse = (
     const subject = typeof lower.subject === "string" ? (lower.subject as string) : undefined
     const html = typeof lower.html === "string" ? (lower.html as string) : undefined
 
-    const textCandidate = lower.output ?? lower.text ?? lower.reply ?? lower.message ?? lower.result
+    const textCandidate = lower.output ?? lower.respuesta ?? lower.response ?? lower.text ?? lower.reply ??
+      lower.message ?? lower.result
     const text = typeof textCandidate === "string"
       ? textCandidate
       : (textCandidate != null ? String(textCandidate) : undefined)
 
-    const escalar = typeof lower.escalar === "boolean" ? (lower.escalar as boolean) : undefined
+    let escalar: boolean | undefined
+    if (typeof lower.escalar === "boolean") {
+      escalar = lower.escalar as boolean
+    } else if (typeof lower.escalar === "string") {
+      const v = lower.escalar.trim().toLowerCase()
+      if (v === "true" || v === "1" || v === "yes" || v === "si") escalar = true
+      if (v === "false" || v === "0" || v === "no") escalar = false
+    }
 
     return { subject, text, html, escalar }
   } catch {
