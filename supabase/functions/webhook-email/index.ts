@@ -79,28 +79,42 @@ const buildSesSmtpPassword = async (secretAccessKey: string, region: string) => 
   return Buffer.from(out).toString("base64")
 }
 
-const extractAiReply = async (
-  response: Response,
-): Promise<{ subject?: string; text?: string; html?: string } | null> => {
-  const contentType = response.headers.get("content-type") || ""
-  const bodyText = await response.text().catch(() => "")
-  if (!bodyText) return null
+const parseAiWebhookResponse = (
+  contentType: string,
+  bodyText: string,
+): { subject?: string; text?: string; html?: string; escalar?: boolean } | null => {
+  const trimmed = bodyText.trim()
+  if (!trimmed) return null
 
   if (contentType.includes("application/json")) {
     try {
-      const json = JSON.parse(bodyText) as Record<string, unknown>
-      const subject = typeof json.subject === "string" ? json.subject : undefined
-      const text = typeof json.text === "string"
-        ? json.text
-        : (typeof json.reply === "string" ? json.reply : undefined)
-      const html = typeof json.html === "string" ? json.html : undefined
-      return { subject, text, html }
+      const json = JSON.parse(trimmed) as unknown
+      const obj = Array.isArray(json) ? json[0] : json
+
+      if (typeof obj === "string") {
+        return { text: obj }
+      }
+
+      if (obj && typeof obj === "object") {
+        const record = obj as Record<string, unknown>
+        const subject = typeof record.subject === "string" ? record.subject : undefined
+        const html = typeof record.html === "string" ? record.html : undefined
+        const text = typeof record.output === "string"
+          ? record.output
+          : (typeof record.text === "string"
+            ? record.text
+            : (typeof record.reply === "string" ? record.reply : undefined))
+        const escalar = typeof record.escalar === "boolean" ? record.escalar : undefined
+        return { subject, text, html, escalar }
+      }
+
+      return { text: trimmed }
     } catch {
-      return { text: bodyText }
+      return { text: trimmed }
     }
   }
 
-  return { text: bodyText }
+  return { text: trimmed }
 }
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim()
@@ -445,7 +459,7 @@ serve(async (req) => {
         })
       }
 
-      const { error: insertError } = await supabase
+      const { data: insertedInbound, error: insertError } = await supabase
         .from("email_messages")
         .insert({
           inbox_id: inbox.id,
@@ -458,6 +472,8 @@ serve(async (req) => {
           is_read: false,
           received_at: receivedAt,
         })
+        .select("id")
+        .single()
 
       if (insertError) {
         console.log("[webhook-email] Error insertando email_messages:", insertError)
@@ -515,11 +531,12 @@ serve(async (req) => {
             )
 
             const aiResponseText = await aiResponse.text().catch(() => "")
+            const aiContentType = aiResponse.headers.get("content-type") || ""
 
             console.log("[webhook-email] Respuesta n8n:", {
               ok: aiResponse.ok,
               status: aiResponse.status,
-              contentType: aiResponse.headers.get("content-type"),
+              contentType: aiContentType,
               bodyPreview: aiResponseText.slice(0, 500),
             })
 
@@ -527,9 +544,8 @@ serve(async (req) => {
               continue
             }
 
-            const reply = await extractAiReply(
-              new Response(aiResponseText, { headers: aiResponse.headers, status: aiResponse.status }),
-            )
+            const reply = parseAiWebhookResponse(aiContentType, aiResponseText)
+            const escalar = !!reply?.escalar
 
             const signed = applySignature({
               text: reply?.text?.trim() || "",
@@ -570,6 +586,7 @@ serve(async (req) => {
                 body_html: replyHtml || null,
                 direction: "outbound",
                 is_read: true,
+                requires_human_followup: escalar,
               })
 
             if (outboundInsertError) {
@@ -577,6 +594,22 @@ serve(async (req) => {
                 "[webhook-email] Error insertando outbound email_messages:",
                 outboundInsertError,
               )
+            }
+
+            if (escalar && insertedInbound?.id) {
+              const { error: escError } = await supabase
+                .from("email_messages")
+                .update({ requires_human_followup: true })
+                .eq("id", insertedInbound.id)
+
+              if (escError) {
+                console.log("[webhook-email] Error marcando escalar inbound:", escError)
+              } else {
+                console.log(
+                  "[webhook-email] Escalación marcada (requiere humano) para:",
+                  insertedInbound.id,
+                )
+              }
             }
           } catch (aiError) {
             console.log("[webhook-email] Error IA auto-respuesta:", aiError)

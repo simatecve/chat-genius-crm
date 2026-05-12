@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -417,6 +418,7 @@ export default function EmailInboxes() {
                             const isSelected = selectedMessage?.id === msg.id;
                             const subject = msg.subject || '(Sin asunto)';
                             const headerText = msg.from_email || '(Sin remitente)';
+                            const requiresHuman = !!msg.requires_human_followup;
 
                             const bodyPreviewRaw = msg.body_text
                               ? msg.body_text
@@ -436,8 +438,13 @@ export default function EmailInboxes() {
                               >
                                 <div className="flex justify-between items-start gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-foreground truncate">
-                                      {headerText}
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-sm font-semibold text-foreground truncate">
+                                        {headerText}
+                                      </div>
+                                      {requiresHuman && (
+                                        <Badge variant="destructive">Escalar</Badge>
+                                      )}
                                     </div>
                                     <div className="text-sm text-foreground mt-1 truncate">{subject}</div>
                                     <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -469,6 +476,7 @@ export default function EmailInboxes() {
                             const isSelected = selectedMessage?.id === msg.id;
                             const subject = msg.subject || '(Sin asunto)';
                             const headerText = `Para: ${msg.to_email || '(Sin destinatario)'}`;
+                            const requiresHuman = !!msg.requires_human_followup;
 
                             const bodyPreviewRaw = msg.body_text
                               ? msg.body_text
@@ -487,8 +495,13 @@ export default function EmailInboxes() {
                               >
                                 <div className="flex justify-between items-start gap-3">
                                   <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-foreground truncate">
-                                      {headerText}
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-sm font-semibold text-foreground truncate">
+                                        {headerText}
+                                      </div>
+                                      {requiresHuman && (
+                                        <Badge variant="destructive">Escalar</Badge>
+                                      )}
                                     </div>
                                     <div className="text-sm text-foreground mt-1 truncate">{subject}</div>
                                     <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -548,6 +561,11 @@ export default function EmailInboxes() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {!!selectedMessage.requires_human_followup && (
+                      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                        Este hilo fue marcado para escalar: la próxima respuesta debe ser manual.
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground">
                       {format(new Date(selectedMessage.received_at), "d MMMM yyyy, HH:mm", { locale: es })}
                     </div>

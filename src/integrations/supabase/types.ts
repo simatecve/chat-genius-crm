@@ -1019,6 +1019,7 @@ export type Database = {
           inbox_id: string | null
           is_read: boolean | null
           received_at: string
+          requires_human_followup: boolean | null
           subject: string | null
           to_email: string | null
         }
@@ -1032,6 +1033,7 @@ export type Database = {
           inbox_id?: string | null
           is_read?: boolean | null
           received_at?: string
+          requires_human_followup?: boolean | null
           subject?: string | null
           to_email?: string | null
         }
@@ -1045,6 +1047,7 @@ export type Database = {
           inbox_id?: string | null
           is_read?: boolean | null
           received_at?: string
+          requires_human_followup?: boolean | null
           subject?: string | null
           to_email?: string | null
         }
