@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Mail, Plus, Inbox, RefreshCw, Eye, ArrowLeft, Send, Reply } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -82,6 +83,7 @@ export default function EmailInboxes() {
   const [newEmail, setNewEmail] = useState('');
   const [selectedInbox, setSelectedInbox] = useState<EmailInbox | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(null);
+  const [messageTab, setMessageTab] = useState<'inbound' | 'outbound'>('inbound');
 
   // Estado para el modal de redactar
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -128,6 +130,7 @@ export default function EmailInboxes() {
       if (error) throw error;
       setMessages(data || []);
       setSelectedMessage(null);
+      setMessageTab('inbound');
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -236,6 +239,16 @@ export default function EmailInboxes() {
     return { subject, fromTo };
   }, [selectedMessage]);
 
+  const inboundMessages = useMemo(
+    () => messages.filter((m) => m.direction === 'inbound'),
+    [messages],
+  );
+
+  const outboundMessages = useMemo(
+    () => messages.filter((m) => m.direction === 'outbound'),
+    [messages],
+  );
+
   if (selectedInbox) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -274,69 +287,121 @@ export default function EmailInboxes() {
                 <CardTitle className="text-base">Mensajes</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
-                    <Inbox className="h-12 w-12 mb-4 opacity-20" />
-                    <p>No hay mensajes en esta bandeja todavía.</p>
-                    <p className="text-sm mt-2">Los correos enviados o recibidos aparecerán aquí.</p>
+                <Tabs value={messageTab} onValueChange={(v) => setMessageTab(v as 'inbound' | 'outbound')}>
+                  <div className="px-4 pt-3">
+                    <TabsList className="w-full">
+                      <TabsTrigger className="flex-1" value="inbound">
+                        Recibidos ({inboundMessages.length})
+                      </TabsTrigger>
+                      <TabsTrigger className="flex-1" value="outbound">
+                        Enviados ({outboundMessages.length})
+                      </TabsTrigger>
+                    </TabsList>
                   </div>
-                ) : (
-                  <ScrollArea className="h-[70vh]">
-                    <div className="divide-y divide-border">
-                      {messages.map((msg) => {
-                        const isSelected = selectedMessage?.id === msg.id;
-                        const subject = msg.subject || '(Sin asunto)';
-                        const headerText = msg.direction === 'inbound'
-                          ? (msg.from_email || '(Sin remitente)')
-                          : `Para: ${msg.to_email || '(Sin destinatario)'}`;
 
-                        const bodyPreviewRaw = msg.body_text
-                          ? msg.body_text
-                          : (msg.body_html ? stripHtml(msg.body_html) : '');
-                        const bodyPreview = bodyPreviewRaw ? bodyPreviewRaw.slice(0, 140) : '(Sin contenido)';
+                  <TabsContent value="inbound" className="mt-0">
+                    {inboundMessages.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+                        <Inbox className="h-12 w-12 mb-4 opacity-20" />
+                        <p>No hay correos recibidos.</p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[66vh]">
+                        <div className="divide-y divide-border">
+                          {inboundMessages.map((msg) => {
+                            const isSelected = selectedMessage?.id === msg.id;
+                            const subject = msg.subject || '(Sin asunto)';
+                            const headerText = msg.from_email || '(Sin remitente)';
 
-                        return (
-                          <button
-                            key={msg.id}
-                            type="button"
-                            className={[
-                              'w-full text-left p-4 transition-colors',
-                              isSelected ? 'bg-muted/60' : 'hover:bg-muted/40',
-                              !msg.is_read && msg.direction === 'inbound' ? 'bg-muted/20 font-medium' : '',
-                            ].join(' ')}
-                            onClick={() => handleOpenMessage(msg)}
-                          >
-                            <div className="flex justify-between items-start gap-3">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold text-foreground truncate">
-                                    {headerText}
-                                  </span>
-                                  <span
-                                    className={`text-xs px-2 py-0.5 rounded-full ${
-                                      msg.direction === 'inbound'
-                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'
-                                    }`}
-                                  >
-                                    {msg.direction === 'inbound' ? 'Recibido' : 'Enviado'}
+                            const bodyPreviewRaw = msg.body_text
+                              ? msg.body_text
+                              : (msg.body_html ? stripHtml(msg.body_html) : '');
+                            const bodyPreview = bodyPreviewRaw ? bodyPreviewRaw.slice(0, 140) : '(Sin contenido)';
+
+                            return (
+                              <button
+                                key={msg.id}
+                                type="button"
+                                className={[
+                                  'w-full text-left p-4 transition-colors',
+                                  isSelected ? 'bg-muted/60' : 'hover:bg-muted/40',
+                                  !msg.is_read ? 'bg-muted/20 font-medium' : '',
+                                ].join(' ')}
+                                onClick={() => handleOpenMessage(msg)}
+                              >
+                                <div className="flex justify-between items-start gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-foreground truncate">
+                                      {headerText}
+                                    </div>
+                                    <div className="text-sm text-foreground mt-1 truncate">{subject}</div>
+                                    <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                      {bodyPreview}
+                                    </div>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    {format(new Date(msg.received_at), "d MMM, HH:mm", { locale: es })}
                                   </span>
                                 </div>
-                                <div className="text-sm text-foreground mt-1 truncate">{subject}</div>
-                                <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                  {bodyPreview}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="outbound" className="mt-0">
+                    {outboundMessages.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+                        <Inbox className="h-12 w-12 mb-4 opacity-20" />
+                        <p>No hay correos enviados.</p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[66vh]">
+                        <div className="divide-y divide-border">
+                          {outboundMessages.map((msg) => {
+                            const isSelected = selectedMessage?.id === msg.id;
+                            const subject = msg.subject || '(Sin asunto)';
+                            const headerText = `Para: ${msg.to_email || '(Sin destinatario)'}`;
+
+                            const bodyPreviewRaw = msg.body_text
+                              ? msg.body_text
+                              : (msg.body_html ? stripHtml(msg.body_html) : '');
+                            const bodyPreview = bodyPreviewRaw ? bodyPreviewRaw.slice(0, 140) : '(Sin contenido)';
+
+                            return (
+                              <button
+                                key={msg.id}
+                                type="button"
+                                className={[
+                                  'w-full text-left p-4 transition-colors',
+                                  isSelected ? 'bg-muted/60' : 'hover:bg-muted/40',
+                                ].join(' ')}
+                                onClick={() => handleOpenMessage(msg)}
+                              >
+                                <div className="flex justify-between items-start gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-foreground truncate">
+                                      {headerText}
+                                    </div>
+                                    <div className="text-sm text-foreground mt-1 truncate">{subject}</div>
+                                    <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                      {bodyPreview}
+                                    </div>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    {format(new Date(msg.received_at), "d MMM, HH:mm", { locale: es })}
+                                  </span>
                                 </div>
-                              </div>
-                              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                {format(new Date(msg.received_at), "d MMM, HH:mm", { locale: es })}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
 
