@@ -977,18 +977,24 @@ export type Database = {
       }
       email_inboxes: {
         Row: {
+          ai_enabled: boolean
+          ai_webhook_url: string | null
           created_at: string
           email_address: string
           id: string
           user_id: string | null
         }
         Insert: {
+          ai_enabled?: boolean
+          ai_webhook_url?: string | null
           created_at?: string
           email_address: string
           id?: string
           user_id?: string | null
         }
         Update: {
+          ai_enabled?: boolean
+          ai_webhook_url?: string | null
           created_at?: string
           email_address?: string
           id?: string

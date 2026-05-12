@@ -10,7 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Plus, Inbox, RefreshCw, Eye, ArrowLeft, Send, Reply } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Mail, Plus, Inbox, RefreshCw, Eye, ArrowLeft, Send, Reply, Trash2, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Database } from '@/integrations/supabase/types';
@@ -84,6 +96,9 @@ export default function EmailInboxes() {
   const [selectedInbox, setSelectedInbox] = useState<EmailInbox | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(null);
   const [messageTab, setMessageTab] = useState<'inbound' | 'outbound'>('inbound');
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiWebhookUrl, setAiWebhookUrl] = useState('');
+  const [savingAiConfig, setSavingAiConfig] = useState(false);
 
   // Estado para el modal de redactar
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -100,6 +115,13 @@ export default function EmailInboxes() {
   useEffect(() => {
     if (selectedInbox) {
       fetchMessages(selectedInbox.id);
+    }
+  }, [selectedInbox]);
+
+  useEffect(() => {
+    if (selectedInbox) {
+      setAiEnabled(!!selectedInbox.ai_enabled);
+      setAiWebhookUrl(selectedInbox.ai_webhook_url || '');
     }
   }, [selectedInbox]);
 
@@ -160,6 +182,60 @@ export default function EmailInboxes() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteInbox = async (inbox: EmailInbox) => {
+    try {
+      const { error } = await supabase
+        .from('email_inboxes')
+        .delete()
+        .eq('id', inbox.id)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      toast({ title: "Bandeja eliminada", description: "La bandeja se eliminó correctamente." });
+      if (selectedInbox?.id === inbox.id) setSelectedInbox(null);
+      fetchInboxes();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "No se pudo eliminar la bandeja.", variant: "destructive" });
+    }
+  };
+
+  const handleSaveAiConfig = async () => {
+    if (!selectedInbox) return;
+
+    if (aiEnabled) {
+      const url = aiWebhookUrl.trim();
+      const isValidUrl = /^https?:\/\/.+/i.test(url);
+      if (!isValidUrl) {
+        toast({ title: "Error", description: "Ingresa una URL válida (https://...)", variant: "destructive" });
+        return;
+      }
+    }
+
+    setSavingAiConfig(true);
+    try {
+      const { error } = await supabase
+        .from('email_inboxes')
+        .update({
+          ai_enabled: aiEnabled,
+          ai_webhook_url: aiWebhookUrl.trim() || null,
+        })
+        .eq('id', selectedInbox.id)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      toast({ title: "Configuración guardada", description: "La asistencia de IA fue actualizada." });
+      setSelectedInbox((prev) =>
+        prev ? ({ ...prev, ai_enabled: aiEnabled, ai_webhook_url: aiWebhookUrl.trim() || null }) : prev
+      );
+      fetchInboxes();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "No se pudo guardar la configuración.", variant: "destructive" });
+    } finally {
+      setSavingAiConfig(false);
     }
   };
 
@@ -458,6 +534,41 @@ export default function EmailInboxes() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">Asistencia de IA</CardTitle>
+                  <CardDescription>
+                    Si está activado, al llegar un correo se enviará a n8n y se responderá automáticamente.
+                  </CardDescription>
+                </div>
+                <Button variant="outline" onClick={handleSaveAiConfig} disabled={savingAiConfig}>
+                  <Save className={`h-4 w-4 mr-2 ${savingAiConfig ? 'animate-spin' : ''}`} />
+                  Guardar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-medium text-foreground">Activar asistencia</div>
+                  <div className="text-xs text-muted-foreground">Procesa correos recibidos y responde automáticamente.</div>
+                </div>
+                <Switch checked={aiEnabled} onCheckedChange={setAiEnabled} />
+              </div>
+              <div className="space-y-2">
+                <Label>Webhook n8n</Label>
+                <Input
+                  placeholder="https://tu-n8n.com/webhook/..."
+                  value={aiWebhookUrl}
+                  onChange={(e) => setAiWebhookUrl(e.target.value)}
+                  disabled={!aiEnabled}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Modal de Redacción */}
@@ -541,11 +652,6 @@ export default function EmailInboxes() {
                 Crear Bandeja
               </Button>
             </div>
-            
-            <div className="mt-4 p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">Configuración del Webhook para recibir (AWS SES)</p>
-              <p>Tu URL del webhook es: <code className="bg-background px-1 py-0.5 rounded text-primary">https://[TU_PROYECTO_SUPABASE].supabase.co/functions/v1/webhook-email</code></p>
-            </div>
           </CardContent>
         </Card>
 
@@ -557,9 +663,37 @@ export default function EmailInboxes() {
                   <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                     <Mail className="h-5 w-5 text-primary" />
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 group-hover:text-primary">
-                    <Eye className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 group-hover:text-primary">
+                      <Eye className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Eliminar bandeja</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Se eliminarán también los mensajes asociados. Esta acción no se puede deshacer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteInbox(inbox)}>
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
                 <h3 className="font-semibold text-lg text-foreground truncate" title={inbox.email_address}>
                   {inbox.email_address}

@@ -7,11 +7,16 @@ import {
   GetObjectCommand,
 } from "npm:@aws-sdk/client-s3"
 import { simpleParser } from "npm:mailparser"
+import nodemailer from "npm:nodemailer"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+}
+
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void
 }
 
 type N8nWebhookItem = {
@@ -20,6 +25,155 @@ type N8nWebhookItem = {
   size?: number
   received_at?: string
   source_ip?: string
+}
+
+type InboxAiConfig = {
+  id: string
+  email_address: string
+  ai_enabled: boolean
+  ai_webhook_url: string | null
+}
+
+const getEnv = (...keys: string[]) => {
+  for (const key of keys) {
+    const value = Deno.env.get(key)
+    if (value && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
+const hmacSha256 = async (key: Uint8Array, data: string) => {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  )
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    new TextEncoder().encode(data),
+  )
+  return new Uint8Array(signature)
+}
+
+const buildSesSmtpPassword = async (secretAccessKey: string, region: string) => {
+  const kSecret = new TextEncoder().encode(`AWS4${secretAccessKey}`)
+  const kDate = await hmacSha256(kSecret, "11111111")
+  const kRegion = await hmacSha256(kDate, region)
+  const kService = await hmacSha256(kRegion, "ses")
+  const kTerminal = await hmacSha256(kService, "aws4_request")
+  const kSigning = await hmacSha256(kTerminal, "SendRawEmail")
+
+  const version = 0x04
+  const out = new Uint8Array(1 + kSigning.length)
+  out[0] = version
+  out.set(kSigning, 1)
+  return Buffer.from(out).toString("base64")
+}
+
+const extractAiReply = async (
+  response: Response,
+): Promise<{ subject?: string; text?: string; html?: string } | null> => {
+  const contentType = response.headers.get("content-type") || ""
+  const bodyText = await response.text().catch(() => "")
+  if (!bodyText) return null
+
+  if (contentType.includes("application/json")) {
+    try {
+      const json = JSON.parse(bodyText) as Record<string, unknown>
+      const subject = typeof json.subject === "string" ? json.subject : undefined
+      const text = typeof json.text === "string"
+        ? json.text
+        : (typeof json.reply === "string" ? json.reply : undefined)
+      const html = typeof json.html === "string" ? json.html : undefined
+      return { subject, text, html }
+    } catch {
+      return { text: bodyText }
+    }
+  }
+
+  return { text: bodyText }
+}
+
+const sendSmtpEmail = async (params: {
+  from: string
+  to: string
+  subject: string
+  text: string
+  html?: string
+}) => {
+  const region = getEnv("AWS_REGION", "AWS_DEFAULT_REGION", "AWS_SES_REGION") || "us-west-1"
+  const smtpHost = getEnv("AWS_SES_SMTP_HOST", "SMTP_HOST") ||
+    `email-smtp.${region}.amazonaws.com`
+  const smtpPort = parseInt(
+    getEnv("AWS_SES_SMTP_PORT", "SMTP_PORT", "SES_SMTP_PORT") || "587",
+    10,
+  )
+
+  const explicitSmtpUser = getEnv(
+    "AWS_SES_SMTP_USER",
+    "AWS_SES_SMTP_USERNAME",
+    "AWS_SES_SMTP_USER_NAME",
+    "SES_SMTP_USER",
+    "SES_SMTP_USERNAME",
+    "SMTP_USER",
+    "SMTP_USERNAME",
+  )
+  const explicitSmtpPass = getEnv(
+    "AWS_SES_SMTP_PASS",
+    "AWS_SES_SMTP_PASSWORD",
+    "SES_SMTP_PASS",
+    "SES_SMTP_PASSWORD",
+    "SMTP_PASS",
+    "SMTP_PASSWORD",
+  )
+
+  const accessKeyId = getEnv("AWS_ACCESS_KEY_ID")
+  const secretAccessKey = getEnv("AWS_SECRET_ACCESS_KEY")
+
+  let smtpUser = explicitSmtpUser
+  let smtpPass = explicitSmtpPass
+
+  if (!smtpUser && accessKeyId) smtpUser = accessKeyId
+  if (!smtpPass && secretAccessKey) {
+    smtpPass = await buildSesSmtpPassword(secretAccessKey, region)
+  }
+
+  if (!smtpUser || !smtpPass) {
+    throw new Error("SMTP credentials not configured on the server")
+  }
+
+  const isTlsWrapperPort = smtpPort === 465 || smtpPort === 2465
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: isTlsWrapperPort,
+    requireTLS: true,
+    tls: {
+      servername: smtpHost,
+      minVersion: "TLSv1.2",
+    },
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  })
+
+  const info = await transporter.sendMail({
+    from: params.from,
+    to: params.to,
+    subject: params.subject,
+    text: params.text,
+    html: params.html,
+    headers: {
+      "X-Auto-Reply": "1",
+    },
+  })
+
+  return info
 }
 
 serve(async (req) => {
@@ -139,6 +293,9 @@ serve(async (req) => {
       const bodyHtml = typeof parsedEmail.html === "string"
         ? parsedEmail.html
         : (parsedEmail.html ? String(parsedEmail.html) : "")
+      const headersMap = (parsedEmail as unknown as { headers?: Map<string, unknown> })
+        .headers
+      const hasAutoReplyHeader = !!headersMap?.get("x-auto-reply")
 
       console.log("[webhook-email] Email parseado:", {
         fromEmail,
@@ -160,7 +317,7 @@ serve(async (req) => {
 
       const { data: inboxes, error: inboxesError } = await supabase
         .from("email_inboxes")
-        .select("id,email_address")
+        .select("id,email_address,ai_enabled,ai_webhook_url")
         .in("email_address", toCandidates)
 
       if (inboxesError) {
@@ -171,7 +328,7 @@ serve(async (req) => {
         })
       }
 
-      const inbox = inboxes?.[0]
+      const inbox = inboxes?.[0] as InboxAiConfig | undefined
       if (!inbox?.id) {
         console.log("[webhook-email] No existe inbox para:", toCandidates)
         return Response.json(false, {
@@ -207,6 +364,88 @@ serve(async (req) => {
         toEmail,
       })
 
+      if (!hasAutoReplyHeader && inbox.ai_enabled && inbox.ai_webhook_url) {
+        const aiWebhookUrl = inbox.ai_webhook_url.trim()
+        const aiTask = (async () => {
+          try {
+            console.log("[webhook-email] IA activa, enviando a n8n:", {
+              inboxId: inbox.id,
+              url: aiWebhookUrl,
+            })
+
+            const aiResponse = await fetch(aiWebhookUrl, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                inbox_id: inbox.id,
+                inbox_email: inbox.email_address,
+                from_email: fromEmail,
+                to_email: toEmail,
+                subject,
+                body_text: bodyText,
+                body_html: bodyHtml,
+                received_at: receivedAt,
+              }),
+            })
+
+            console.log("[webhook-email] Respuesta n8n:", {
+              ok: aiResponse.ok,
+              status: aiResponse.status,
+              contentType: aiResponse.headers.get("content-type"),
+            })
+
+            if (!aiResponse.ok) return
+
+            const reply = await extractAiReply(aiResponse)
+            const replyText = reply?.text?.trim() || ""
+            const replyHtml = reply?.html?.trim()
+
+            if (!replyText && !replyHtml) return
+
+            const replySubject = (reply?.subject?.trim() || subject || "(Sin asunto)")
+
+            const info = await sendSmtpEmail({
+              from: inbox.email_address,
+              to: fromEmail,
+              subject: replySubject,
+              text: replyText || "",
+              html: replyHtml,
+            })
+
+            console.log("[webhook-email] Auto-respuesta enviada:", {
+              messageId: (info as { messageId?: string }).messageId,
+            })
+
+            const { error: outboundInsertError } = await supabase
+              .from("email_messages")
+              .insert({
+                inbox_id: inbox.id,
+                from_email: inbox.email_address,
+                to_email: fromEmail,
+                subject: replySubject,
+                body_text: replyText || null,
+                body_html: replyHtml || null,
+                direction: "outbound",
+                is_read: true,
+              })
+
+            if (outboundInsertError) {
+              console.log(
+                "[webhook-email] Error insertando outbound email_messages:",
+                outboundInsertError,
+              )
+            }
+          } catch (aiError) {
+            console.log("[webhook-email] Error IA auto-respuesta:", aiError)
+          }
+        })()
+
+        try {
+          EdgeRuntime.waitUntil(aiTask)
+        } catch {
+          await aiTask
+        }
+      }
     }
 
     return Response.json(true, {
