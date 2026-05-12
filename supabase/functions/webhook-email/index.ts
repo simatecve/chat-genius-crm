@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
+import { Buffer } from "node:buffer"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.0"
 import {
   S3Client,
@@ -127,7 +128,7 @@ serve(async (req) => {
       )
       console.log("[webhook-email] Email descargado (preview):", preview)
 
-      const parsedEmail = await simpleParser(rawEmailBytes)
+      const parsedEmail = await simpleParser(Buffer.from(rawEmailBytes))
 
       const fromEmail = parsedEmail.from?.value?.[0]?.address || ""
       const toEmails = parsedEmail.to?.value?.map((t) => t.address).filter(Boolean) ||
