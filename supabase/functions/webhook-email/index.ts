@@ -315,20 +315,41 @@ serve(async (req) => {
         new Set(toEmails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
       )
 
-      const { data: inboxes, error: inboxesError } = await supabase
+      let inbox: InboxAiConfig | undefined
+
+      const { data: inboxesWithAi, error: inboxesWithAiError } = await supabase
         .from("email_inboxes")
         .select("id,email_address,ai_enabled,ai_webhook_url")
         .in("email_address", toCandidates)
 
-      if (inboxesError) {
-        console.log("[webhook-email] Error buscando inbox:", inboxesError)
-        return Response.json(false, {
-          status: 500,
-          headers: corsHeaders,
-        })
+      if (!inboxesWithAiError) {
+        inbox = inboxesWithAi?.[0] as InboxAiConfig | undefined
+      } else {
+        console.log("[webhook-email] Inbox query sin AI (fallback):", inboxesWithAiError)
+        const { data: inboxesBasic, error: inboxesBasicError } = await supabase
+          .from("email_inboxes")
+          .select("id,email_address")
+          .in("email_address", toCandidates)
+
+        if (inboxesBasicError) {
+          console.log("[webhook-email] Error buscando inbox:", inboxesBasicError)
+          return Response.json(false, {
+            status: 500,
+            headers: corsHeaders,
+          })
+        }
+
+        const basic = inboxesBasic?.[0] as { id?: string; email_address?: string } | undefined
+        if (basic?.id && basic.email_address) {
+          inbox = {
+            id: basic.id,
+            email_address: basic.email_address,
+            ai_enabled: false,
+            ai_webhook_url: null,
+          }
+        }
       }
 
-      const inbox = inboxes?.[0] as InboxAiConfig | undefined
       if (!inbox?.id) {
         console.log("[webhook-email] No existe inbox para:", toCandidates)
         return Response.json(false, {
@@ -364,7 +385,7 @@ serve(async (req) => {
         toEmail,
       })
 
-      if (!hasAutoReplyHeader && inbox.ai_enabled && inbox.ai_webhook_url) {
+      if (!hasAutoReplyHeader && inbox.ai_enabled && inbox.ai_webhook_url && fromEmail) {
         const aiWebhookUrl = inbox.ai_webhook_url.trim()
         const aiTask = (async () => {
           try {
