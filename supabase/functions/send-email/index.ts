@@ -1,10 +1,50 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { Buffer } from "node:buffer"
 import nodemailer from 'npm:nodemailer'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+const getEnv = (...keys: string[]) => {
+  for (const key of keys) {
+    const value = Deno.env.get(key)
+    if (value && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
+const hmacSha256 = async (key: Uint8Array, data: string) => {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  )
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    new TextEncoder().encode(data),
+  )
+  return new Uint8Array(signature)
+}
+
+const buildSesSmtpPassword = async (secretAccessKey: string, region: string) => {
+  const kSecret = new TextEncoder().encode(`AWS4${secretAccessKey}`)
+  const kDate = await hmacSha256(kSecret, "11111111")
+  const kRegion = await hmacSha256(kDate, region)
+  const kService = await hmacSha256(kRegion, "ses")
+  const kTerminal = await hmacSha256(kService, "aws4_request")
+  const kSigning = await hmacSha256(kTerminal, "SendRawEmail")
+
+  const version = 0x04
+  const out = new Uint8Array(1 + kSigning.length)
+  out[0] = version
+  out.set(kSigning, 1)
+  return Buffer.from(out).toString("base64")
 }
 
 serve(async (req) => {
@@ -65,10 +105,54 @@ serve(async (req) => {
 
     // 2. Configurar el transporter de Nodemailer con AWS SES SMTP
     // (Asegúrate de agregar estas variables en los Supabase Secrets)
-    const smtpHost = Deno.env.get('AWS_SES_SMTP_HOST') || 'email-smtp.us-west-1.amazonaws.com'
-    const smtpPort = parseInt(Deno.env.get('AWS_SES_SMTP_PORT') || '587')
-    const smtpUser = Deno.env.get('AWS_SES_SMTP_USER')
-    const smtpPass = Deno.env.get('AWS_SES_SMTP_PASS')
+    const region = getEnv("AWS_REGION", "AWS_DEFAULT_REGION", "AWS_SES_REGION") || "us-west-1"
+    const smtpHost = getEnv("AWS_SES_SMTP_HOST", "SMTP_HOST") ||
+      `email-smtp.${region}.amazonaws.com`
+    const smtpPort = parseInt(
+      getEnv("AWS_SES_SMTP_PORT", "SMTP_PORT", "SES_SMTP_PORT") || "587",
+      10,
+    )
+
+    const explicitSmtpUser = getEnv(
+      "AWS_SES_SMTP_USER",
+      "AWS_SES_SMTP_USERNAME",
+      "AWS_SES_SMTP_USER_NAME",
+      "SES_SMTP_USER",
+      "SES_SMTP_USERNAME",
+      "SMTP_USER",
+      "SMTP_USERNAME",
+    )
+    const explicitSmtpPass = getEnv(
+      "AWS_SES_SMTP_PASS",
+      "AWS_SES_SMTP_PASSWORD",
+      "SES_SMTP_PASS",
+      "SES_SMTP_PASSWORD",
+      "SMTP_PASS",
+      "SMTP_PASSWORD",
+    )
+
+    const accessKeyId = getEnv("AWS_ACCESS_KEY_ID")
+    const secretAccessKey = getEnv("AWS_SECRET_ACCESS_KEY")
+
+    let smtpUser = explicitSmtpUser
+    let smtpPass = explicitSmtpPass
+
+    if (!smtpUser && accessKeyId) smtpUser = accessKeyId
+    if (!smtpPass && secretAccessKey) {
+      smtpPass = await buildSesSmtpPassword(secretAccessKey, region)
+    }
+
+    console.log("[send-email] SMTP configuración:", {
+      region,
+      smtpHost,
+      smtpPort,
+      hasExplicitUser: !!explicitSmtpUser,
+      hasExplicitPass: !!explicitSmtpPass,
+      hasAccessKeyId: !!accessKeyId,
+      hasSecretAccessKey: !!secretAccessKey,
+      hasFinalUser: !!smtpUser,
+      hasFinalPass: !!smtpPass,
+    })
 
     if (!smtpUser || !smtpPass) {
        return new Response(JSON.stringify({ error: 'SMTP credentials not configured on the server' }), {
