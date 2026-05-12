@@ -161,10 +161,17 @@ serve(async (req) => {
       })
     }
 
+    const isTlsWrapperPort = smtpPort === 465 || smtpPort === 2465
+
     const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: smtpPort,
-      secure: smtpPort === 465, // true for 465, false for other ports
+      secure: isTlsWrapperPort,
+      requireTLS: true,
+      tls: {
+        servername: smtpHost,
+        minVersion: "TLSv1.2",
+      },
       auth: {
         user: smtpUser,
         pass: smtpPass,
@@ -207,9 +214,10 @@ serve(async (req) => {
       status: 200,
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error sending email:", error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    const message = error instanceof Error ? error.message : String(error)
+    return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
