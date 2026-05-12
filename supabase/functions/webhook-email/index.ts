@@ -32,6 +32,8 @@ type InboxAiConfig = {
   email_address: string
   ai_enabled: boolean
   ai_webhook_url: string | null
+  signature_text: string | null
+  signature_html: string | null
 }
 
 const getEnv = (...keys: string[]) => {
@@ -95,6 +97,50 @@ const extractAiReply = async (
   }
 
   return { text: bodyText }
+}
+
+const stripHtml = (value: string) => value.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim()
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#039;")
+
+const signatureTextToHtml = (value: string) =>
+  `<div style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(value).replaceAll("\n", "<br>")}</div>`
+
+const applySignature = (params: {
+  text?: string
+  html?: string
+  signatureText?: string | null
+  signatureHtml?: string | null
+}) => {
+  const signatureText = (params.signatureText || "").trim()
+  const signatureHtml = (params.signatureHtml || "").trim()
+
+  if (!signatureText && !signatureHtml) {
+    return { text: params.text, html: params.html }
+  }
+
+  const baseText = params.text || ""
+  const baseHtml = params.html
+
+  const finalText = signatureText
+    ? [baseText, signatureText].filter(Boolean).join("\n\n")
+    : [baseText, stripHtml(signatureHtml)].filter(Boolean).join("\n\n")
+
+  const signatureBlockHtml = signatureHtml
+    ? signatureHtml
+    : signatureTextToHtml(signatureText)
+
+  const finalHtml = baseHtml
+    ? `${baseHtml}<div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:12px;">${signatureBlockHtml}</div>`
+    : `${signatureTextToHtml(baseText)}<div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:12px;">${signatureBlockHtml}</div>`
+
+  return { text: finalText, html: finalHtml }
 }
 
 const sendSmtpEmail = async (params: {
@@ -319,13 +365,37 @@ serve(async (req) => {
 
       const { data: inboxesWithAi, error: inboxesWithAiError } = await supabase
         .from("email_inboxes")
-        .select("id,email_address,ai_enabled,ai_webhook_url")
+        .select("id,email_address,ai_enabled,ai_webhook_url,signature_text,signature_html")
         .in("email_address", toCandidates)
 
       if (!inboxesWithAiError) {
         inbox = inboxesWithAi?.[0] as InboxAiConfig | undefined
       } else {
-        console.log("[webhook-email] Inbox query sin AI (fallback):", inboxesWithAiError)
+        console.log("[webhook-email] Inbox query con firma falló:", inboxesWithAiError)
+
+        const { data: inboxesAiOnly, error: inboxesAiOnlyError } = await supabase
+          .from("email_inboxes")
+          .select("id,email_address,ai_enabled,ai_webhook_url")
+          .in("email_address", toCandidates)
+
+        if (!inboxesAiOnlyError) {
+          const aiOnly = inboxesAiOnly?.[0] as
+            | { id?: string; email_address?: string; ai_enabled?: boolean; ai_webhook_url?: string | null }
+            | undefined
+          if (aiOnly?.id && aiOnly.email_address) {
+            inbox = {
+              id: aiOnly.id,
+              email_address: aiOnly.email_address,
+              ai_enabled: !!aiOnly.ai_enabled,
+              ai_webhook_url: aiOnly.ai_webhook_url ?? null,
+              signature_text: null,
+              signature_html: null,
+            }
+          }
+        } else {
+          console.log("[webhook-email] Inbox query sin AI (fallback):", inboxesAiOnlyError)
+        }
+
         const { data: inboxesBasic, error: inboxesBasicError } = await supabase
           .from("email_inboxes")
           .select("id,email_address")
@@ -346,6 +416,8 @@ serve(async (req) => {
             email_address: basic.email_address,
             ai_enabled: false,
             ai_webhook_url: null,
+            signature_text: null,
+            signature_html: null,
           }
         }
       }
@@ -418,8 +490,14 @@ serve(async (req) => {
             if (!aiResponse.ok) return
 
             const reply = await extractAiReply(aiResponse)
-            const replyText = reply?.text?.trim() || ""
-            const replyHtml = reply?.html?.trim()
+            const signed = applySignature({
+              text: reply?.text?.trim() || "",
+              html: reply?.html?.trim(),
+              signatureText: inbox.signature_text,
+              signatureHtml: inbox.signature_html,
+            })
+            const replyText = signed.text?.trim() || ""
+            const replyHtml = signed.html?.trim()
 
             if (!replyText && !replyHtml) return
 

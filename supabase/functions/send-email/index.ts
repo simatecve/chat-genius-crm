@@ -8,6 +8,50 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const stripHtml = (value: string) => value.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+
+const signatureTextToHtml = (value: string) =>
+  `<div style="white-space: pre-wrap; word-break: break-word;">${escapeHtml(value).replaceAll('\n', '<br>')}</div>`
+
+const appendSignature = (params: {
+  text?: string
+  html?: string
+  signatureText?: string | null
+  signatureHtml?: string | null
+}) => {
+  const signatureText = (params.signatureText || '').trim()
+  const signatureHtml = (params.signatureHtml || '').trim()
+
+  if (!signatureText && !signatureHtml) {
+    return { text: params.text, html: params.html }
+  }
+
+  const baseText = params.text || ''
+  const baseHtml = params.html
+
+  const finalText = signatureText
+    ? [baseText, signatureText].filter(Boolean).join('\n\n')
+    : [baseText, stripHtml(signatureHtml)].filter(Boolean).join('\n\n')
+
+  const signatureBlockHtml = signatureHtml
+    ? signatureHtml
+    : signatureTextToHtml(signatureText)
+
+  const finalHtml = baseHtml
+    ? `${baseHtml}<div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:12px;">${signatureBlockHtml}</div>`
+    : `${signatureTextToHtml(baseText)}<div style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:12px;">${signatureBlockHtml}</div>`
+
+  return { text: finalText, html: finalHtml }
+}
+
 const getEnv = (...keys: string[]) => {
   for (const key of keys) {
     const value = Deno.env.get(key)
@@ -87,14 +131,38 @@ serve(async (req) => {
     }
 
     // 1. Obtener la información del inbox para saber qué email poner en "from"
-    const { data: inbox, error: inboxError } = await supabaseClient
+    let inbox:
+      | { email_address: string; signature_text?: string | null; signature_html?: string | null }
+      | null = null
+
+    const { data: inboxWithSignature, error: inboxWithSignatureError } = await supabaseClient
       .from('email_inboxes')
-      .select('email_address')
+      .select('email_address,signature_text,signature_html')
       .eq('id', inboxId)
       .eq('user_id', user.id)
       .single()
 
-    if (inboxError || !inbox) {
+    if (!inboxWithSignatureError && inboxWithSignature) {
+      inbox = inboxWithSignature
+    } else {
+      const { data: inboxBasic, error: inboxBasicError } = await supabaseClient
+        .from('email_inboxes')
+        .select('email_address')
+        .eq('id', inboxId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (inboxBasicError || !inboxBasic) {
+        return new Response(JSON.stringify({ error: 'Inbox not found or access denied' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        })
+      }
+
+      inbox = inboxBasic
+    }
+
+    if (!inbox) {
       return new Response(JSON.stringify({ error: 'Inbox not found or access denied' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 404,
@@ -102,6 +170,8 @@ serve(async (req) => {
     }
 
     const fromEmail = inbox.email_address
+    const signatureText = inbox.signature_text ?? null
+    const signatureHtml = inbox.signature_html ?? null
 
     // 2. Configurar el transporter de Nodemailer con AWS SES SMTP
     // (Asegúrate de agregar estas variables en los Supabase Secrets)
@@ -178,13 +248,20 @@ serve(async (req) => {
       },
     })
 
+    const finalContent = appendSignature({
+      text: textBody,
+      html: htmlBody,
+      signatureText,
+      signatureHtml,
+    })
+
     // 3. Enviar el correo
     const mailOptions = {
       from: fromEmail,
       to: toEmail,
       subject: subject,
-      text: textBody,
-      html: htmlBody,
+      text: finalContent.text,
+      html: finalContent.html,
     }
 
     const info = await transporter.sendMail(mailOptions)
@@ -198,8 +275,8 @@ serve(async (req) => {
         from_email: fromEmail,
         to_email: toEmail,
         subject: subject,
-        body_text: textBody,
-        body_html: htmlBody,
+        body_text: finalContent.text,
+        body_html: finalContent.html,
         direction: 'outbound',
         is_read: true // Un correo saliente siempre está leído
       })

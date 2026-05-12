@@ -120,6 +120,7 @@ export default function EmailInboxes() {
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiWebhookUrl, setAiWebhookUrl] = useState('');
   const [savingAiConfig, setSavingAiConfig] = useState(false);
+  const [signatureText, setSignatureText] = useState('');
 
   // Estado para el modal de redactar
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -143,6 +144,7 @@ export default function EmailInboxes() {
     if (selectedInbox) {
       setAiEnabled(!!selectedInbox.ai_enabled);
       setAiWebhookUrl(selectedInbox.ai_webhook_url || '');
+      setSignatureText(selectedInbox.signature_text || '');
     }
   }, [selectedInbox]);
 
@@ -242,6 +244,7 @@ export default function EmailInboxes() {
         .update({
           ai_enabled: aiEnabled,
           ai_webhook_url: aiWebhookUrl.trim() || null,
+          signature_text: signatureText.trim() || null,
         })
         .eq('id', selectedInbox.id)
         .eq('user_id', user?.id);
@@ -250,7 +253,12 @@ export default function EmailInboxes() {
 
       toast({ title: "Configuración guardada", description: "La asistencia de IA fue actualizada." });
       setSelectedInbox((prev) =>
-        prev ? ({ ...prev, ai_enabled: aiEnabled, ai_webhook_url: aiWebhookUrl.trim() || null }) : prev
+        prev ? ({
+          ...prev,
+          ai_enabled: aiEnabled,
+          ai_webhook_url: aiWebhookUrl.trim() || null,
+          signature_text: signatureText.trim() || null,
+        }) : prev
       );
       fetchInboxes();
     } catch (error: any) {
@@ -586,6 +594,15 @@ export default function EmailInboxes() {
                   value={aiWebhookUrl}
                   onChange={(e) => setAiWebhookUrl(e.target.value)}
                   disabled={!aiEnabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Firma</Label>
+                <Textarea
+                  placeholder="Escribe tu firma para esta bandeja..."
+                  className="min-h-[120px]"
+                  value={signatureText}
+                  onChange={(e) => setSignatureText(e.target.value)}
                 />
               </div>
             </CardContent>
