@@ -59,25 +59,46 @@ function EmailHtmlFrame({ html }: { html: string }) {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const handleLoad = () => {
+    const updateHeight = () => {
       try {
         const doc = iframe.contentDocument;
         if (!doc) return;
         const height = doc.documentElement.scrollHeight;
-        iframe.style.height = `${Math.max(height, 200)}px`;
+        iframe.style.height = `${Math.max(height, 700)}px`;
       } catch {
       }
     };
 
+    const handleLoad = () => {
+      updateHeight();
+      setTimeout(updateHeight, 250);
+      setTimeout(updateHeight, 1000);
+      setTimeout(updateHeight, 3000);
+    };
+
+    let resizeObserver: ResizeObserver | null = null;
+    try {
+      const doc = iframe.contentDocument;
+      if (doc?.documentElement) {
+        resizeObserver = new ResizeObserver(() => updateHeight());
+        resizeObserver.observe(doc.documentElement);
+      }
+    } catch {
+    }
+
     iframe.addEventListener('load', handleLoad);
-    return () => iframe.removeEventListener('load', handleLoad);
+    handleLoad();
+    return () => {
+      iframe.removeEventListener('load', handleLoad);
+      resizeObserver?.disconnect();
+    };
   }, [srcDoc]);
 
   return (
     <iframe
       ref={iframeRef}
       title="email-html"
-      className="w-full rounded-md border border-border bg-background"
+      className="w-full rounded-md border border-border bg-background min-h-[70vh]"
       sandbox="allow-popups allow-popups-to-escape-sandbox"
       srcDoc={srcDoc}
     />
