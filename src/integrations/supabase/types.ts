@@ -975,6 +975,77 @@ export type Database = {
           },
         ]
       }
+      email_inboxes: {
+        Row: {
+          created_at: string
+          email_address: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email_address: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email_address?: string
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      email_messages: {
+        Row: {
+          body_html: string | null
+          body_text: string | null
+          created_at: string
+          direction: string | null
+          from_email: string | null
+          id: string
+          inbox_id: string | null
+          is_read: boolean | null
+          received_at: string
+          subject: string | null
+          to_email: string | null
+        }
+        Insert: {
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          direction?: string | null
+          from_email?: string | null
+          id?: string
+          inbox_id?: string | null
+          is_read?: boolean | null
+          received_at?: string
+          subject?: string | null
+          to_email?: string | null
+        }
+        Update: {
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          direction?: string | null
+          from_email?: string | null
+          id?: string
+          inbox_id?: string | null
+          is_read?: boolean | null
+          received_at?: string
+          subject?: string | null
+          to_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_messages_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "email_inboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       etiquetas: {
         Row: {
           color: string
@@ -1053,6 +1124,42 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      ia_calls: {
+        Row: {
+          contacts: Json | null
+          created_at: string
+          id: string
+          knowledge_base_files: Json | null
+          knowledge_base_text: string | null
+          name: string
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contacts?: Json | null
+          created_at?: string
+          id?: string
+          knowledge_base_files?: Json | null
+          knowledge_base_text?: string | null
+          name: string
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contacts?: Json | null
+          created_at?: string
+          id?: string
+          knowledge_base_files?: Json | null
+          knowledge_base_text?: string | null
+          name?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2588,6 +2695,200 @@ export type Database = {
           usage_month?: string
           user_id?: string
           whatsapp_connections_used?: number | null
+        }
+        Relationships: []
+      }
+      vapi_assistants: {
+        Row: {
+          created_at: string | null
+          first_message: string | null
+          id: string
+          model_name: string | null
+          model_provider: string | null
+          name: string
+          system_prompt: string | null
+          vapi_assistant_id: string
+          voice_id: string | null
+          voice_provider: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          first_message?: string | null
+          id?: string
+          model_name?: string | null
+          model_provider?: string | null
+          name: string
+          system_prompt?: string | null
+          vapi_assistant_id: string
+          voice_id?: string | null
+          voice_provider?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          first_message?: string | null
+          id?: string
+          model_name?: string | null
+          model_provider?: string | null
+          name?: string
+          system_prompt?: string | null
+          vapi_assistant_id?: string
+          voice_id?: string | null
+          voice_provider?: string | null
+        }
+        Relationships: []
+      }
+      vapi_calls: {
+        Row: {
+          assistant_id: string | null
+          campaign_id: string | null
+          created_at: string | null
+          destination: string
+          duration_seconds: number | null
+          ended_at: string | null
+          ended_reason: string | null
+          id: string
+          intent: Json | null
+          phone_number_id: string | null
+          raw_event: Json | null
+          recording_url: string | null
+          started_at: string | null
+          status: string | null
+          summary: string | null
+          transcript: string | null
+          updated_at: string | null
+          vapi_call_id: string | null
+        }
+        Insert: {
+          assistant_id?: string | null
+          campaign_id?: string | null
+          created_at?: string | null
+          destination: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          intent?: Json | null
+          phone_number_id?: string | null
+          raw_event?: Json | null
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string | null
+          summary?: string | null
+          transcript?: string | null
+          updated_at?: string | null
+          vapi_call_id?: string | null
+        }
+        Update: {
+          assistant_id?: string | null
+          campaign_id?: string | null
+          created_at?: string | null
+          destination?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          intent?: Json | null
+          phone_number_id?: string | null
+          raw_event?: Json | null
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string | null
+          summary?: string | null
+          transcript?: string | null
+          updated_at?: string | null
+          vapi_call_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vapi_calls_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ia_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vapi_campaigns: {
+        Row: {
+          assistant_id: string | null
+          contacts: Json
+          created_at: string | null
+          id: string
+          name: string
+          phone_number_id: string | null
+          status: string | null
+        }
+        Insert: {
+          assistant_id?: string | null
+          contacts: Json
+          created_at?: string | null
+          id?: string
+          name: string
+          phone_number_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          assistant_id?: string | null
+          contacts?: Json
+          created_at?: string | null
+          id?: string
+          name?: string
+          phone_number_id?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      vapi_phone_numbers: {
+        Row: {
+          created_at: string | null
+          friendly_name: string | null
+          id: string
+          phone_number: string | null
+          vapi_phone_number_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          friendly_name?: string | null
+          id?: string
+          phone_number?: string | null
+          vapi_phone_number_id: string
+        }
+        Update: {
+          created_at?: string | null
+          friendly_name?: string | null
+          id?: string
+          phone_number?: string | null
+          vapi_phone_number_id?: string
+        }
+        Relationships: []
+      }
+      vapi_voices: {
+        Row: {
+          created_at: string | null
+          id: string
+          language: string | null
+          name: string | null
+          provider: string
+          raw_data: Json | null
+          vapi_voice_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          name?: string | null
+          provider: string
+          raw_data?: Json | null
+          vapi_voice_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          language?: string | null
+          name?: string | null
+          provider?: string
+          raw_data?: Json | null
+          vapi_voice_id?: string
         }
         Relationships: []
       }
