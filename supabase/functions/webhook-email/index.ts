@@ -86,35 +86,40 @@ const parseAiWebhookResponse = (
   const trimmed = bodyText.trim()
   if (!trimmed) return null
 
-  if (contentType.includes("application/json")) {
-    try {
-      const json = JSON.parse(trimmed) as unknown
-      const obj = Array.isArray(json) ? json[0] : json
-
-      if (typeof obj === "string") {
-        return { text: obj }
-      }
-
-      if (obj && typeof obj === "object") {
-        const record = obj as Record<string, unknown>
-        const subject = typeof record.subject === "string" ? record.subject : undefined
-        const html = typeof record.html === "string" ? record.html : undefined
-        const text = typeof record.output === "string"
-          ? record.output
-          : (typeof record.text === "string"
-            ? record.text
-            : (typeof record.reply === "string" ? record.reply : undefined))
-        const escalar = typeof record.escalar === "boolean" ? record.escalar : undefined
-        return { subject, text, html, escalar }
-      }
-
-      return { text: trimmed }
-    } catch {
-      return { text: trimmed }
-    }
+  if (!contentType.includes("application/json")) {
+    return { text: trimmed }
   }
 
-  return { text: trimmed }
+  try {
+    const json = JSON.parse(trimmed) as unknown
+    const obj = Array.isArray(json) ? json[0] : json
+
+    if (typeof obj === "string") {
+      return { text: obj }
+    }
+
+    if (!obj || typeof obj !== "object") {
+      return { text: trimmed }
+    }
+
+    const record = obj as Record<string, unknown>
+    const lower: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(record)) lower[k.toLowerCase()] = v
+
+    const subject = typeof lower.subject === "string" ? (lower.subject as string) : undefined
+    const html = typeof lower.html === "string" ? (lower.html as string) : undefined
+
+    const textCandidate = lower.output ?? lower.text ?? lower.reply ?? lower.message ?? lower.result
+    const text = typeof textCandidate === "string"
+      ? textCandidate
+      : (textCandidate != null ? String(textCandidate) : undefined)
+
+    const escalar = typeof lower.escalar === "boolean" ? (lower.escalar as boolean) : undefined
+
+    return { subject, text, html, escalar }
+  } catch {
+    return { text: trimmed }
+  }
 }
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>?/gm, " ").replace(/\s+/g, " ").trim()
@@ -564,6 +569,14 @@ serve(async (req) => {
             if (!replyText && replyHtml) {
               replyText = stripHtml(replyHtml)
             }
+
+            console.log("[webhook-email] IA reply preparado:", {
+              escalar,
+              replyTextLen: replyText.length,
+              replyTextPreview: replyText.slice(0, 200),
+              replyHtmlLen: replyHtml?.length || 0,
+              replyHtmlPreview: (replyHtml || "").slice(0, 200),
+            })
 
             if (!replyText && !replyHtml) {
               continue
