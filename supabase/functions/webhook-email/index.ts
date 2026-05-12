@@ -554,8 +554,16 @@ serve(async (req) => {
               signatureHtml: inbox.signature_html,
             })
 
-            const replyText = signed.text?.trim() || ""
-            const replyHtml = signed.html?.trim()
+            let replyText = signed.text?.trim() || ""
+            let replyHtml = signed.html?.trim()
+
+            if (!replyHtml && replyText) {
+              replyHtml = signatureTextToHtml(replyText)
+            }
+
+            if (!replyText && replyHtml) {
+              replyText = stripHtml(replyHtml)
+            }
 
             if (!replyText && !replyHtml) {
               continue
